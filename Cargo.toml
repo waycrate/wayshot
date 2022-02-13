@@ -12,8 +12,7 @@ nix = "0.20"
 tempfile = "3.3.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-wayland-client = "0.29"
-wayland-protocols = {version = "0.29", features = ["client", "unstable_protocols"]}
+smithay-client-toolkit = "0.15.3"
 clap = "3.0.14"
 
 [[bin]]

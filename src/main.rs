@@ -21,21 +21,30 @@ use nix::{
     unistd,
 };
 use tracing::debug;
-use wayland_client::{
-    protocol::{
-        wl_output::{
-            Event::{Done, Geometry, Mode, Scale},
-            WlOutput,
+
+use smithay_client_toolkit::{
+    default_environment, new_default_environment,
+    output::with_output_info,
+    reexports::{
+        client::{
+            protocol::{
+                wl_output::{
+                    Event::{Done, Geometry, Mode, Scale},
+                    WlOutput,
+                },
+                wl_shm,
+                wl_shm::Format,
+            },
+            Display, GlobalManager, Main,
         },
-        wl_shm,
-        wl_shm::Format,
+        protocols::wlr::unstable::screencopy::v1::client::{
+            zwlr_screencopy_frame_v1, zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
+            zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
+        },
     },
-    Display, GlobalManager, Main,
 };
-use wayland_protocols::wlr::unstable::screencopy::v1::client::{
-    zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
-    zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
-};
+
+default_environment!(Env);
 
 #[derive(Debug, Copy, Clone)]
 struct FrameFormat {
@@ -137,30 +146,36 @@ fn main() -> Result<()> {
         let frame_state = frame_state.clone();
         let frame_buffer_done = frame_buffer_done.clone();
         move |_frame, event, _| {
-        match event {
-            wayland_protocols::wlr::unstable::screencopy::v1::client::zwlr_screencopy_frame_v1::Event::Buffer { format, width, height, stride } => {
-                frame_formats.borrow_mut().push(FrameFormat {
+            match event {
+                zwlr_screencopy_frame_v1::Event::Buffer {
                     format,
                     width,
                     height,
                     stride,
-                });
-            },
-            wayland_protocols::wlr::unstable::screencopy::v1::client::zwlr_screencopy_frame_v1::Event::Flags { .. } => {},
-            wayland_protocols::wlr::unstable::screencopy::v1::client::zwlr_screencopy_frame_v1::Event::Ready { .. } => {
-                frame_state.borrow_mut().replace(FrameState::Finished);
-            },
-            wayland_protocols::wlr::unstable::screencopy::v1::client::zwlr_screencopy_frame_v1::Event::Failed => {
-                frame_state.borrow_mut().replace(FrameState::Failed);
-            },
-            wayland_protocols::wlr::unstable::screencopy::v1::client::zwlr_screencopy_frame_v1::Event::Damage { .. } => {},
-            wayland_protocols::wlr::unstable::screencopy::v1::client::zwlr_screencopy_frame_v1::Event::LinuxDmabuf { .. } => {},
-            wayland_protocols::wlr::unstable::screencopy::v1::client::zwlr_screencopy_frame_v1::Event::BufferDone => {
-                frame_buffer_done.store(true, Ordering::SeqCst);
-            },
-            _ => unreachable!()
-        };
-    }});
+                } => {
+                    frame_formats.borrow_mut().push(FrameFormat {
+                        format,
+                        width,
+                        height,
+                        stride,
+                    });
+                }
+                zwlr_screencopy_frame_v1::Event::Flags { .. } => {}
+                zwlr_screencopy_frame_v1::Event::Ready { .. } => {
+                    frame_state.borrow_mut().replace(FrameState::Finished);
+                }
+                zwlr_screencopy_frame_v1::Event::Failed => {
+                    frame_state.borrow_mut().replace(FrameState::Failed);
+                }
+                zwlr_screencopy_frame_v1::Event::Damage { .. } => {}
+                zwlr_screencopy_frame_v1::Event::LinuxDmabuf { .. } => {}
+                zwlr_screencopy_frame_v1::Event::BufferDone => {
+                    frame_buffer_done.store(true, Ordering::SeqCst);
+                }
+                _ => unreachable!(),
+            };
+        }
+    });
 
     while !frame_buffer_done.load(Ordering::SeqCst) {
         event_queue.sync_roundtrip(&mut (), |_, _, _| unreachable!())?;
