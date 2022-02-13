@@ -115,6 +115,9 @@ fn main() -> Result<()> {
     }
 
     if args.is_present("slurp") {
+        if args.value_of("slurp").unwrap() == "" {
+            bail!("Failed to recieve geometry.");
+        }
         let slurp: Vec<_> = args.value_of("slurp").unwrap().trim().split(" ").collect();
         let slurp: Vec<i32> = slurp.iter().map(|i| i.parse::<i32>().unwrap()).collect();
         frame = screencopy_manager.capture_output_region(
