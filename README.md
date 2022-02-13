@@ -28,6 +28,9 @@ wayshot > /tmp/image.png
 ```
 
 # Installation
+## AUR:
+`wayshot-git` `wayshot-musl-git` have been packaged. `wayshot-bin` & `wayshot-musl-bin` will be released soon.
+
 ## Compile time dependencies:
 -   rustup
 -   make
