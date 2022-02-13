@@ -36,7 +36,7 @@ wayshot > /tmp/image.png
 -   make
 
 ## Compiling:
--   `git clone https://github.com/waycrate/wayshot;cd wayshot`
+-   `git clone https://github.com/waycrate/wayshot && cd wayshot`
 -   `make setup`
 -   `make clean`
     -   `make`
