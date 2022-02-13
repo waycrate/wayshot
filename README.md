@@ -27,6 +27,23 @@ Fullscreen:
 wayshot > /tmp/image.png
 ```
 
+Screenshot and copy to clipboard:
+
+```bash
+wayshot | wl-copy
+```
+
+Pick a hex color code, using ImageMagick:
+
+```bash
+wayshot -s "$(slurp -p -f '%x %y %w %h')" | convert - -format '%[pixel:p{0,0}]' txt:-|egrep "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
+```
+
+Pick a color, using ImageMagick:
+
+```bash
+wayshot -s "$(slurp -p -f '%x %y %w %h')" | convert - -format '%[pixel:p{0,0}]' txt:-
+```
 # Installation
 ## AUR:
 `wayshot-git` `wayshot-musl-git` have been packaged. `wayshot-bin` & `wayshot-musl-bin` will be released soon.
