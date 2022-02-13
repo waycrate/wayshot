@@ -1,6 +1,6 @@
 <p align=center>
   <img src="./docs/assets/wayshot.png" alt=wayshot width=60%>
-  <p align=center>A native screenshot tool for Wayland (X11 support coming soon) written in Rust.</p>
+  <p align=center>A native screenshot tool for wlroots based compositors such as sway and river written in Rust. X11 support coming soon. </p>
   
   <p align="center">
   <a href="./LICENSE.md"><img src="https://img.shields.io/github/license/waycrate/wayshot?style=flat-square&logo=appveyor"></a>
