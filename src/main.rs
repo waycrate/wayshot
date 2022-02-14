@@ -118,9 +118,7 @@ fn main() -> Result<()> {
     let frame: Main<ZwlrScreencopyFrameV1>;
     let mut cursor_overlay = 0;
     if args.is_present("cursor") {
-        if args.value_of("cursor").unwrap().trim().to_lowercase() == "true" {
-            cursor_overlay = 1;
-        }
+        cursor_overlay = 1;
     }
 
     if args.is_present("slurp") {
@@ -340,10 +338,10 @@ fn set_flags() -> App<'static> {
                 .help("Choose a portion of your display to screenshot using slurp."),
         )
         .arg(
-            arg!(-c --cursor <CURSOR_VISIBILITY>)
+            arg!(-c - -cursor)
                 .required(false)
-                .takes_value(true)
-                .help("Set visibility of cursor in screenshot. It is invisible by default. Set this flag to true for a visible cursor."),
+                .takes_value(false)
+                .help("Enable cursor in screenshots."),
         );
     app
 }
