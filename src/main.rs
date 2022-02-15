@@ -139,13 +139,17 @@ fn main() -> Result<()> {
     }
 
     if args.is_present("listoutputs") {
-        print_valid_outputs();
+        let valid_outputs = get_valid_outputs(display);
+        for output in valid_outputs {
+            let (_, info) = output;
+            println!("{:#?}", info.name);
+        }
         std::process::exit(1);
     }
 
     if args.is_present("output") {
         let mut is_present = false;
-        let valid_outputs = get_valid_outputs();
+        let valid_outputs = get_valid_outputs(display);
 
         for device in valid_outputs {
             let (output_device, info) = device;
@@ -399,8 +403,7 @@ fn set_flags() -> App<'static> {
     app
 }
 
-fn get_valid_outputs() -> Vec<(WlOutput, OutputInfo)> {
-    let display = Display::connect_to_env().unwrap();
+fn get_valid_outputs(display: Display) -> Vec<(WlOutput, OutputInfo)> {
     let mut queue = display.create_event_queue();
     let attached_display = display.attach(queue.token());
 
@@ -427,12 +430,4 @@ fn get_valid_outputs() -> Vec<(WlOutput, OutputInfo)> {
         });
     }
     valid_outputs
-}
-
-fn print_valid_outputs() {
-    let valid_outputs = get_valid_outputs();
-    for output in valid_outputs {
-        let (_, info) = output;
-        println!("{:#?}", info.name);
-    }
 }
