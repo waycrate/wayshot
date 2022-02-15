@@ -45,6 +45,7 @@ Pick a color, using ImageMagick:
 wayshot -s "$(slurp -p -f '%x %y %w %h')" | convert - -format '%[pixel:p{0,0}]' txt:-
 ```
 # Installation
+
 ## AUR:
 `wayshot-git` has been packaged. `wayshot-bin` & `wayshot-musl-bin` will be released soon.
 
@@ -64,11 +65,13 @@ wayshot -s "$(slurp -p -f '%x %y %w %h')" | convert - -format '%[pixel:p{0,0}]' 
 
 https://discord.gg/KKZRDYrRYW
 
+# Smithay Developers:
+
+Massive thanks to smithay developer <a href="https://github.com/cmeissl">Cmeissl</a> and <a href="https://github.com/vberger">Victor Berger</a>. Without them this project won't be possible as my wayland knowledge is very very limited.
+
 # Contributors:
 
 <a href="https://github.com/waycrate/wayshot/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=waycrate/wayshot" />
 </a>
 
-# Cmeissl: 
-Massive thanks to smithay contributor <a href="https://github.com/cmeissl">Cmeissl</a>. Without them this project won't be possible as my wayland knowledge is very very limited.
