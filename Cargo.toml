@@ -1,5 +1,5 @@
 [package]
-authors = ["Shinyzenith <aakash@shinyzenith.xyz>", "Cmeissl <https://github.com/cmeissl>"]
+authors = ["Shinyzenith <aakash@shinyzenith.xyz>", "Cmeissl <https://github.com/cmeissl>", "Victor Berger <https://github.com/vberger>"]
 edition = "2021"
 name = "wayshot"
 version = "0.1.0"

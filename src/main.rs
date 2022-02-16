@@ -23,8 +23,9 @@ use nix::{
 use tracing::debug;
 
 use smithay_client_toolkit::{
-    default_environment, new_default_environment,
-    output::with_output_info,
+    environment,
+    environment::Environment,
+    output::{with_output_info, OutputHandler, OutputInfo, XdgOutputHandler},
     reexports::{
         client::{
             protocol::{
@@ -37,14 +38,29 @@ use smithay_client_toolkit::{
             },
             Display, GlobalManager, Main,
         },
-        protocols::wlr::unstable::screencopy::v1::client::{
-            zwlr_screencopy_frame_v1, zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
-            zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
+        protocols::{
+            unstable::xdg_output::v1::client::zxdg_output_manager_v1::ZxdgOutputManagerV1,
+            wlr::unstable::screencopy::v1::client::{
+                zwlr_screencopy_frame_v1, zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
+                zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
+            },
         },
     },
 };
 
-default_environment!(Env);
+struct ValidOutputs {
+    outputs: OutputHandler,
+    xdg_output: XdgOutputHandler,
+}
+
+environment! {ValidOutputs,
+    singles = [
+        ZxdgOutputManagerV1 => xdg_output,
+    ],
+    multis = [
+        WlOutput => outputs,
+    ]
+}
 
 #[derive(Debug, Copy, Clone)]
 struct FrameFormat {
@@ -108,6 +124,7 @@ fn main() -> Result<()> {
         Some(output) => output,
         None => bail!("compositor did not advertise a output"),
     };
+    let mut output = output.detach();
 
     let frame_formats: Rc<RefCell<Vec<FrameFormat>>> = Rc::new(RefCell::new(Vec::new()));
     let frame_state: Rc<RefCell<Option<FrameState>>> = Rc::new(RefCell::new(None));
@@ -121,6 +138,34 @@ fn main() -> Result<()> {
         cursor_overlay = 1;
     }
 
+    if args.is_present("listoutputs") {
+        let valid_outputs = get_valid_outputs(display);
+        for output in valid_outputs {
+            let (_, info) = output;
+            println!("{:#?}", info.name);
+        }
+        std::process::exit(1);
+    }
+
+    if args.is_present("output") {
+        let mut is_present = false;
+        let valid_outputs = get_valid_outputs(display);
+
+        for device in valid_outputs {
+            let (output_device, info) = device;
+            if info.name == args.value_of("output").unwrap().trim() {
+                is_present = true;
+                output = output_device.clone();
+            }
+        }
+        if !is_present {
+            bail!(
+                "\"{}\" is not a valid output.",
+                args.value_of("output").unwrap().trim()
+            );
+        }
+    }
+
     if args.is_present("slurp") {
         if args.value_of("slurp").unwrap() == "" {
             bail!("Failed to recieve geometry.");
@@ -129,14 +174,14 @@ fn main() -> Result<()> {
         let slurp: Vec<i32> = slurp.iter().map(|i| i.parse::<i32>().unwrap()).collect();
         frame = screencopy_manager.capture_output_region(
             cursor_overlay,
-            &output.detach(),
+            &output,
             slurp[0],
             slurp[1],
             slurp[2],
             slurp[3],
         );
     } else {
-        frame = screencopy_manager.capture_output(cursor_overlay, &output.detach());
+        frame = screencopy_manager.capture_output(cursor_overlay, &output);
     }
 
     frame.quick_assign({
@@ -258,7 +303,6 @@ fn main() -> Result<()> {
             }
         }
     };
-
     result
 }
 
@@ -338,10 +382,52 @@ fn set_flags() -> App<'static> {
                 .help("Choose a portion of your display to screenshot using slurp."),
         )
         .arg(
+            arg!(-l - -listoutputs)
+                .required(false)
+                .takes_value(false)
+                .help("List all valid outputs."),
+        )
+        .arg(
+            arg!(-o --output <OUTPUT>)
+                .required(false)
+                .takes_value(true)
+                .conflicts_with("slurp")
+                .help("Choose a particular display to screenshot."),
+        )
+        .arg(
             arg!(-c - -cursor)
                 .required(false)
                 .takes_value(false)
                 .help("Enable cursor in screenshots."),
         );
     app
+}
+
+fn get_valid_outputs(display: Display) -> Vec<(WlOutput, OutputInfo)> {
+    let mut queue = display.create_event_queue();
+    let attached_display = display.attach(queue.token());
+
+    let (outputs, xdg_output) = XdgOutputHandler::new_output_handlers();
+    let mut valid_outputs: Vec<(WlOutput, OutputInfo)> = Vec::new();
+
+    let env = Environment::new(
+        &attached_display,
+        &mut &mut queue,
+        ValidOutputs {
+            outputs,
+            xdg_output,
+        },
+    )
+    .unwrap();
+
+    queue.sync_roundtrip(&mut (), |_, _, _| {}).unwrap();
+
+    for output in env.get_all_outputs() {
+        with_output_info(&output, |info| {
+            if info.obsolete == false {
+                valid_outputs.push((output.clone(), info.clone()));
+            }
+        });
+    }
+    valid_outputs
 }
