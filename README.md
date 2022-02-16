@@ -55,9 +55,7 @@ wayshot -s "$(slurp -p -f '%x %y %w %h')" | convert - -format '%[pixel:p{0,0}]' 
 ## Compiling:
 -   `git clone https://github.com/waycrate/wayshot && cd wayshot`
 -   `make setup`
--   `make clean`
-    -   `make`
-    -   `make glibc`
+-   `make`
 -   `sudo make install`
 
 # Support server:
