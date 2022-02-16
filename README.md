@@ -46,7 +46,7 @@ wayshot -s "$(slurp -p -f '%x %y %w %h')" | convert - -format '%[pixel:p{0,0}]' 
 ```
 # Installation
 ## AUR:
-`wayshot-git` has been packaged. `wayshot-bin` & `wayshot-musl-bin` will be released soon.
+`wayshot-git` has been packaged. `wayshot-bin` will be released soon.
 
 ## Compile time dependencies:
 -   rustup
