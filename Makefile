@@ -1,16 +1,20 @@
 BINARY := wayshot
 BUILDFLAGS := --release
 TARGET_DIR := /usr/bin
+SOURCE_DIR := ./target/release
 
 all: build
 
 build:
 	@cargo build $(BUILDFLAGS)
-	@cp ./target/release/$(BINARY) ./bin/$(BINARY)
+	@cp $(SOURCE_DIR)/$(BINARY) ./bin/$(BINARY)
+
+run:
+	@cargo run
 
 install:
 	@mkdir -p $(TARGET_DIR)
-	@cp ./bin/$(BINARY) $(TARGET_DIR)
+	@cp $(SOURCE_DIR)/$(BINARY) $(TARGET_DIR)
 	@chmod +x $(TARGET_DIR)/$(BINARY)
 
 uninstall:
@@ -24,7 +28,6 @@ clean:
 	@cargo clean
 
 setup:
-	@mkdir -p ./bin
 	@rustup install stable
 	@rustup default stable
 
