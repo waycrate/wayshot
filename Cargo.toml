@@ -17,4 +17,4 @@ clap = "3.0.14"
 
 [[bin]]
 name = "wayshot"
-path = "src/main.rs"
+path = "src/wayshot.rs"

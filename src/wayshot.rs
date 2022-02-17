@@ -30,7 +30,6 @@ use smithay_client_toolkit::{
         client::{
             protocol::{
                 wl_output::{
-                    Event::{Done, Geometry, Mode, Scale},
                     WlOutput,
                 },
                 wl_shm,
@@ -96,35 +95,16 @@ fn main() -> Result<()> {
     let globals = GlobalManager::new(&attached_display);
     event_queue.sync_roundtrip(&mut (), |_, _, _| unreachable!())?;
 
-    let outputs: Rc<RefCell<Vec<Main<WlOutput>>>> = Rc::new(RefCell::new(Vec::new()));
-    let outputs_done = Rc::new(AtomicBool::new(false));
-    let output_global = globals.instantiate_exact::<WlOutput>(2)?;
-    output_global.quick_assign({
-        let outputs = outputs.clone();
-        let outputs_done = outputs_done.clone();
-        move |wl_output, event, _| {
-            outputs.borrow_mut().push(wl_output);
-            match event {
-                Geometry { .. } => {}
-                Mode { .. } => {}
-                Done => {
-                    outputs_done.store(true, Ordering::SeqCst);
-                }
-                Scale { .. } => {}
-                _ => unreachable!(),
+    let valid_outputs = get_valid_outputs(display.clone());
+    let mut output:Option<WlOutput>=None;
+    for device in valid_outputs {
+        let (output_device, info) = device;
+        for mode in info.modes {
+            if mode.is_current == true {
+                output = Some(output_device.clone());
             }
         }
-    });
-
-    while !outputs_done.load(Ordering::SeqCst) {
-        event_queue.sync_roundtrip(&mut (), |_, _, _| unreachable!())?;
     }
-
-    let output = match outputs.borrow().first().cloned() {
-        Some(output) => output,
-        None => bail!("compositor did not advertise a output"),
-    };
-    let mut output = output.detach();
 
     let frame_formats: Rc<RefCell<Vec<FrameFormat>>> = Rc::new(RefCell::new(Vec::new()));
     let frame_state: Rc<RefCell<Option<FrameState>>> = Rc::new(RefCell::new(None));
@@ -155,7 +135,7 @@ fn main() -> Result<()> {
             let (output_device, info) = device;
             if info.name == args.value_of("output").unwrap().trim() {
                 is_present = true;
-                output = output_device.clone();
+                output = Some(output_device.clone());
             }
         }
         if !is_present {
@@ -172,16 +152,21 @@ fn main() -> Result<()> {
         }
         let slurp: Vec<_> = args.value_of("slurp").unwrap().trim().split(" ").collect();
         let slurp: Vec<i32> = slurp.iter().map(|i| i.parse::<i32>().unwrap()).collect();
+        if let Some(ref _i) = output {
+            noop();
+        } else {
+            bail!("Compositor did not advertise any outputs.");
+        }
         frame = screencopy_manager.capture_output_region(
             cursor_overlay,
-            &output,
+            &output.unwrap(),
             slurp[0],
             slurp[1],
             slurp[2],
             slurp[3],
         );
     } else {
-        frame = screencopy_manager.capture_output(cursor_overlay, &output);
+        frame = screencopy_manager.capture_output(cursor_overlay, &output.unwrap());
     }
 
     frame.quick_assign({
@@ -431,3 +416,5 @@ fn get_valid_outputs(display: Display) -> Vec<(WlOutput, OutputInfo)> {
     }
     valid_outputs
 }
+
+fn noop()->() {} // No-operation function
