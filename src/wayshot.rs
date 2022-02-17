@@ -28,14 +28,7 @@ use smithay_client_toolkit::{
     output::{with_output_info, OutputHandler, OutputInfo, XdgOutputHandler},
     reexports::{
         client::{
-            protocol::{
-                wl_output::{
-                    Event::{Done, Geometry, Mode, Scale},
-                    WlOutput,
-                },
-                wl_shm,
-                wl_shm::Format,
-            },
+            protocol::{wl_output::WlOutput, wl_shm, wl_shm::Format},
             Display, GlobalManager, Main,
         },
         protocols::{
@@ -96,35 +89,8 @@ fn main() -> Result<()> {
     let globals = GlobalManager::new(&attached_display);
     event_queue.sync_roundtrip(&mut (), |_, _, _| unreachable!())?;
 
-    let outputs: Rc<RefCell<Vec<Main<WlOutput>>>> = Rc::new(RefCell::new(Vec::new()));
-    let outputs_done = Rc::new(AtomicBool::new(false));
-    let output_global = globals.instantiate_exact::<WlOutput>(2)?;
-    output_global.quick_assign({
-        let outputs = outputs.clone();
-        let outputs_done = outputs_done.clone();
-        move |wl_output, event, _| {
-            outputs.borrow_mut().push(wl_output);
-            match event {
-                Geometry { .. } => {}
-                Mode { .. } => {}
-                Done => {
-                    outputs_done.store(true, Ordering::SeqCst);
-                }
-                Scale { .. } => {}
-                _ => unreachable!(),
-            }
-        }
-    });
-
-    while !outputs_done.load(Ordering::SeqCst) {
-        event_queue.sync_roundtrip(&mut (), |_, _, _| unreachable!())?;
-    }
-
-    let output = match outputs.borrow().first().cloned() {
-        Some(output) => output,
-        None => bail!("compositor did not advertise a output"),
-    };
-    let mut output = output.detach();
+    let valid_outputs = get_valid_outputs(display.clone());
+    let (mut output, _): (WlOutput, OutputInfo) = valid_outputs.first().unwrap().clone();
 
     let frame_formats: Rc<RefCell<Vec<FrameFormat>>> = Rc::new(RefCell::new(Vec::new()));
     let frame_state: Rc<RefCell<Option<FrameState>>> = Rc::new(RefCell::new(None));

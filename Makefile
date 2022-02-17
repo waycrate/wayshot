@@ -7,7 +7,6 @@ all: build
 
 build:
 	@cargo build $(BUILDFLAGS)
-	@cp $(SOURCE_DIR)/$(BINARY) ./bin/$(BINARY)
 
 run:
 	@cargo run
