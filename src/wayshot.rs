@@ -28,13 +28,7 @@ use smithay_client_toolkit::{
     output::{with_output_info, OutputHandler, OutputInfo, XdgOutputHandler},
     reexports::{
         client::{
-            protocol::{
-                wl_output::{
-                    WlOutput,
-                },
-                wl_shm,
-                wl_shm::Format,
-            },
+            protocol::{wl_output::WlOutput, wl_shm, wl_shm::Format},
             Display, GlobalManager, Main,
         },
         protocols::{
@@ -96,15 +90,7 @@ fn main() -> Result<()> {
     event_queue.sync_roundtrip(&mut (), |_, _, _| unreachable!())?;
 
     let valid_outputs = get_valid_outputs(display.clone());
-    let mut output:Option<WlOutput>=None;
-    for device in valid_outputs {
-        let (output_device, info) = device;
-        for mode in info.modes {
-            if mode.is_current == true {
-                output = Some(output_device.clone());
-            }
-        }
-    }
+    let (mut output, _): (WlOutput, OutputInfo) = valid_outputs.first().unwrap().clone();
 
     let frame_formats: Rc<RefCell<Vec<FrameFormat>>> = Rc::new(RefCell::new(Vec::new()));
     let frame_state: Rc<RefCell<Option<FrameState>>> = Rc::new(RefCell::new(None));
@@ -135,7 +121,7 @@ fn main() -> Result<()> {
             let (output_device, info) = device;
             if info.name == args.value_of("output").unwrap().trim() {
                 is_present = true;
-                output = Some(output_device.clone());
+                output = output_device.clone();
             }
         }
         if !is_present {
@@ -152,21 +138,16 @@ fn main() -> Result<()> {
         }
         let slurp: Vec<_> = args.value_of("slurp").unwrap().trim().split(" ").collect();
         let slurp: Vec<i32> = slurp.iter().map(|i| i.parse::<i32>().unwrap()).collect();
-        if let Some(ref _i) = output {
-            noop();
-        } else {
-            bail!("Compositor did not advertise any outputs.");
-        }
         frame = screencopy_manager.capture_output_region(
             cursor_overlay,
-            &output.unwrap(),
+            &output,
             slurp[0],
             slurp[1],
             slurp[2],
             slurp[3],
         );
     } else {
-        frame = screencopy_manager.capture_output(cursor_overlay, &output.unwrap());
+        frame = screencopy_manager.capture_output(cursor_overlay, &output);
     }
 
     frame.quick_assign({
@@ -416,5 +397,3 @@ fn get_valid_outputs(display: Display) -> Vec<(WlOutput, OutputInfo)> {
     }
     valid_outputs
 }
-
-fn noop()->() {} // No-operation function
