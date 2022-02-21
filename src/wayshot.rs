@@ -392,6 +392,8 @@ fn get_valid_outputs(display: Display) -> Vec<(WlOutput, OutputInfo)> {
         with_output_info(&output, |info| {
             if info.obsolete == false {
                 valid_outputs.push((output.clone(), info.clone()));
+            } else {
+                output.release();
             }
         });
     }
