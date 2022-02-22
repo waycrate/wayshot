@@ -9,7 +9,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use clap::{arg, App};
+use clap::{arg, Command};
 
 use anyhow::{bail, Result};
 use image::{codecs::png::PngEncoder, ImageEncoder};
@@ -336,8 +336,8 @@ fn create_shm_fd() -> std::io::Result<RawFd> {
     }
 }
 
-fn set_flags() -> App<'static> {
-    let app = App::new("wayshot")
+fn set_flags() -> Command<'static> {
+    let app = Command::new("wayshot")
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .about("Simple screenshot tool for wlroots based compositors.")

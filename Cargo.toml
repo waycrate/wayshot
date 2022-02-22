@@ -1,5 +1,5 @@
 [package]
-authors = ["Shinyzenith <aakash@shinyzenith.xyz>", "Cmeissl <https://github.com/cmeissl>", "Victor Berger <https://github.com/vberger>"]
+authors = ["\nShinyzenith <https://shinyzenith.xyz> ", " Cmeissl <https://github.com/cmeissl> ", " Victor Berger <https://github.com/vberger>"]
 edition = "2021"
 name = "wayshot"
 version = "0.1.0"
@@ -13,7 +13,7 @@ tempfile = "3.3.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 smithay-client-toolkit = "0.15.3"
-clap = "3.0.14"
+clap = "3.1"
 
 [[bin]]
 name = "wayshot"
