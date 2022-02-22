@@ -1,5 +1,5 @@
 <p align=center>
-  <img src="./docs/assets/wayshot.png" alt=wayshot width=60%>
+  <img src="https://git.sr.ht/~shinyzenith/wayshot/blob/main/docs/assets/wayshot.png" alt=wayshot width=60%>
   <p align=center>A native screenshot tool for wlroots based compositors such as sway and river written in Rust. X11 support coming soon. </p>
   
   <p align="center">
