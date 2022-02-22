@@ -139,6 +139,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     height,
                     stride,
                 } => {
+                    log::debug!("Received buffer event");
                     frame_formats.borrow_mut().push(FrameFormat {
                         format,
                         width,
@@ -146,16 +147,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                         stride,
                     });
                 }
-                zwlr_screencopy_frame_v1::Event::Flags { .. } => {}
+                zwlr_screencopy_frame_v1::Event::Flags { .. } => {
+                    log::debug!("Received flags event");
+                }
                 zwlr_screencopy_frame_v1::Event::Ready { .. } => {
+                    log::debug!("Received ready event");
                     frame_state.borrow_mut().replace(FrameState::Finished);
                 }
                 zwlr_screencopy_frame_v1::Event::Failed => {
+                    log::debug!("Received failed event");
                     frame_state.borrow_mut().replace(FrameState::Failed);
                 }
-                zwlr_screencopy_frame_v1::Event::Damage { .. } => {}
-                zwlr_screencopy_frame_v1::Event::LinuxDmabuf { .. } => {}
+                zwlr_screencopy_frame_v1::Event::Damage { .. } => {
+                    log::debug!("Received Damaga event");
+                }
+                zwlr_screencopy_frame_v1::Event::LinuxDmabuf { .. } => {
+                    log::debug!("Received LinuxDmaBuf event");
+                }
                 zwlr_screencopy_frame_v1::Event::BufferDone => {
+                    log::debug!("Received bufferdone event");
                     frame_buffer_done.store(true, Ordering::SeqCst);
                 }
                 _ => unreachable!(),
