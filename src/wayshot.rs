@@ -1,7 +1,3 @@
-mod clap;
-mod output;
-mod shm;
-
 use std::{
     cell::RefCell,
     env,
@@ -15,7 +11,11 @@ use std::{
     time::SystemTime,
 };
 
-use image::{codecs::png::PngEncoder, ImageEncoder};
+use image::{
+    codecs::{jpeg::JpegEncoder, png::PngEncoder},
+    ColorType::Rgba8,
+    ImageEncoder,
+};
 use memmap2::MmapMut;
 
 use smithay_client_toolkit::{
@@ -31,6 +31,10 @@ use smithay_client_toolkit::{
         },
     },
 };
+
+mod clap;
+mod output;
+mod shm;
 
 #[derive(Debug, Copy, Clone)]
 struct FrameFormat {
@@ -242,49 +246,89 @@ fn main() -> Result<(), Box<dyn Error>> {
                                 chunk[0] = chunk[2];
                                 chunk[2] = tmp;
                             }
-                            image::ColorType::Rgba8
+                            Rgba8
                         }
-                        wl_shm::Format::Xbgr8888 => image::ColorType::Rgba8,
+                        wl_shm::Format::Xbgr8888 => Rgba8,
                         other => {
                             log::error!("Unsupported buffer format: {:?}", other);
                             log::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
                             break;
                         }
                     };
-                    if args.is_present("stdout") {
-                        let stdout = stdout();
-                        let guard = stdout.lock();
-                        let mut writer = BufWriter::new(guard);
-                        PngEncoder::new(&mut writer).write_image(
-                            &mmap,
-                            frame_format.width,
-                            frame_format.height,
-                            color_type,
-                        )?;
-                        writer.flush()?;
-                    } else {
-                        let time = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-                            Ok(n) => n.as_secs().to_string(),
-                            Err(_) => {
-                                log::error!("SystemTime before UNIX EPOCH!");
-                                exit(1);
+
+                    let time = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                        // getting current time for the file name
+                        Ok(n) => n.as_secs().to_string(),
+                        Err(_) => {
+                            log::error!("SystemTime before UNIX EPOCH!");
+                            exit(1);
+                        }
+                    };
+
+                    let mut extension = "png"; // default extension and encoder
+
+                    if args.is_present("extension") {
+                        let ext = args.value_of("extension").unwrap().trim();
+                        if ext == "jpeg" || ext == "jpg" || ext == "png" {
+                            extension = ext;
+                            log::debug!("Using custom extension: {}", extension);
+                        } else {
+                            log::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png");
+                            exit(1);
+                        }
+                    }
+
+                    let mut path: &str = &(time + "-wayshot." + extension);
+
+                    if args.is_present("file") {
+                        path = args.value_of("file").unwrap().trim()
+                    }
+
+                    match extension {
+                        "jpeg" | "jpg" => {
+                            if args.is_present("stdout") {
+                                let stdout = stdout();
+                                let guard = stdout.lock();
+                                let mut writer = BufWriter::new(guard);
+                                JpegEncoder::new(&mut writer).write_image(
+                                    &mmap,
+                                    frame_format.width,
+                                    frame_format.height,
+                                    color_type,
+                                )?;
+                                writer.flush()?;
                             }
-                        };
-
-                        let mut path: &str = &(time + "-wayshot" + ".png");
-
-                        if args.is_present("file") {
-                            path = args.value_of("file").unwrap().trim()
+                            JpegEncoder::new(File::create(path)?).write_image(
+                                &mmap,
+                                frame_format.width,
+                                frame_format.height,
+                                color_type,
+                            )?;
                         }
 
-                        let output_file = File::create(path)?;
-                        PngEncoder::new(output_file).write_image(
-                            &mmap,
-                            frame_format.width,
-                            frame_format.height,
-                            color_type,
-                        )?;
+                        "png" => {
+                            if args.is_present("stdout") {
+                                let stdout = stdout();
+                                let guard = stdout.lock();
+                                let mut writer = BufWriter::new(guard);
+                                PngEncoder::new(&mut writer).write_image(
+                                    &mmap,
+                                    frame_format.width,
+                                    frame_format.height,
+                                    color_type,
+                                )?;
+                                writer.flush()?;
+                            }
+                            PngEncoder::new(File::create(path)?).write_image(
+                                &mmap,
+                                frame_format.width,
+                                frame_format.height,
+                                color_type,
+                            )?;
+                        }
+                        _ => unreachable!(),
                     }
+
                     break;
                 }
             }
