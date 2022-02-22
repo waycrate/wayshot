@@ -1,7 +1,13 @@
 [package]
 authors = ["\nShinyzenith <https://shinyzenith.xyz> ", " Cmeissl <https://github.com/cmeissl> ", " Victor Berger <https://github.com/vberger>"]
+description = "Screenshot tool for wlroots based compositors implementing the zwlr_screencopy_v1 protocol."
+documentation = "https://git.sr.ht/~shinyzenith/wayshot"
 edition = "2021"
+homepage = "https://waycrate.shinyzenith.xyz"
+keywords = ["screenshot", "wayland", "wlroots"]
+license = "BSD-2 Clause"
 name = "wayshot"
+repository = "https://git.sr.ht/~shinyzenith/wayshot"
 version = "0.1.0"
 
 [dependencies]
