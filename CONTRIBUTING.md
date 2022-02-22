@@ -1,4 +1,4 @@
-# Contributing to swhkd
+# Contributing to wayshot
 
 1. Fork the repo and create your branch from `main`.
 1. Make sure to write tests for the functions you make.
@@ -16,7 +16,7 @@ I'm again borrowing these from [Facebook's Guidelines](https://github.com/facebo
 ## Proper Commit Messages
 Make sure to write proper commit messages. 
 
-Example: `[refactor] main.rs, per output selection`.
+Example: `[refactor] wayshot.rs, per output selection`.
 
 ## License
 By contributing, you agree that your contributions will be licensed under its BSD-2-Clause License.
