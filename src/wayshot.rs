@@ -1,59 +1,35 @@
+mod clap;
+mod output;
+mod shm;
+
 use std::{
     cell::RefCell,
-    ffi::CStr,
+    env,
+    error::Error,
     fs::File,
     io::Write,
-    os::unix::prelude::{FromRawFd, RawFd},
+    os::unix::prelude::FromRawFd,
+    process::exit,
     rc::Rc,
     sync::atomic::{AtomicBool, Ordering},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
-use clap::{arg, Command};
-
-use anyhow::{bail, Result};
 use image::{codecs::png::PngEncoder, ImageEncoder};
 use memmap2::MmapMut;
-use nix::{
-    errno::Errno,
-    fcntl,
-    sys::{memfd, mman, stat},
-    unistd,
-};
-use tracing::debug;
 
 use smithay_client_toolkit::{
-    environment,
-    environment::Environment,
-    output::{with_output_info, OutputHandler, OutputInfo, XdgOutputHandler},
+    output::OutputInfo,
     reexports::{
         client::{
             protocol::{wl_output::WlOutput, wl_shm, wl_shm::Format},
             Display, GlobalManager, Main,
         },
-        protocols::{
-            unstable::xdg_output::v1::client::zxdg_output_manager_v1::ZxdgOutputManagerV1,
-            wlr::unstable::screencopy::v1::client::{
-                zwlr_screencopy_frame_v1, zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
-                zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
-            },
+        protocols::wlr::unstable::screencopy::v1::client::{
+            zwlr_screencopy_frame_v1, zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
+            zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
         },
     },
 };
-
-struct ValidOutputs {
-    outputs: OutputHandler,
-    xdg_output: XdgOutputHandler,
-}
-
-environment! {ValidOutputs,
-    singles = [
-        ZxdgOutputManagerV1 => xdg_output,
-    ],
-    multis = [
-        WlOutput => outputs,
-    ]
-}
 
 #[derive(Debug, Copy, Clone)]
 struct FrameFormat {
@@ -69,18 +45,16 @@ enum FrameState {
     Finished,
 }
 
-fn main() -> Result<()> {
-    let args = set_flags().get_matches();
-    if let Ok(env_filter) = tracing_subscriber::EnvFilter::try_from_default_env() {
-        tracing_subscriber::fmt()
-            .with_env_filter(env_filter)
-            .with_writer(std::io::stderr)
-            .init();
-    } else {
-        tracing_subscriber::fmt()
-            .with_writer(std::io::stderr)
-            .init();
+fn main() -> Result<(), Box<dyn Error>> {
+    let args = clap::set_flags().get_matches();
+    env::set_var("RUST_LOG", "wayshot=info");
+
+    if args.is_present("debug") {
+        env::set_var("RUST_LOG", "wayshot=trace");
     }
+
+    env_logger::init();
+    log::trace!("Logger initialized.");
 
     let display = Display::connect_to_env()?;
     let mut event_queue = display.create_event_queue();
@@ -89,7 +63,7 @@ fn main() -> Result<()> {
     let globals = GlobalManager::new(&attached_display);
     event_queue.sync_roundtrip(&mut (), |_, _, _| unreachable!())?;
 
-    let valid_outputs = get_valid_outputs(display.clone());
+    let valid_outputs = output::get_valid_outputs(display.clone());
     let (mut output, _): (WlOutput, OutputInfo) = valid_outputs.first().unwrap().clone();
 
     let frame_formats: Rc<RefCell<Vec<FrameFormat>>> = Rc::new(RefCell::new(Vec::new()));
@@ -105,17 +79,17 @@ fn main() -> Result<()> {
     }
 
     if args.is_present("listoutputs") {
-        let valid_outputs = get_valid_outputs(display);
+        let valid_outputs = output::get_valid_outputs(display);
         for output in valid_outputs {
             let (_, info) = output;
-            println!("{:#?}", info.name);
+            log::info!("{:#?}", info.name);
         }
         std::process::exit(1);
     }
 
     if args.is_present("output") {
         let mut is_present = false;
-        let valid_outputs = get_valid_outputs(display);
+        let valid_outputs = output::get_valid_outputs(display);
 
         for device in valid_outputs {
             let (output_device, info) = device;
@@ -125,16 +99,18 @@ fn main() -> Result<()> {
             }
         }
         if !is_present {
-            bail!(
+            log::error!(
                 "\"{}\" is not a valid output.",
                 args.value_of("output").unwrap().trim()
             );
+            exit(1);
         }
     }
 
     if args.is_present("slurp") {
         if args.value_of("slurp").unwrap() == "" {
-            bail!("Failed to recieve geometry.");
+            log::error!("Failed to recieve geometry.");
+            exit(1);
         }
         let slurp: Vec<_> = args.value_of("slurp").unwrap().trim().split(" ").collect();
         let slurp: Vec<i32> = slurp.iter().map(|i| i.parse::<i32>().unwrap()).collect();
@@ -190,7 +166,10 @@ fn main() -> Result<()> {
         event_queue.sync_roundtrip(&mut (), |_, _, _| unreachable!())?;
     }
 
-    debug!(formats = ?frame_formats, "received compositor frame buffer formats");
+    log::debug!(
+        "Received compositor frame buffer formats: {:#?}",
+        frame_formats
+    );
 
     let frame_format = frame_formats
         .borrow()
@@ -204,16 +183,19 @@ fn main() -> Result<()> {
         .nth(0)
         .copied();
 
-    debug!(format = ?frame_format, "selected frame buffer format");
+    log::debug!("Selected frame buffer format: {:#?}", frame_format);
 
     let frame_format = match frame_format {
         Some(format) => format,
-        None => bail!("no suitable frame format found"),
+        None => {
+            log::error!("No suitable frame format found");
+            exit(1);
+        }
     };
 
     let frame_bytes = frame_format.stride * frame_format.height;
 
-    let mem_fd = create_shm_fd()?;
+    let mem_fd = shm::create_shm_fd()?;
     let mem_file = unsafe { File::from_raw_fd(mem_fd) };
     mem_file.set_len(frame_bytes as u64)?;
 
@@ -229,13 +211,14 @@ fn main() -> Result<()> {
 
     frame.copy(&buffer);
 
-    let result = loop {
+    loop {
         event_queue.sync_roundtrip(&mut (), |_, _, _| {})?;
 
         if let Some(state) = frame_state.borrow_mut().take() {
             match state {
                 FrameState::Failed => {
-                    break Err(anyhow::anyhow!("frame copy failed"));
+                    log::error!("Frame copy failed");
+                    break;
                 }
                 FrameState::Finished => {
                     let mut mmap = unsafe { MmapMut::map_mut(&mem_file)? };
@@ -246,6 +229,7 @@ fn main() -> Result<()> {
                     let color_type = match frame_format.format {
                         wl_shm::Format::Argb8888 | wl_shm::Format::Xrgb8888 => {
                             for chunk in data.chunks_exact_mut(4) {
+                                // swap in place (b with r)
                                 let tmp = chunk[0];
                                 chunk[0] = chunk[2];
                                 chunk[2] = tmp;
@@ -254,7 +238,9 @@ fn main() -> Result<()> {
                         }
                         wl_shm::Format::Xbgr8888 => image::ColorType::Rgba8,
                         other => {
-                            break Err(anyhow::anyhow!("Unsupported buffer format: {:?}", other))
+                            log::error!("Unsupported buffer format: {:?}", other);
+                            log::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
+                            break;
                         }
                     };
                     PngEncoder::new(&mut writer).write_image(
@@ -264,138 +250,10 @@ fn main() -> Result<()> {
                         color_type,
                     )?;
                     writer.flush()?;
-                    break Ok(());
+                    break;
                 }
             }
         }
-    };
-    result
-}
-
-fn create_shm_fd() -> std::io::Result<RawFd> {
-    // Only try memfd on linux
-    #[cfg(target_os = "linux")]
-    loop {
-        match memfd::memfd_create(
-            CStr::from_bytes_with_nul(b"wayshot\0").unwrap(),
-            memfd::MemFdCreateFlag::MFD_CLOEXEC | memfd::MemFdCreateFlag::MFD_ALLOW_SEALING,
-        ) {
-            Ok(fd) => {
-                // this is only an optimization, so ignore errors
-                let _ = fcntl::fcntl(
-                    fd,
-                    fcntl::F_ADD_SEALS(
-                        fcntl::SealFlag::F_SEAL_SHRINK | fcntl::SealFlag::F_SEAL_SEAL,
-                    ),
-                );
-                return Ok(fd);
-            }
-            Err(nix::Error::Sys(Errno::EINTR)) => continue,
-            Err(nix::Error::Sys(Errno::ENOSYS)) => break,
-            Err(nix::Error::Sys(errno)) => return Err(std::io::Error::from(errno)),
-            Err(err) => unreachable!(err),
-        }
     }
-
-    // Fallback to using shm_open
-    let sys_time = SystemTime::now();
-    let mut mem_file_handle = format!(
-        "/wayshot-{}",
-        sys_time.duration_since(UNIX_EPOCH).unwrap().subsec_nanos()
-    );
-    loop {
-        match mman::shm_open(
-            mem_file_handle.as_str(),
-            fcntl::OFlag::O_CREAT
-                | fcntl::OFlag::O_EXCL
-                | fcntl::OFlag::O_RDWR
-                | fcntl::OFlag::O_CLOEXEC,
-            stat::Mode::S_IRUSR | stat::Mode::S_IWUSR,
-        ) {
-            Ok(fd) => match mman::shm_unlink(mem_file_handle.as_str()) {
-                Ok(_) => return Ok(fd),
-                Err(nix::Error::Sys(errno)) => match unistd::close(fd) {
-                    Ok(_) => return Err(std::io::Error::from(errno)),
-                    Err(nix::Error::Sys(errno)) => return Err(std::io::Error::from(errno)),
-                    Err(err) => panic!("{}", err),
-                },
-                Err(err) => panic!("{}", err),
-            },
-            Err(nix::Error::Sys(Errno::EEXIST)) => {
-                // If a file with that handle exists then change the handle
-                mem_file_handle = format!(
-                    "/wayshot-{}",
-                    sys_time.duration_since(UNIX_EPOCH).unwrap().subsec_nanos()
-                );
-                continue;
-            }
-            Err(nix::Error::Sys(Errno::EINTR)) => continue,
-            Err(nix::Error::Sys(errno)) => return Err(std::io::Error::from(errno)),
-            Err(err) => unreachable!(err),
-        }
-    }
-}
-
-fn set_flags() -> Command<'static> {
-    let app = Command::new("wayshot")
-        .version(env!("CARGO_PKG_VERSION"))
-        .author(env!("CARGO_PKG_AUTHORS"))
-        .about("Simple screenshot tool for wlroots based compositors.")
-        .arg(
-            arg!(-s --slurp <GEOMETRY>)
-                .required(false)
-                .takes_value(true)
-                .help("Choose a portion of your display to screenshot using slurp."),
-        )
-        .arg(
-            arg!(-l - -listoutputs)
-                .required(false)
-                .takes_value(false)
-                .help("List all valid outputs."),
-        )
-        .arg(
-            arg!(-o --output <OUTPUT>)
-                .required(false)
-                .takes_value(true)
-                .conflicts_with("slurp")
-                .help("Choose a particular display to screenshot."),
-        )
-        .arg(
-            arg!(-c - -cursor)
-                .required(false)
-                .takes_value(false)
-                .help("Enable cursor in screenshots."),
-        );
-    app
-}
-
-fn get_valid_outputs(display: Display) -> Vec<(WlOutput, OutputInfo)> {
-    let mut queue = display.create_event_queue();
-    let attached_display = display.attach(queue.token());
-
-    let (outputs, xdg_output) = XdgOutputHandler::new_output_handlers();
-    let mut valid_outputs: Vec<(WlOutput, OutputInfo)> = Vec::new();
-
-    let env = Environment::new(
-        &attached_display,
-        &mut &mut queue,
-        ValidOutputs {
-            outputs,
-            xdg_output,
-        },
-    )
-    .unwrap();
-
-    queue.sync_roundtrip(&mut (), |_, _, _| {}).unwrap();
-
-    for output in env.get_all_outputs() {
-        with_output_info(&output, |info| {
-            if info.obsolete == false {
-                valid_outputs.push((output.clone(), info.clone()));
-            } else {
-                output.release();
-            }
-        });
-    }
-    valid_outputs
+    Ok(())
 }

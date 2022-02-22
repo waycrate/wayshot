@@ -5,15 +5,14 @@ name = "wayshot"
 version = "0.1.0"
 
 [dependencies]
-anyhow = "1.0"
+clap = "3.1"
+env_logger = "0.8.4"
 image = "0.24"
+log = "0.4.0"
 memmap2 = "0.2"
 nix = "0.20"
-tempfile = "3.3.0"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 smithay-client-toolkit = "0.15.3"
-clap = "3.1"
+tempfile = "3.3.0"
 
 [[bin]]
 name = "wayshot"
