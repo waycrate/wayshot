@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let (_, info) = output;
             log::info!("{:#?}", info.name);
         }
-        std::process::exit(1);
+        exit(1);
     }
 
     if args.is_present("output") {
