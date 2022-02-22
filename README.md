@@ -28,7 +28,7 @@ wayshot
 Custom file path:
 
 ```bash
-wayshot -f ../screenshot.png
+wayshot -f ../screenshot.png --extension jpg
 ```
 
 Screenshot and copy to clipboard:
