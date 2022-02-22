@@ -60,8 +60,8 @@ wayshot -s "$(slurp -p -f '%x %y %w %h')" | convert - -format '%[pixel:p{0,0}]' 
 -   `sudo make install`
 
 # Support server:
-
-https://discord.gg/KKZRDYrRYW
+1. Use the mailing list.
+1. I don't endorse the usage of discord but if you really need it, then you can join the following <a href="https://discord.gg/KKZRDYrRYW">server</a> for support.
 
 # Smithay Developers:
 
