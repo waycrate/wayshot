@@ -18,31 +18,37 @@
 Region Selection:
 
 ```bash
-wayshot -s "$(slurp -f '%x %y %w %h')" > /tmp/image.png
+wayshot -s "$(slurp -f '%x %y %w %h')"
 ```
 
 Fullscreen:
 
 ```bash
-wayshot > /tmp/image.png
+wayshot
+```
+
+Custom file path:
+
+```bash
+wayshot -f ../screenshot.png
 ```
 
 Screenshot and copy to clipboard:
 
 ```bash
-wayshot | wl-copy
+wayshot --stdout | wl-copy
 ```
 
 Pick a hex color code, using ImageMagick:
 
 ```bash
-wayshot -s "$(slurp -p -f '%x %y %w %h')" | convert - -format '%[pixel:p{0,0}]' txt:-|egrep "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
+wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-|egrep "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
 ```
 
 Pick a color, using ImageMagick:
 
 ```bash
-wayshot -s "$(slurp -p -f '%x %y %w %h')" | convert - -format '%[pixel:p{0,0}]' txt:-
+wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-
 ```
 # Installation
 

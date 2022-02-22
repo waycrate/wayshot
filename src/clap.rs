@@ -18,6 +18,20 @@ pub fn set_flags() -> Command<'static> {
                 .help("Enable debug mode."),
         )
         .arg(
+            arg!(-f - -file <FILE_PATH>)
+                .required(false)
+                .conflicts_with("stdout")
+                .takes_value(true)
+                .help("Mention a custom file path."),
+        )
+        .arg(
+            arg!(--stdout)
+                .required(false)
+                .conflicts_with("file")
+                .takes_value(false)
+                .help("Output the image data to standard out."),
+        )
+        .arg(
             arg!(-l - -listoutputs)
                 .required(false)
                 .takes_value(false)

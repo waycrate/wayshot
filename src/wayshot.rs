@@ -7,11 +7,12 @@ use std::{
     env,
     error::Error,
     fs::File,
-    io::Write,
+    io::{stdout, BufWriter, Write},
     os::unix::prelude::FromRawFd,
     process::exit,
     rc::Rc,
     sync::atomic::{AtomicBool, Ordering},
+    time::SystemTime,
 };
 
 use image::{codecs::png::PngEncoder, ImageEncoder};
@@ -222,9 +223,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 FrameState::Finished => {
                     let mut mmap = unsafe { MmapMut::map_mut(&mem_file)? };
-                    let stdout = std::io::stdout();
-                    let guard = stdout.lock();
-                    let mut writer = std::io::BufWriter::new(guard);
                     let data = &mut *mmap;
                     let color_type = match frame_format.format {
                         wl_shm::Format::Argb8888 | wl_shm::Format::Xrgb8888 => {
@@ -243,13 +241,40 @@ fn main() -> Result<(), Box<dyn Error>> {
                             break;
                         }
                     };
-                    PngEncoder::new(&mut writer).write_image(
-                        &mmap,
-                        frame_format.width,
-                        frame_format.height,
-                        color_type,
-                    )?;
-                    writer.flush()?;
+                    if args.is_present("stdout") {
+                        let stdout = stdout();
+                        let guard = stdout.lock();
+                        let mut writer = BufWriter::new(guard);
+                        PngEncoder::new(&mut writer).write_image(
+                            &mmap,
+                            frame_format.width,
+                            frame_format.height,
+                            color_type,
+                        )?;
+                        writer.flush()?;
+                    } else {
+                        let time = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                            Ok(n) => n.as_secs().to_string(),
+                            Err(_) => {
+                                log::error!("SystemTime before UNIX EPOCH!");
+                                exit(1);
+                            }
+                        };
+
+                        let mut path: &str = &(time + "-wayshot" + ".png");
+
+                        if args.is_present("file") {
+                            path = args.value_of("file").unwrap().trim()
+                        }
+
+                        let output_file = File::create(path)?;
+                        PngEncoder::new(output_file).write_image(
+                            &mmap,
+                            frame_format.width,
+                            frame_format.height,
+                            color_type,
+                        )?;
+                    }
                     break;
                 }
             }
