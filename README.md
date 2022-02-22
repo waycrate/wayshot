@@ -66,10 +66,3 @@ wayshot -s "$(slurp -p -f '%x %y %w %h')" | convert - -format '%[pixel:p{0,0}]' 
 # Smithay Developers:
 
 Massive thanks to smithay developer <a href="https://github.com/cmeissl">Cmeissl</a> and <a href="https://github.com/vberger">Victor Berger</a>. Without them this project won't be possible as my wayland knowledge is limited.
-
-# Contributors:
-
-<a href="https://github.com/waycrate/wayshot/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=waycrate/wayshot" />
-</a>
-
