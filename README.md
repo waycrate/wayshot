@@ -1,4 +1,3 @@
-<div>
 <p align=center>
   <img src="https://git.sr.ht/~shinyzenith/wayshot/blob/main/docs/assets/wayshot.png" alt=wayshot width=60%>
   <p align=center>A native screenshot tool for wlroots based compositors such as sway and river written in Rust. X11 support coming soon. </p>
@@ -11,7 +10,6 @@
   <img src="https://img.shields.io/github/stars/waycrate/wayshot?style=flat-square&logo=appveyor">
   </p>
 </p>
-</div>
 
 # Usage:
 
