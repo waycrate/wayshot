@@ -297,6 +297,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                                     color_type,
                                 )?;
                                 writer.flush()?;
+                                break;
                             }
                             JpegEncoder::new(File::create(path)?).write_image(
                                 &mmap,
@@ -318,6 +319,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                                     color_type,
                                 )?;
                                 writer.flush()?;
+                                break;
                             }
                             PngEncoder::new(File::create(path)?).write_image(
                                 &mmap,
