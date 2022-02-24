@@ -178,7 +178,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     while !frame_buffer_done.load(Ordering::SeqCst) {
-        event_queue.sync_roundtrip(&mut (), |_, _, _| unreachable!())?;
+        event_queue.dispatch(&mut (), |_, _, _| unreachable!())?;
     }
 
     log::debug!(
@@ -227,7 +227,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     frame.copy(&buffer);
 
     loop {
-        event_queue.sync_roundtrip(&mut (), |_, _, _| {})?;
+        event_queue.dispatch(&mut (), |_, _, _| {})?;
 
         if let Some(state) = frame_state.borrow_mut().take() {
             match state {
