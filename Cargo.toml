@@ -8,7 +8,7 @@ keywords = ["screenshot", "wayland", "wlroots"]
 license = "BSD-2-Clause"
 name = "wayshot"
 repository = "https://git.sr.ht/~shinyzenith/wayshot"
-version = "1.1.2"
+version = "1.1.5"
 exclude = [
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
@@ -19,10 +19,10 @@ exclude = [
 
 [dependencies]
 clap = "3.1"
-env_logger = "0.8.4"
+env_logger = "0.9.0"
 image = "0.24"
 log = "0.4.0"
-memmap2 = "0.2"
+memmap2 = "0.5.3"
 nix = "0.20"
 smithay-client-toolkit = "0.15.3"
 tempfile = "3.3.0"
