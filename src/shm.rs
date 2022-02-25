@@ -32,7 +32,7 @@ pub fn create_shm_fd() -> std::io::Result<RawFd> {
             Err(nix::Error::Sys(Errno::EINTR)) => continue,
             Err(nix::Error::Sys(Errno::ENOSYS)) => break,
             Err(nix::Error::Sys(errno)) => return Err(std::io::Error::from(errno)),
-            Err(err) => unreachable!(err),
+            Err(err) => unreachable!("{}", err),
         }
     }
 
@@ -70,7 +70,7 @@ pub fn create_shm_fd() -> std::io::Result<RawFd> {
             }
             Err(nix::Error::Sys(Errno::EINTR)) => continue,
             Err(nix::Error::Sys(errno)) => return Err(std::io::Error::from(errno)),
-            Err(err) => unreachable!(err),
+            Err(err) => unreachable!("{}", err),
         }
     }
 }
