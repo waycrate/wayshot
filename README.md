@@ -53,6 +53,14 @@ wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout | convert - -format '%[pixel:
 ## AUR:
 `wayshot-git` & `wayshot-bin` has been packaged.
 
+## OpenSuse:
+As root:
+```bash
+zypper addrepo https://download.opensuse.org/repositories/X11:Wayland/openSUSE_Tumbleweed/X11:Wayland.repo
+zypper refresh
+zypper install wayshot
+```
+
 ## Compile time dependencies:
 -   rustup
 -   make
