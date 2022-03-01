@@ -57,7 +57,7 @@ Multi monitor systems break on `--slurp` usage. This is quite the tricky bug and
 ## AUR:
 `wayshot-git` & `wayshot-bin` have been packaged.
 
-## OpenSuse:
+## OpenSuse Tumbleweed:
 As root:
 ```bash
 zypper addrepo https://download.opensuse.org/repositories/X11:Wayland/openSUSE_Tumbleweed/X11:Wayland.repo
