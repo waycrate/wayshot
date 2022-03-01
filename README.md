@@ -48,10 +48,14 @@ Pick a color, using ImageMagick:
 ```bash
 wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-
 ```
+# Known bugs:
+
+Multi monitor systems break on `--slurp` usage. This is quite the tricky bug and will need some refactoring which we're currently working on. (https://github.com/waycrate/wayshot/issues/7)
+
 # Installation
 
 ## AUR:
-`wayshot-git` & `wayshot-bin` has been packaged.
+`wayshot-git` & `wayshot-bin` have been packaged.
 
 ## OpenSuse:
 As root:
