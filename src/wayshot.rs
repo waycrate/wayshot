@@ -27,11 +27,35 @@ fn main() -> Result<(), Box<dyn Error>> {
         .first() // This is just for testing reasons.
         .unwrap()
         .clone();
-    let frame_copy = match backend::grab_head_frame(display.clone(), output, 1) {
-        Ok(x) => x,
-        Err(_) => exit(1),
-    }; // Getting the copied frame.
     let args = clap::set_flags().get_matches(); // Getting all args from clap
+    let frame_copy: backend::FrameCopy;
+
+    if args.is_present("slurp") {
+        if args.value_of("slurp").unwrap() == "" {
+            log::error!("Failed to recieve geometry.");
+            exit(1);
+        }
+        let slurp: Vec<_> = args.value_of("slurp").unwrap().trim().split(" ").collect();
+        let slurp: Vec<i32> = slurp.iter().map(|i| i.parse::<i32>().unwrap()).collect();
+        let x_coordinate = slurp[0];
+        let y_coordinate = slurp[1];
+        let width = slurp[2];
+        let height = slurp[3];
+        frame_copy = backend::grab_head_frame(
+            display.clone(),
+            1,
+            output,
+            Some(backend::CaptureRegion {
+                x_coordinate,
+                y_coordinate,
+                width,
+                height,
+            }),
+        )?;
+    } else {
+        frame_copy = backend::grab_head_frame(display.clone(), 1, output, None)?;
+    }
+
     let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(n) => n.as_secs().to_string(),
         Err(_) => {
