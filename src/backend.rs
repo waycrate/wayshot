@@ -57,10 +57,20 @@ pub struct FrameCopy {
     pub frame_mmap: MmapMut,
 }
 
+// Struct to store region capture details.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct CaptureRegion {
+    pub x_coordinate: i32,
+    pub y_coordinate: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
 pub fn grab_head_frame(
     display: Display,
-    output: WlOutput,
     cursor_overlay: i32,
+    output: WlOutput,
+    capture_region: Option<CaptureRegion>,
 ) -> Result<FrameCopy, Box<dyn Error>> {
     // Connecting to wayland environment.
     let mut event_queue = display.create_event_queue();
@@ -81,7 +91,18 @@ pub fn grab_head_frame(
     let frame: Main<ZwlrScreencopyFrameV1>;
 
     // Capture output.
-    frame = screencopy_manager.capture_output(cursor_overlay, &output);
+    if let Some(region) = capture_region {
+        frame = screencopy_manager.capture_output_region(
+            cursor_overlay,
+            &output,
+            region.x_coordinate,
+            region.y_coordinate,
+            region.width,
+            region.height,
+        );
+    } else {
+        frame = screencopy_manager.capture_output(cursor_overlay, &output);
+    }
 
     // Assign callback to frame.
     frame.quick_assign({
