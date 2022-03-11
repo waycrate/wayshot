@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let output: WlOutput;
 
     let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(time) => time.as_nanos().to_string(),
+        Ok(time) => time.as_secs().to_string(),
         Err(e) => {
             log::error!("Err: {:#?}", e);
             exit(1);
@@ -135,10 +135,21 @@ fn main() -> Result<(), Box<dyn Error>> {
             );
         }
 
-        for i in 1..image_buffers.len() {
-            image::imageops::overlay(&mut image_buffers[0].as_ref(), &image_buffers[i], 0, 0);
+        if let Some(mut composited_frame) = image_buffers.pop() {
+            for i in 0..image_buffers.len() {
+                image::imageops::overlay(&mut composited_frame, &image_buffers[i], 0, 0);
+            }
+            if args.is_present("stdout") {
+            } else {
+                composited_frame.save_with_format(
+                    path,
+                    match extension {
+                        backend::EncodingFormat::Png => image::ImageFormat::Png,
+                        backend::EncodingFormat::Jpg => image::ImageFormat::Jpeg,
+                    },
+                )?;
+            }
         }
-
         exit(1);
     } else {
         frame_copy = backend::capture_output_frame(display.clone(), cursor_overlay, output, None)?;
