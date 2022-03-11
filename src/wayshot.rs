@@ -3,7 +3,6 @@ use std::{
     error::Error,
     fs::File,
     io::{stdout, BufWriter},
-    path::Path,
     process::exit,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -13,7 +12,7 @@ use smithay_client_toolkit::{
     reexports::client::{protocol::wl_output::WlOutput, Display},
 };
 
-use image::DynamicImage;
+use image::ImageBuffer;
 
 mod backend;
 mod clap;
@@ -123,34 +122,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }),
             )?);
         }
-
-        let mut image_paths: Vec<String> = Vec::new();
+        // TODO: This line. The algorithm for area detection is in another branch.
         for frame in frames {
-            let file_name = format!("/tmp/wayshot/{}", path);
-            backend::write_to_file(
-                File::create(file_name.clone())?,
-                backend::EncodingFormat::Png,
-                frame,
-            )?;
-            image_paths.push(file_name.clone());
+            ImageBuffer::from_raw(
+                frame.frame_format.width,
+                frame.frame_format.height,
+                &frame.frame_mmap,
+            );
         }
-
-        let mut frame: Option<DynamicImage> = None;
-        for i in 0..image_paths.len() {
-            if i == 0 {
-                frame = Some(image::open(&Path::new(&image_paths[i]))?);
-                break;
-            }
-            if frame.is_some() {
-                image::imageops::overlay(
-                    &mut frame.clone().unwrap(),
-                    &image::open(&Path::new(&image_paths[i]))?,
-                    0,
-                    0,
-                );
-            }
-        }
-        frame.unwrap().save(path)?;
         exit(1);
     } else {
         frame_copy = backend::capture_output_frame(display.clone(), cursor_overlay, output, None)?;
