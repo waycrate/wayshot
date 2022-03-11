@@ -1,5 +1,5 @@
 <p align=center>
-  <img src="https://git.sr.ht/~shinyzenith/wayshot/blob/main/docs/assets/wayshot.png" alt=wayshot width=60%>
+  <img src="https://git.sr.ht/~shinyzenith/wayshot/blob/main/assets/wayshot.png" alt=wayshot width=60%>
   <p align=center>A native screenshot tool for wlroots based compositors such as sway and river written in Rust. X11 support coming soon. </p>
   
   <p align="center">
@@ -8,8 +8,14 @@
   <img src="https://img.shields.io/github/issues/waycrate/wayshot?style=flat-square&logo=appveyor">
   <img src="https://img.shields.io/github/forks/waycrate/wayshot?style=flat-square&logo=appveyor">
   <img src="https://img.shields.io/github/stars/waycrate/wayshot?style=flat-square&logo=appveyor">
+
+  </p>
   </p>
 </p>
+
+<p align="center">
+<a href="https://repology.org/project/wayshot/versions">
+<img src="https://repology.org/badge/vertical-allrepos/wayshot.svg" /></a></p>
 
 # Usage:
 
@@ -55,12 +61,14 @@ Multi monitor systems break on `--slurp` usage. This is quite the tricky bug and
 # Installation
 
 ## AUR:
+
 `wayshot-git` & `wayshot-bin` have been packaged.
 
 ## OpenSuse Tumbleweed:
 As root:
+
 ```bash
-zypper addrepo https://download.opensuse.org/repositories/X11:Wayland/openSUSE_Tumbleweed/X11:Wayland.repo
+zypper addrepo https://download.opensuse.org/repositories/openSUSE:Factory/standard/openSUSE:Factory.repo
 zypper refresh
 zypper install wayshot
 ```
