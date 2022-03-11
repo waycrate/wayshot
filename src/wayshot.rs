@@ -12,7 +12,7 @@ use smithay_client_toolkit::{
     reexports::client::{protocol::wl_output::WlOutput, Display},
 };
 
-use image::ImageBuffer;
+use image::{ImageBuffer, Rgba};
 
 mod backend;
 mod clap;
@@ -122,14 +122,23 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }),
             )?);
         }
-        // TODO: This line. The algorithm for area detection is in another branch.
+
+        let mut image_buffers: Vec<ImageBuffer<Rgba<u8>, _>> = Vec::new();
         for frame in frames {
-            ImageBuffer::from_raw(
-                frame.frame_format.width,
-                frame.frame_format.height,
-                &frame.frame_mmap,
+            image_buffers.push(
+                ImageBuffer::<Rgba<u8>, _>::from_raw(
+                    frame.frame_format.width,
+                    frame.frame_format.height,
+                    frame.frame_mmap,
+                )
+                .unwrap(),
             );
         }
+
+        for i in 1..image_buffers.len() {
+            image::imageops::overlay(&mut image_buffers[0].as_ref(), &image_buffers[i], 0, 0);
+        }
+
         exit(1);
     } else {
         frame_copy = backend::capture_output_frame(display.clone(), cursor_overlay, output, None)?;
@@ -142,9 +151,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         if args.is_present("file") {
             path = args.value_of("file").unwrap().trim().to_string();
-        } else {
         }
-
         backend::write_to_file(File::create(path)?, extension, frame_copy)?;
     }
     Ok(())
