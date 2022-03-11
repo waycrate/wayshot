@@ -3,6 +3,7 @@ use std::{
     error::Error,
     fs::File,
     io::{stdout, BufWriter},
+    path::Path,
     process::exit,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -11,6 +12,8 @@ use smithay_client_toolkit::{
     output::OutputInfo,
     reexports::client::{protocol::wl_output::WlOutput, Display},
 };
+
+use image::DynamicImage;
 
 mod backend;
 mod clap;
@@ -38,6 +41,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let frame_copy: backend::FrameCopy;
     let output: WlOutput;
 
+    let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(time) => time.as_nanos().to_string(),
+        Err(e) => {
+            log::error!("Err: {:#?}", e);
+            exit(1);
+        }
+    };
+    let mut path = (time
+        + match extension {
+            backend::EncodingFormat::Png => "-wayshot.png",
+            backend::EncodingFormat::Jpg => "-wayshot.jpg",
+        })
+    .to_string();
+
     let mut cursor_overlay: i32 = 0;
     if args.is_present("cursor") {
         cursor_overlay = 1;
@@ -63,6 +80,21 @@ fn main() -> Result<(), Box<dyn Error>> {
             .unwrap()
             .clone();
     }
+    if args.is_present("extension") {
+        let ext = args.value_of("extension").unwrap().trim();
+        match ext {
+            "jpeg" | "jpg" => {
+                extension = backend::EncodingFormat::Jpg;
+            }
+            "png" => {}
+            _ => {
+                log::error!(
+                    "Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png"
+                );
+                exit(1);
+            }
+        }
+    }
 
     if args.is_present("slurp") {
         if args.value_of("slurp").unwrap() == "" {
@@ -76,21 +108,50 @@ fn main() -> Result<(), Box<dyn Error>> {
         let width = slurp[2];
         let height = slurp[3];
 
-        //let out = output::get_valid_outputs(display.clone());
-        //println!("{:#?}", out);
-        //exit(1);
+        let valid_outputs = output::get_valid_outputs(display.clone());
+        let mut frames: Vec<backend::FrameCopy> = Vec::new();
+        for (output, _) in valid_outputs {
+            frames.push(backend::capture_output_frame(
+                display.clone(),
+                cursor_overlay,
+                output,
+                Some(backend::CaptureRegion {
+                    x_coordinate,
+                    y_coordinate,
+                    width,
+                    height,
+                }),
+            )?);
+        }
 
-        frame_copy = backend::capture_output_frame(
-            display.clone(),
-            cursor_overlay,
-            output,
-            Some(backend::CaptureRegion {
-                x_coordinate,
-                y_coordinate,
-                width,
-                height,
-            }),
-        )?;
+        let mut image_paths: Vec<String> = Vec::new();
+        for frame in frames {
+            let file_name = format!("/tmp/wayshot/{}", path);
+            backend::write_to_file(
+                File::create(file_name.clone())?,
+                backend::EncodingFormat::Png,
+                frame,
+            )?;
+            image_paths.push(file_name.clone());
+        }
+
+        let mut frame: Option<DynamicImage> = None;
+        for i in 0..image_paths.len() {
+            if i == 0 {
+                frame = Some(image::open(&Path::new(&image_paths[i]))?);
+                break;
+            }
+            if frame.is_some() {
+                image::imageops::overlay(
+                    &mut frame.clone().unwrap(),
+                    &image::open(&Path::new(&image_paths[i]))?,
+                    0,
+                    0,
+                );
+            }
+        }
+        frame.unwrap().save(path)?;
+        exit(1);
     } else {
         frame_copy = backend::capture_output_frame(display.clone(), cursor_overlay, output, None)?;
     }
@@ -100,38 +161,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let writer = BufWriter::new(stdout.lock());
         backend::write_to_file(writer, extension, frame_copy)?;
     } else {
-        let path: String;
         if args.is_present("file") {
             path = args.value_of("file").unwrap().trim().to_string();
         } else {
-            let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
-                Ok(n) => n.as_secs().to_string(),
-                Err(_) => {
-                    log::error!("SystemTime before UNIX EPOCH!");
-                    exit(1);
-                }
-            };
-
-            if args.is_present("extension") {
-                let ext = args.value_of("extension").unwrap().trim();
-                match ext {
-                    "jpeg" | "jpg" => {
-                        extension = backend::EncodingFormat::Jpg;
-                        log::debug!("Using custom extension: {:#?}", extension);
-                    }
-                    "png" => {}
-                    _ => {
-                        log::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png");
-                        exit(1);
-                    }
-                }
-            }
-            path = (time
-                + match extension {
-                    backend::EncodingFormat::Png => "-wayshot.png",
-                    backend::EncodingFormat::Jpg => "-wayshot.jpg",
-                })
-            .to_string();
         }
 
         backend::write_to_file(File::create(path)?, extension, frame_copy)?;
