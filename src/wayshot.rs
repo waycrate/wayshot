@@ -76,9 +76,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let width = slurp[2];
         let height = slurp[3];
 
-        let out = output::get_valid_outputs(display.clone());
-        println!("{:#?}", out);
-        exit(1);
+        //let out = output::get_valid_outputs(display.clone());
+        //println!("{:#?}", out);
+        //exit(1);
 
         frame_copy = backend::capture_output_frame(
             display.clone(),
