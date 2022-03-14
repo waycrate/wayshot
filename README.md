@@ -84,8 +84,9 @@ zypper install wayshot
 -   `sudo make install`
 
 # Support:
-1. Use the mailing list.
-1. I don't endorse the usage of discord but if you really need it, then you can join the following <a href="https://discord.gg/KKZRDYrRYW">server</a> for support.
+
+1) https://matrix.to/#/#waycrate-tools:matrix.org
+2) https://discord.gg/KKZRDYrRYW
 
 # Smithay Developers:
 
