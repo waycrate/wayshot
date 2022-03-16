@@ -1,4 +1,4 @@
-name: Build Wayshot
+name: Wayshot CI
 
 on: [push]
 
@@ -6,17 +6,63 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  x86_64-gnu:
+    name: wayshot
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout
       uses: actions/checkout@v2
 
-    - name: Build
-      run: |
-        rm Cargo.lock
-        cargo build --release
+    - name: Build with Toolchain Stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+    - uses: action-rs/cargo@v1
+      with:
+        command: build
+        args: --release
+
+    - name: Build with Toolchain Nightly
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+    - uses: action-rs/cargo@v1
+      with:
+        command: build
+        args: --release
+
+  x86_64-musl:
+    name: wayshot-musl
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Build with Toolchain Stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: x86_64-unknown-linux-musl
+        override: true
+    - uses: action-rs/cargo@v1
+      with:
+        use-cross: true
+        command: build
+        args: --release
+
+    - name: Build with Toolchain Nightly
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        target: x86_64-unknown-linux-musl
+        override: true
+    - uses: action-rs/cargo@v1
+      with:
+        use-cross: true
+        command: build
+        args: --release
 
   rustfmt:
     runs-on: ubuntu-latest
