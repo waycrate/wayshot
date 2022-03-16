@@ -18,7 +18,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
-    - uses: action-rs/cargo@v1
+    - uses: actions-rs/cargo@v1
       with:
         command: build
         args: --release
@@ -27,7 +27,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
-    - uses: action-rs/cargo@v1
+    - uses: actions-rs/cargo@v1
       with:
         command: build
         args: --release
@@ -46,7 +46,7 @@ jobs:
         toolchain: stable
         target: x86_64-unknown-linux-musl
         override: true
-    - uses: action-rs/cargo@v1
+    - uses: actions-rs/cargo@v1
       with:
         use-cross: true
         command: build
@@ -58,7 +58,7 @@ jobs:
         toolchain: nightly
         target: x86_64-unknown-linux-musl
         override: true
-    - uses: action-rs/cargo@v1
+    - uses: actions-rs/cargo@v1
       with:
         use-cross: true
         command: build
