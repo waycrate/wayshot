@@ -139,8 +139,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             for i in 0..image_buffers.len() {
                 image::imageops::overlay(&mut composited_frame, &image_buffers[i], 0, 0);
             }
-            if args.is_present("stdout") {
-            } else {
+            if !(args.is_present("stdout")) {
                 composited_frame.save_with_format(
                     path,
                     match extension {
