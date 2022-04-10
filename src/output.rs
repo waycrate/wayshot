@@ -31,7 +31,7 @@ pub fn get_valid_outputs(display: Display) -> Vec<(WlOutput, OutputInfo)> {
 
     let env = Environment::new(
         &attached_display,
-        &mut &mut queue,
+        &mut queue,
         App {
             outputs,
             xdg_output,
@@ -43,7 +43,7 @@ pub fn get_valid_outputs(display: Display) -> Vec<(WlOutput, OutputInfo)> {
 
     for output in env.get_all_outputs() {
         with_output_info(&output, |info| {
-            if info.obsolete == false {
+            if !info.obsolete {
                 valid_outputs.push((output.clone(), info.clone()));
             } else {
                 output.release();

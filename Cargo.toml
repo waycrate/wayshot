@@ -30,3 +30,14 @@ tempfile = "3.3.0"
 [[bin]]
 name = "wayshot"
 path = "src/wayshot.rs"
+
+[[bin]]
+name = "test"
+path = "src/test.rs"
+
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'
+strip = true

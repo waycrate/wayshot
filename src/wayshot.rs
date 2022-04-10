@@ -12,9 +12,10 @@ use smithay_client_toolkit::{
     reexports::client::{protocol::wl_output::WlOutput, Display},
 };
 
-mod backend;
 mod clap;
+mod dmabuf_export;
 mod output;
+mod screencopy;
 
 // TODO: Create a transparent layer_shell in the background, pass None as WlOutput as that makes
 // compositors choose the currently focused monitor. Once done check the enter event for the
@@ -34,8 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     log::trace!("Logger initialized.");
 
     let display = Display::connect_to_env()?;
-    let mut extension = backend::EncodingFormat::Png;
-    let frame_copy: backend::FrameCopy;
+    let mut extension = screencopy::EncodingFormat::Png;
     let output: WlOutput;
 
     let mut cursor_overlay: i32 = 0;
@@ -64,12 +64,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             .clone();
     }
 
-    if args.is_present("slurp") {
+    let frame_copy: screencopy::FrameCopy = if args.is_present("slurp") {
         if args.value_of("slurp").unwrap() == "" {
             log::error!("Failed to recieve geometry.");
             exit(1);
         }
-        let slurp: Vec<_> = args.value_of("slurp").unwrap().trim().split(" ").collect();
+        let slurp: Vec<_> = args.value_of("slurp").unwrap().trim().split(' ').collect();
         let slurp: Vec<i32> = slurp.iter().map(|i| i.parse::<i32>().unwrap()).collect();
         let x_coordinate = slurp[0];
         let y_coordinate = slurp[1];
@@ -80,25 +80,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         //println!("{:#?}", out);
         //exit(1);
 
-        frame_copy = backend::capture_output_frame(
-            display.clone(),
+        screencopy::capture_output_frame(
+            display,
             cursor_overlay,
             output,
-            Some(backend::CaptureRegion {
+            Some(screencopy::CaptureRegion {
                 x_coordinate,
                 y_coordinate,
                 width,
                 height,
             }),
-        )?;
+        )?
     } else {
-        frame_copy = backend::capture_output_frame(display.clone(), cursor_overlay, output, None)?;
-    }
+        screencopy::capture_output_frame(display, cursor_overlay, output, None)?
+    };
 
     if args.is_present("stdout") {
         let stdout = stdout();
         let writer = BufWriter::new(stdout.lock());
-        backend::write_to_file(writer, extension, frame_copy)?;
+        screencopy::write_to_file(writer, extension, frame_copy)?;
     } else {
         let path: String;
         if args.is_present("file") {
@@ -116,7 +116,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let ext = args.value_of("extension").unwrap().trim();
                 match ext {
                     "jpeg" | "jpg" => {
-                        extension = backend::EncodingFormat::Jpg;
+                        extension = screencopy::EncodingFormat::Jpg;
                         log::debug!("Using custom extension: {:#?}", extension);
                     }
                     "png" => {}
@@ -126,22 +126,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                 }
             }
-            path = (time
+            path = time
                 + match extension {
-                    backend::EncodingFormat::Png => "-wayshot.png",
-                    backend::EncodingFormat::Jpg => "-wayshot.jpg",
-                })
-            .to_string();
+                    screencopy::EncodingFormat::Png => "-wayshot.png",
+                    screencopy::EncodingFormat::Jpg => "-wayshot.jpg",
+                };
         }
 
-        backend::write_to_file(File::create(path)?, extension, frame_copy)?;
+        screencopy::write_to_file(File::create(path)?, extension, frame_copy)?;
     }
     Ok(())
 }
 
 /// Get a wl_output object from the output name.
 fn get_wloutput(name: String, valid_outputs: Vec<(WlOutput, OutputInfo)>) -> WlOutput {
-    for device in valid_outputs.clone() {
+    for device in valid_outputs {
         let (output_device, info) = device;
         if info.name == name {
             return output_device;
