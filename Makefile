@@ -22,6 +22,7 @@ uninstall:
 check:
 	@cargo fmt
 	@cargo check
+	@cargo clippy
 
 clean:
 	@cargo clean

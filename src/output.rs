@@ -7,6 +7,7 @@ use smithay_client_toolkit::{
         protocols::unstable::xdg_output::v1::client::zxdg_output_manager_v1::ZxdgOutputManagerV1,
     },
 };
+use std::process::exit;
 
 struct App {
     outputs: OutputHandler,
@@ -22,6 +23,7 @@ environment! {App,
     ]
 }
 
+/// Get all non-obsolete wl_outputs along with some info regarding them.
 pub fn get_valid_outputs(display: Display) -> Vec<(WlOutput, OutputInfo)> {
     let mut queue = display.create_event_queue();
     let attached_display = display.attach(queue.token());
@@ -31,7 +33,7 @@ pub fn get_valid_outputs(display: Display) -> Vec<(WlOutput, OutputInfo)> {
 
     let env = Environment::new(
         &attached_display,
-        &mut &mut queue,
+        &mut queue,
         App {
             outputs,
             xdg_output,
@@ -43,7 +45,7 @@ pub fn get_valid_outputs(display: Display) -> Vec<(WlOutput, OutputInfo)> {
 
     for output in env.get_all_outputs() {
         with_output_info(&output, |info| {
-            if info.obsolete == false {
+            if !info.obsolete {
                 valid_outputs.push((output.clone(), info.clone()));
             } else {
                 output.release();
@@ -51,4 +53,16 @@ pub fn get_valid_outputs(display: Display) -> Vec<(WlOutput, OutputInfo)> {
         });
     }
     valid_outputs
+}
+
+/// Get a non-obsolete wl_output object from the output name.
+pub fn get_wloutput(name: String, valid_outputs: Vec<(WlOutput, OutputInfo)>) -> WlOutput {
+    for device in valid_outputs {
+        let (output_device, info) = device;
+        if info.name == name {
+            return output_device;
+        }
+    }
+    println!("Error: No output of name \"{}\" was found", name);
+    exit(1);
 }

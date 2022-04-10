@@ -39,6 +39,13 @@ use smithay_client_toolkit::reexports::{
     },
 };
 
+// TODO: Create a transparent layer_shell in the background, pass None as WlOutput as that makes
+// compositors choose the currently focused monitor. Once done check the enter event for the
+// WlOutput object and then feed that to the screencopy capture output function.
+//
+//
+// TODO: support ppm/pnm rendering image::codecs::pnm.
+
 /// Type of frame supported by the compositor. For now we only support Argb8888, Xrgb8888, and
 /// Xbgr8888.
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -111,22 +118,19 @@ pub fn capture_output_frame(
     // Instantiating screencopy manager.
     let screencopy_manager = globals.instantiate_exact::<ZwlrScreencopyManagerV1>(3)?;
 
-    // Instantiating the image frame.
-    let frame: Main<ZwlrScreencopyFrameV1>;
-
-    // Capture output.
-    if let Some(region) = capture_region {
-        frame = screencopy_manager.capture_output_region(
+    // Instantiating the image frame and capturing the output.
+    let frame: Main<ZwlrScreencopyFrameV1> = if let Some(region) = capture_region {
+        screencopy_manager.capture_output_region(
             cursor_overlay,
             &output,
             region.x_coordinate,
             region.y_coordinate,
             region.width,
             region.height,
-        );
+        )
     } else {
-        frame = screencopy_manager.capture_output(cursor_overlay, &output);
-    }
+        screencopy_manager.capture_output(cursor_overlay, &output)
+    };
 
     // Assign callback to frame.
     frame.quick_assign({
@@ -192,13 +196,12 @@ pub fn capture_output_frame(
     let frame_format = frame_formats
         .borrow()
         .iter()
-        .filter(|frame| {
+        .find(|frame| {
             matches!(
                 frame.format,
                 wl_shm::Format::Argb8888 | wl_shm::Format::Xrgb8888 | wl_shm::Format::Xbgr8888
             )
         })
-        .nth(0)
         .copied();
     log::debug!("Selected frame buffer format: {:#?}", frame_format);
 
@@ -252,9 +255,7 @@ pub fn capture_output_frame(
                         wl_shm::Format::Argb8888 | wl_shm::Format::Xrgb8888 => {
                             // Swap out b with r as these formats are in little endian notation.
                             for chunk in data.chunks_exact_mut(4) {
-                                let alpha = chunk[0];
-                                chunk[0] = chunk[2];
-                                chunk[2] = alpha;
+                                chunk.swap(0, 2);
                             }
                             Rgba8
                         }

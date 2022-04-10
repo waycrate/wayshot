@@ -24,7 +24,7 @@ image = { version = "0.24", default-features = false, features = ["jpeg", "png"]
 log = "0.4.0"
 memmap2 = "0.5.3"
 nix = "0.20"
-smithay-client-toolkit = "0.15.3"
+smithay-client-toolkit = "0.15.4"
 tempfile = "3.3.0"
 
 [[bin]]
