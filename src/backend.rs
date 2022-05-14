@@ -109,7 +109,13 @@ pub fn capture_output_frame(
     let frame_buffer_done = Rc::new(AtomicBool::new(false));
 
     // Instantiating screencopy manager.
-    let screencopy_manager = globals.instantiate_exact::<ZwlrScreencopyManagerV1>(3)?;
+    let screencopy_manager = match globals.instantiate_exact::<ZwlrScreencopyManagerV1>(3) {
+        Ok(x) => x,
+        Err(e) => {
+            log::error!("Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?");
+            panic!("{:#?}", e);
+        }
+    };
 
     // Instantiating the image frame.
     let frame: Main<ZwlrScreencopyFrameV1>;
