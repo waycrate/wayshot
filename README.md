@@ -8,6 +8,8 @@
   <img src="https://img.shields.io/github/issues/waycrate/wayshot?style=flat-square&logo=appveyor">
   <img src="https://img.shields.io/github/forks/waycrate/wayshot?style=flat-square&logo=appveyor">
   <img src="https://img.shields.io/github/stars/waycrate/wayshot?style=flat-square&logo=appveyor">
+  <br>
+  <img src="https://repology.org/badge/vertical-allrepos/wayshot.svg">
   </p>
 </p>
 
@@ -48,6 +50,7 @@ Pick a color, using ImageMagick:
 ```bash
 wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-
 ```
+
 # Known bugs:
 
 Multi monitor systems break on `--slurp` usage. This is quite the tricky bug and will need some refactoring which we're currently working on. (https://github.com/waycrate/wayshot/issues/7)
@@ -55,30 +58,25 @@ Multi monitor systems break on `--slurp` usage. This is quite the tricky bug and
 # Installation
 
 ## AUR:
+
 `wayshot-git` & `wayshot-bin` have been packaged.
 
-## OpenSuse Tumbleweed:
-As root:
-```bash
-zypper addrepo https://download.opensuse.org/repositories/X11:Wayland/openSUSE_Tumbleweed/X11:Wayland.repo
-zypper refresh
-zypper install wayshot
-```
-
 ## Compile time dependencies:
--   rustup
--   make
+
+- rustup
+- make
 
 ## Compiling:
--   `git clone https://github.com/waycrate/wayshot && cd wayshot`
--   `make setup`
--   `make`
--   `sudo make install`
+
+- `git clone https://github.com/waycrate/wayshot && cd wayshot`
+- `make setup`
+- `make`
+- `sudo make install`
 
 # Support:
 
-1) https://matrix.to/#/#waycrate-tools:matrix.org
-2) https://discord.gg/KKZRDYrRYW
+1. https://matrix.to/#/#waycrate-tools:matrix.org
+2. https://discord.gg/KKZRDYrRYW
 
 # Smithay Developers:
 

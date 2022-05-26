@@ -13,7 +13,6 @@ use std::{
 };
 
 use nix::{
-    errno::Errno,
     fcntl,
     sys::{memfd, mman, stat},
     unistd,
@@ -306,10 +305,9 @@ fn create_shm_fd() -> std::io::Result<RawFd> {
                 );
                 return Ok(fd);
             }
-            Err(nix::Error::Sys(Errno::EINTR)) => continue,
-            Err(nix::Error::Sys(Errno::ENOSYS)) => break,
-            Err(nix::Error::Sys(errno)) => return Err(std::io::Error::from(errno)),
-            Err(err) => unreachable!("{}", err),
+            Err(nix::errno::Errno::EINTR) => continue,
+            Err(nix::errno::Errno::ENOSYS) => break,
+            Err(errno) => return Err(std::io::Error::from(errno)),
         }
     }
 
@@ -336,14 +334,12 @@ fn create_shm_fd() -> std::io::Result<RawFd> {
         ) {
             Ok(fd) => match mman::shm_unlink(mem_file_handle.as_str()) {
                 Ok(_) => return Ok(fd),
-                Err(nix::Error::Sys(errno)) => match unistd::close(fd) {
+                Err(errno) => match unistd::close(fd) {
                     Ok(_) => return Err(std::io::Error::from(errno)),
-                    Err(nix::Error::Sys(errno)) => return Err(std::io::Error::from(errno)),
-                    Err(err) => panic!("{}", err),
+                    Err(errno) => return Err(std::io::Error::from(errno)),
                 },
-                Err(err) => panic!("{}", err),
             },
-            Err(nix::Error::Sys(Errno::EEXIST)) => {
+            Err(nix::errno::Errno::EEXIST) => {
                 // If a file with that handle exists then change the handle
                 mem_file_handle = format!(
                     "/wayshot-{}",
@@ -351,9 +347,8 @@ fn create_shm_fd() -> std::io::Result<RawFd> {
                 );
                 continue;
             }
-            Err(nix::Error::Sys(Errno::EINTR)) => continue,
-            Err(nix::Error::Sys(errno)) => return Err(std::io::Error::from(errno)),
-            Err(err) => unreachable!("{}", err),
+            Err(nix::errno::Errno::EINTR) => continue,
+            Err(errno) => return Err(std::io::Error::from(errno)),
         }
     }
 }

@@ -139,6 +139,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+//TODO: This should be a part of output.rs which inturn should be merged into backend.rs
 /// Get a wl_output object from the output name.
 fn get_wloutput(name: String, valid_outputs: Vec<(WlOutput, OutputInfo)>) -> WlOutput {
     for device in valid_outputs.clone() {
