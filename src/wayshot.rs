@@ -7,10 +7,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use smithay_client_toolkit::{
-    output::OutputInfo,
-    reexports::client::{protocol::wl_output::WlOutput, Display},
-};
+use smithay_client_toolkit::reexports::client::{protocol::wl_output::WlOutput, Display};
 
 mod backend;
 mod clap;
@@ -35,8 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let display = Display::connect_to_env()?;
     let mut extension = backend::EncodingFormat::Png;
-    let frame_copy: backend::FrameCopy;
-    let output: WlOutput;
+    let output: &WlOutput;
 
     let mut cursor_overlay: i32 = 0;
     if args.is_present("cursor") {
@@ -44,56 +40,53 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if args.is_present("listoutputs") {
-        let valid_outputs = output::get_valid_outputs(display);
+        let valid_outputs = output::get_all_outputs(display);
         for output in valid_outputs {
-            let (_, info) = output;
-            log::info!("{:#?}", info.name);
+            log::info!("{:#?}", output.name);
         }
         exit(1);
     }
 
     if args.is_present("output") {
-        output = get_wloutput(
+        output = &*output::get_wloutput(
             args.value_of("output").unwrap().trim().to_string(),
-            output::get_valid_outputs(display.clone()),
+            output::get_all_outputs(display.clone()),
         )
     } else {
-        (output, _) = output::get_valid_outputs(display.clone())
-            .first()
-            .unwrap()
-            .clone();
+        unsafe {
+            output = &*output::get_all_outputs(display.clone())
+                .first()
+                .unwrap()
+                .wl_output;
+        }
     }
 
-    if args.is_present("slurp") {
+    let frame_copy: backend::FrameCopy = if args.is_present("slurp") {
         if args.value_of("slurp").unwrap() == "" {
             log::error!("Failed to recieve geometry.");
             exit(1);
         }
-        let slurp: Vec<_> = args.value_of("slurp").unwrap().trim().split(" ").collect();
+        let slurp: Vec<_> = args.value_of("slurp").unwrap().trim().split(' ').collect();
         let slurp: Vec<i32> = slurp.iter().map(|i| i.parse::<i32>().unwrap()).collect();
         let x_coordinate = slurp[0];
         let y_coordinate = slurp[1];
         let width = slurp[2];
         let height = slurp[3];
 
-        //let out = output::get_valid_outputs(display.clone());
-        //println!("{:#?}", out);
-        //exit(1);
-
-        frame_copy = backend::capture_output_frame(
-            display.clone(),
+        backend::capture_output_frame(
+            display,
             cursor_overlay,
-            output,
+            output.clone(),
             Some(backend::CaptureRegion {
                 x_coordinate,
                 y_coordinate,
                 width,
                 height,
             }),
-        )?;
+        )?
     } else {
-        frame_copy = backend::capture_output_frame(display.clone(), cursor_overlay, output, None)?;
-    }
+        backend::capture_output_frame(display, cursor_overlay, output.clone(), None)?
+    };
 
     if args.is_present("stdout") {
         let stdout = stdout();
@@ -126,28 +119,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                 }
             }
-            path = (time
+            path = time
                 + match extension {
                     backend::EncodingFormat::Png => "-wayshot.png",
                     backend::EncodingFormat::Jpg => "-wayshot.jpg",
-                })
-            .to_string();
+                };
         }
 
         backend::write_to_file(File::create(path)?, extension, frame_copy)?;
     }
     Ok(())
-}
-
-//TODO: This should be a part of output.rs which inturn should be merged into backend.rs
-/// Get a wl_output object from the output name.
-fn get_wloutput(name: String, valid_outputs: Vec<(WlOutput, OutputInfo)>) -> WlOutput {
-    for device in valid_outputs.clone() {
-        let (output_device, info) = device;
-        if info.name == name {
-            return output_device;
-        }
-    }
-    println!("Error: No output of name \"{}\" was found", name);
-    exit(1);
 }
