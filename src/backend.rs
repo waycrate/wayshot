@@ -279,8 +279,8 @@ pub fn capture_output_frame(
 /// You don't need to mess around with this function, it is only used by
 /// capture_output_frame.
 fn create_shm_fd() -> std::io::Result<RawFd> {
-    // Only try memfd on linux.
-    #[cfg(target_os = "linux")]
+    // Only try memfd on linux and freebsd.
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     loop {
         // Create a file that closes on succesful execution and seal it's operations.
         match memfd::memfd_create(
