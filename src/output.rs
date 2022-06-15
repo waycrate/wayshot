@@ -1,7 +1,5 @@
-use smithay_client_toolkit::reexports::client::{
-    protocol::wl_output, protocol::wl_output::WlOutput, Display, GlobalManager,
-};
 use std::{cell::RefCell, process::exit, rc::Rc};
+use wayland_client::{protocol::wl_output, protocol::wl_output::WlOutput, Display, GlobalManager};
 
 #[derive(Debug, Clone)]
 pub struct OutputInfo {

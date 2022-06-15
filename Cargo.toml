@@ -24,7 +24,8 @@ image = { version = "0.24", default-features = false, features = ["jpeg", "png"]
 log = "0.4.17"
 memmap2 = "0.5.3"
 nix = "0.24.1"
-smithay-client-toolkit = "0.15.4"
+wayland-client = "0.29.4"
+wayland-protocols = { version = "0.29.4", features=["unstable_protocols", "client"] }
 tempfile = "3.3.0"
 
 [[bin]]

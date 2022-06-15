@@ -7,15 +7,13 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use smithay_client_toolkit::reexports::client::{protocol::wl_output::WlOutput, Display};
+use wayland_client::{protocol::wl_output::WlOutput, Display};
 
 mod backend;
 mod clap;
 mod output;
 
-// TODO: Create a transparent layer_shell in the background, pass None as WlOutput as that makes
-// compositors choose the currently focused monitor. Once done check the enter event for the
-// WlOutput object and then feed that to the screencopy capture output function.
+// TODO: Create a xdg-shell surface, check for the enter event, grab the output from it.
 //
 // TODO: Patch multiple output bug via multiple images composited into 1.
 

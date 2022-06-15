@@ -27,15 +27,13 @@ use image::{
 
 use memmap2::MmapMut;
 
-use smithay_client_toolkit::reexports::{
-    client::{
-        protocol::{wl_output::WlOutput, wl_shm, wl_shm::Format},
-        Display, GlobalManager, Main,
-    },
-    protocols::wlr::unstable::screencopy::v1::client::{
-        zwlr_screencopy_frame_v1, zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
-        zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
-    },
+use wayland_client::{
+    protocol::{wl_output::WlOutput, wl_shm, wl_shm::Format},
+    Display, GlobalManager, Main,
+};
+use wayland_protocols::wlr::unstable::screencopy::v1::client::{
+    zwlr_screencopy_frame_v1, zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
+    zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
 };
 
 /// Type of frame supported by the compositor. For now we only support Argb8888, Xrgb8888, and
