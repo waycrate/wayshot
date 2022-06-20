@@ -1,5 +1,5 @@
 use std::{
-    env,
+    cmp, env,
     error::Error,
     fs::File,
     io::{stdout, BufWriter},
@@ -68,6 +68,33 @@ fn main() -> Result<(), Box<dyn Error>> {
         let y_coordinate = slurp[1];
         let width = slurp[2];
         let height = slurp[3];
+
+        let outputs = output::get_all_outputs(display.clone());
+        let mut intersecting_outputs: Vec<output::OutputInfo> = Vec::new();
+        for output in outputs {
+            let x1: i32 = cmp::max(output.dimensions.x, x_coordinate);
+            let y1: i32 = cmp::max(output.dimensions.y, y_coordinate);
+            let x2: i32 = cmp::min(
+                output.dimensions.x + output.dimensions.width,
+                x_coordinate + width,
+            );
+            let y2: i32 = cmp::min(
+                output.dimensions.y + output.dimensions.height,
+                y_coordinate + height,
+            );
+
+            let width = x2 - x1;
+            let height = y2 - y1;
+
+            if !(width <= 0 || height <= 0) {
+                intersecting_outputs.push(output);
+            }
+        }
+        if intersecting_outputs.is_empty() {
+            log::error!("Provided capture region doesn't intersect with any outputs!");
+            exit(1);
+        }
+        // NOTE: Figure out box bounds for multi monitor screenshot.
 
         backend::capture_output_frame(
             display,
