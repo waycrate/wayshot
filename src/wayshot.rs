@@ -30,7 +30,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let display = Display::connect_to_env()?;
     let mut extension = backend::EncodingFormat::Png;
-    let output: &WlOutput;
 
     let mut cursor_overlay: i32 = 0;
     if args.is_present("cursor") {
@@ -45,19 +44,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         exit(1);
     }
 
-    if args.is_present("output") {
-        output = &*output::get_wloutput(
+    let output: WlOutput = if args.is_present("output") {
+        output::get_wloutput(
             args.value_of("output").unwrap().trim().to_string(),
             output::get_all_outputs(display.clone()),
         )
     } else {
-        unsafe {
-            output = &*output::get_all_outputs(display.clone())
-                .first()
-                .unwrap()
-                .wl_output;
-        }
-    }
+        output::get_all_outputs(display.clone())
+            .first()
+            .unwrap()
+            .wl_output
+            .clone()
+    };
 
     let frame_copy: backend::FrameCopy = if args.is_present("slurp") {
         if args.value_of("slurp").unwrap() == "" {
@@ -74,7 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         backend::capture_output_frame(
             display,
             cursor_overlay,
-            output.clone(),
+            output,
             Some(backend::CaptureRegion {
                 x_coordinate,
                 y_coordinate,
@@ -83,7 +81,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }),
         )?
     } else {
-        backend::capture_output_frame(display, cursor_overlay, output.clone(), None)?
+        backend::capture_output_frame(display, cursor_overlay, output, None)?
     };
 
     if args.is_present("stdout") {
