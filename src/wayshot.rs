@@ -2,11 +2,12 @@ use std::{
     cmp, env,
     error::Error,
     fs::File,
-    io::{stdout, BufWriter},
+    io::{stdout, BufWriter, Write},
     process::exit,
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use image::{ImageBuffer, Rgba};
 use wayland_client::{protocol::wl_output::WlOutput, Display};
 
 mod backend;
@@ -16,11 +17,14 @@ mod output;
 // TODO: Create a xdg-shell surface, check for the enter event, grab the output from it.
 //
 // TODO: Patch multiple output bug via multiple images composited into 1.
+// TODO: Handle flipped monitors.
 
 fn main() -> Result<(), Box<dyn Error>> {
+    // Setting up clap.
     let args = clap::set_flags().get_matches();
     env::set_var("RUST_LOG", "wayshot=info");
 
+    // Setting debug logs.
     if args.is_present("debug") {
         env::set_var("RUST_LOG", "wayshot=trace");
     }
@@ -28,8 +32,53 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
     log::trace!("Logger initialized.");
 
+    // Connecting to wayland display.
     let display = Display::connect_to_env()?;
-    let mut extension = backend::EncodingFormat::Png;
+
+    // Determining encoding format.
+    let extension: backend::EncodingFormat = if args.is_present("extension") {
+        let ext = args.value_of("extension").unwrap().trim();
+        match ext {
+            "jpeg" | "jpg" => {
+                log::debug!(
+                    "Using custom extension: {:#?}",
+                    backend::EncodingFormat::Jpg
+                );
+                backend::EncodingFormat::Jpg
+            }
+            "png" => backend::EncodingFormat::Png,
+            _ => unreachable!(),
+        }
+    } else {
+        backend::EncodingFormat::Png
+    };
+
+    // Determining the file which we're supposed to write to.
+    // Hence the Box<dyn Write> which basically stores a pointer
+    // to a file in memory that implements the write trait.
+    let file: Box<dyn Write> = if args.is_present("stdout") {
+        // Stdout takes priority.
+        Box::new(BufWriter::new(stdout().lock()))
+    } else if args.is_present("file") {
+        // If a file name is given, then use it.
+        Box::new(File::create(args.value_of("file").unwrap().trim())?)
+    } else {
+        // Else, determine your own file name.
+        let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(n) => n.as_secs().to_string(),
+            Err(_) => {
+                log::error!("SystemTime before UNIX EPOCH!");
+                exit(1);
+            }
+        };
+
+        Box::new(File::create(
+            time + match extension {
+                backend::EncodingFormat::Png => "-wayshot.png",
+                backend::EncodingFormat::Jpg => "-wayshot.jpg",
+            },
+        )?)
+    };
 
     let mut cursor_overlay: i32 = 0;
     if args.is_present("cursor") {
@@ -70,7 +119,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         let height = slurp[3];
 
         let outputs = output::get_all_outputs(display.clone());
-        let mut intersecting_outputs: Vec<output::OutputInfo> = Vec::new();
+        let mut intersecting_outputs: Vec<(i32, i32, i32, i32, output::OutputInfo)> = Vec::new();
+
         for output in outputs {
             let x1: i32 = cmp::max(output.dimensions.x, x_coordinate);
             let y1: i32 = cmp::max(output.dimensions.y, y_coordinate);
@@ -86,70 +136,72 @@ fn main() -> Result<(), Box<dyn Error>> {
             let width = x2 - x1;
             let height = y2 - y1;
 
+            let y_offset = y2 - (y1 + height);
+            let x_offset = x2 - (y2 + width);
+
             if !(width <= 0 || height <= 0) {
-                intersecting_outputs.push(output);
+                intersecting_outputs.push((x1, y1, width, height, output));
             }
         }
+
         if intersecting_outputs.is_empty() {
             log::error!("Provided capture region doesn't intersect with any outputs!");
             exit(1);
+        } else {
+            log::debug!(
+                "Region intersects with the following outputs: {:#?}",
+                intersecting_outputs
+            );
         }
-        // NOTE: Figure out box bounds for multi monitor screenshot.
 
-        backend::capture_output_frame(
-            display,
-            cursor_overlay,
-            output,
-            Some(backend::CaptureRegion {
-                x_coordinate,
-                y_coordinate,
+        let mut frames: Vec<(i32, i32, backend::FrameCopy)> = Vec::new();
+        for (x, y, width, height, output) in intersecting_outputs {
+            frames.push((
                 width,
                 height,
-            }),
-        )?
+                backend::capture_output_frame(
+                    display.clone(),
+                    cursor_overlay,
+                    output.wl_output,
+                    Some(backend::CaptureRegion {
+                        x_coordinate: x,
+                        y_coordinate: y,
+                        width,
+                        height,
+                    }),
+                )?,
+            ));
+        }
+
+        let mut image_buffers: Vec<ImageBuffer<Rgba<u8>, _>> = Vec::new();
+        for (width, height, frame) in frames {
+            image_buffers.push(
+                ImageBuffer::<Rgba<u8>, _>::from_raw(
+                    width.try_into().unwrap(),
+                    height.try_into().unwrap(),
+                    frame.frame_mmap,
+                )
+                .unwrap(),
+            );
+        }
+
+        let mut composited_frame = image_buffers.pop().unwrap();
+        for buffer in image_buffers {
+            image::imageops::overlay(&mut composited_frame, &buffer, 0, 0);
+        }
+        composited_frame.save_with_format(
+            "frame.png",
+            match extension {
+                backend::EncodingFormat::Png => image::ImageFormat::Png,
+                backend::EncodingFormat::Jpg => image::ImageFormat::Jpeg,
+            },
+        )?;
+
+        exit(1);
     } else {
         backend::capture_output_frame(display, cursor_overlay, output, None)?
     };
 
-    if args.is_present("stdout") {
-        let stdout = stdout();
-        let writer = BufWriter::new(stdout.lock());
-        backend::write_to_file(writer, extension, frame_copy)?;
-    } else {
-        let path: String;
-        if args.is_present("file") {
-            path = args.value_of("file").unwrap().trim().to_string();
-        } else {
-            let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
-                Ok(n) => n.as_secs().to_string(),
-                Err(_) => {
-                    log::error!("SystemTime before UNIX EPOCH!");
-                    exit(1);
-                }
-            };
-
-            if args.is_present("extension") {
-                let ext = args.value_of("extension").unwrap().trim();
-                match ext {
-                    "jpeg" | "jpg" => {
-                        extension = backend::EncodingFormat::Jpg;
-                        log::debug!("Using custom extension: {:#?}", extension);
-                    }
-                    "png" => {}
-                    _ => {
-                        log::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png");
-                        exit(1);
-                    }
-                }
-            }
-            path = time
-                + match extension {
-                    backend::EncodingFormat::Png => "-wayshot.png",
-                    backend::EncodingFormat::Jpg => "-wayshot.jpg",
-                };
-        }
-
-        backend::write_to_file(File::create(path)?, extension, frame_copy)?;
-    }
+    backend::write_to_file(file, extension, frame_copy)?;
     Ok(())
 }

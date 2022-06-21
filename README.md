@@ -1,10 +1,10 @@
 <p align=center>
   <img src="https://git.sr.ht/~shinyzenith/wayshot/blob/main/docs/assets/wayshot.png" alt=wayshot width=60%>
   <p align=center>A native, blazing-fast 🚀🚀🚀 screenshot tool for wlroots based compositors such as sway and river written in Rust.</p>
-  
+
   <p align="center">
   <a href="./LICENSE.md"><img src="https://img.shields.io/github/license/waycrate/wayshot?style=flat-square&logo=appveyor"></a>
-  <img src="https://img.shields.io/badge/cargo-v1.1.5-green?style=flat-square&logo=appveyor">
+  <img src="https://img.shields.io/badge/cargo-v1.1.7-green?style=flat-square&logo=appveyor">
   <img src="https://img.shields.io/github/issues/waycrate/wayshot?style=flat-square&logo=appveyor">
   <img src="https://img.shields.io/github/forks/waycrate/wayshot?style=flat-square&logo=appveyor">
   <img src="https://img.shields.io/github/stars/waycrate/wayshot?style=flat-square&logo=appveyor">
@@ -63,15 +63,15 @@ Multi monitor systems break on `--slurp` usage. This is quite the tricky bug and
 
 ## Compile time dependencies:
 
-- rustup
-- make
+-   rustup
+-   make
 
 ## Compiling:
 
-- `git clone https://github.com/waycrate/wayshot && cd wayshot`
-- `make setup`
-- `make`
-- `sudo make install`
+-   `git clone https://github.com/waycrate/wayshot && cd wayshot`
+-   `make setup`
+-   `make`
+-   `sudo make install`
 
 # Support:
 

@@ -96,9 +96,7 @@ pub fn get_all_outputs(display: Display) -> Vec<OutputInfo> {
             });
 
         // Exhaust the internal buffer queue until we get our required data.
-        event_queue
-            .sync_roundtrip(&mut (), |_, _, _| unreachable!())
-            .unwrap();
+        event_queue.sync_roundtrip(&mut (), |_, _, _| {}).unwrap();
 
         // Set the output dimensions
         output.dimensions = output_position.take();
