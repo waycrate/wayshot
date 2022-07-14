@@ -8,7 +8,7 @@ keywords = ["screenshot", "wayland", "wlroots"]
 license = "BSD-2-Clause"
 name = "wayshot"
 repository = "https://git.sr.ht/~shinyzenith/wayshot"
-version = "1.1.7"
+version = "1.1.8"
 exclude = [
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
