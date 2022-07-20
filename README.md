@@ -1,10 +1,10 @@
 <p align=center>
   <img src="https://git.sr.ht/~shinyzenith/wayshot/blob/main/docs/assets/wayshot.png" alt=wayshot width=60%>
   <p align=center>A native, blazing-fast 🚀🚀🚀 screenshot tool for wlroots based compositors such as sway and river written in Rust.</p>
-  
+
   <p align="center">
   <a href="./LICENSE.md"><img src="https://img.shields.io/github/license/waycrate/wayshot?style=flat-square&logo=appveyor"></a>
-  <img src="https://img.shields.io/badge/cargo-v1.1.5-green?style=flat-square&logo=appveyor">
+  <img src="https://img.shields.io/badge/cargo-v1.1.9-green?style=flat-square&logo=appveyor">
   <img src="https://img.shields.io/github/issues/waycrate/wayshot?style=flat-square&logo=appveyor">
   <img src="https://img.shields.io/github/forks/waycrate/wayshot?style=flat-square&logo=appveyor">
   <img src="https://img.shields.io/github/stars/waycrate/wayshot?style=flat-square&logo=appveyor">
@@ -45,6 +45,12 @@ Pick a hex color code, using ImageMagick:
 wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-|egrep "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
 ```
 
+Pick a hex color code without using ImageMagick:
+
+```bash
+wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout -e ppm | tail -c 3 | od -An -tuC | xargs printf '#%02X%02X%02X\n'
+```
+
 Pick a color, using ImageMagick:
 
 ```bash
@@ -63,15 +69,15 @@ Multi monitor systems break on `--slurp` usage. This is quite the tricky bug and
 
 ## Compile time dependencies:
 
-- rustup
-- make
+-   rustup
+-   make
 
 ## Compiling:
 
-- `git clone https://github.com/waycrate/wayshot && cd wayshot`
-- `make setup`
-- `make`
-- `sudo make install`
+-   `git clone https://github.com/waycrate/wayshot && cd wayshot`
+-   `make setup`
+-   `make`
+-   `sudo make install`
 
 # Support:
 
