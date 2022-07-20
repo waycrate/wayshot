@@ -370,7 +370,7 @@ pub fn write_to_file(
                 frame_copy.frame_format.height,
                 frame_copy.frame_color_type,
             )?;
-            let _ = output_file.flush()?;
+            output_file.flush()?;
         }
         EncodingFormat::Png => {
             PngEncoder::new(&mut output_file).write_image(
@@ -379,20 +379,21 @@ pub fn write_to_file(
                 frame_copy.frame_format.height,
                 frame_copy.frame_color_type,
             )?;
-            let _ = output_file.flush()?;
+            output_file.flush()?;
         }
         EncodingFormat::Ppm => {
             let rgb8_data = if let ColorType::Rgba8 = frame_copy.frame_color_type {
-                let data = frame_copy
-                    .frame_mmap
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, &v)| if i % 4 != 3 { Some(v) } else { None })
-                    .collect::<Vec<u8>>();
+                let mut data = Vec::with_capacity(
+                    (3 * frame_copy.frame_format.width * frame_copy.frame_format.height) as _,
+                );
+                for chunk in frame_copy.frame_mmap.chunks_exact(4) {
+                    data.extend_from_slice(&chunk[..3]);
+                }
                 data
             } else {
                 unimplemented!("Currently only ColorType::Rgba8 is supported")
             };
+
             PnmEncoder::new(&mut output_file)
                 .with_subtype(pnm::PnmSubtype::Pixmap(pnm::SampleEncoding::Binary))
                 .write_image(
@@ -401,7 +402,7 @@ pub fn write_to_file(
                     frame_copy.frame_format.height,
                     ColorType::Rgb8,
                 )?;
-            let _ = output_file.flush()?;
+            output_file.flush()?;
         }
     }
 
