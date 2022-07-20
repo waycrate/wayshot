@@ -19,7 +19,11 @@ use nix::{
 };
 
 use image::{
-    codecs::{jpeg::JpegEncoder, png::PngEncoder},
+    codecs::{
+        jpeg::JpegEncoder,
+        png::PngEncoder,
+        pnm::{self, PnmEncoder},
+    },
     ColorType,
     ColorType::Rgba8,
     ImageEncoder,
@@ -84,6 +88,8 @@ pub enum EncodingFormat {
     Jpg,
     /// Png encoder.
     Png,
+    /// Ppm encoder
+    Ppm,
 }
 
 /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
@@ -373,6 +379,28 @@ pub fn write_to_file(
                 frame_copy.frame_format.height,
                 frame_copy.frame_color_type,
             )?;
+            let _ = output_file.flush()?;
+        }
+        EncodingFormat::Ppm => {
+            let rgb8_data = if let ColorType::Rgba8 = frame_copy.frame_color_type {
+                let data = frame_copy
+                    .frame_mmap
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, &v)| if i % 4 != 3 { Some(v) } else { None })
+                    .collect::<Vec<u8>>();
+                data
+            } else {
+                unimplemented!("Currently only ColorType::Rgba8 is supported")
+            };
+            PnmEncoder::new(&mut output_file)
+                .with_subtype(pnm::PnmSubtype::Pixmap(pnm::SampleEncoding::Binary))
+                .write_image(
+                    &rgb8_data,
+                    frame_copy.frame_format.width,
+                    frame_copy.frame_format.height,
+                    ColorType::Rgb8,
+                )?;
             let _ = output_file.flush()?;
         }
     }

@@ -29,7 +29,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     log::trace!("Logger initialized.");
 
     let display = Display::connect_to_env()?;
-    let mut extension = backend::EncodingFormat::Png;
 
     let mut cursor_overlay: i32 = 0;
     if args.is_present("cursor") {
@@ -111,14 +110,32 @@ fn main() -> Result<(), Box<dyn Error>> {
         backend::capture_output_frame(display, cursor_overlay, output, None)?
     };
 
+    let extension = if args.is_present("extension") {
+        let ext = args.value_of("extension").unwrap().trim();
+        match ext {
+            "jpeg" | "jpg" => backend::EncodingFormat::Jpg,
+            "png" => backend::EncodingFormat::Png,
+            "ppm" => backend::EncodingFormat::Ppm,
+            _ => {
+                log::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm");
+                exit(1);
+            }
+        }
+    } else {
+        backend::EncodingFormat::Png
+    };
+
+    if extension != backend::EncodingFormat::Png {
+        log::debug!("Using custom extension: {:#?}", extension);
+    }
+
     if args.is_present("stdout") {
         let stdout = stdout();
         let writer = BufWriter::new(stdout.lock());
         backend::write_to_file(writer, extension, frame_copy)?;
     } else {
-        let path: String;
-        if args.is_present("file") {
-            path = args.value_of("file").unwrap().trim().to_string();
+        let path = if args.is_present("file") {
+            args.value_of("file").unwrap().trim().to_string()
         } else {
             let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
                 Ok(n) => n.as_secs().to_string(),
@@ -128,28 +145,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             };
 
-            if args.is_present("extension") {
-                let ext = args.value_of("extension").unwrap().trim();
-                match ext {
-                    "jpeg" | "jpg" => {
-                        extension = backend::EncodingFormat::Jpg;
-                        log::debug!("Using custom extension: {:#?}", extension);
-                    }
-                    "png" => {}
-                    _ => {
-                        log::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png");
-                        exit(1);
-                    }
-                }
+            time + match extension {
+                backend::EncodingFormat::Png => "-wayshot.png",
+                backend::EncodingFormat::Jpg => "-wayshot.jpg",
+                backend::EncodingFormat::Ppm => "-wayshot.ppm",
             }
-            path = time
-                + match extension {
-                    backend::EncodingFormat::Png => "-wayshot.png",
-                    backend::EncodingFormat::Jpg => "-wayshot.jpg",
-                };
-        }
+        };
 
         backend::write_to_file(File::create(path)?, extension, frame_copy)?;
     }
+
     Ok(())
 }
