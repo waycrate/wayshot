@@ -7,6 +7,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use image::codecs::png::{CompressionType, FilterType};
 use wayland_client::{protocol::wl_output::WlOutput, Display};
 
 mod backend;
@@ -110,24 +111,51 @@ fn main() -> Result<(), Box<dyn Error>> {
         backend::capture_output_frame(display, cursor_overlay, output, None)?
     };
 
-    let extension = if args.is_present("extension") {
-        let ext = args.value_of("extension").unwrap().trim();
-        match ext {
-            "jpeg" | "jpg" => backend::EncodingFormat::Jpg,
-            "png" => backend::EncodingFormat::Png,
-            "ppm" => backend::EncodingFormat::Ppm,
-            _ => {
-                log::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm");
-                exit(1);
-            }
+    let ext = args.value_of("extension").unwrap().trim();
+    let extension: backend::EncodingFormat = match ext {
+        "jpeg" | "jpg" => backend::EncodingFormat::Jpg,
+        "png" => {
+            let compression_type: CompressionType = match args
+                .value_of("png_compression_type")
+                .unwrap()
+                .trim()
+                .to_lowercase()
+                .as_ref()
+            {
+                "default" => CompressionType::Default,
+                "best" => CompressionType::Best,
+                "huffman" => CompressionType::Huffman,
+                "rle" => CompressionType::Rle,
+                _ => CompressionType::Fast,
+            };
+            let filter_type: FilterType = match args
+                .value_of("png_filter_type")
+                .unwrap()
+                .trim()
+                .to_lowercase()
+                .as_ref()
+            {
+                "nofilter" => FilterType::NoFilter,
+                "sub" => FilterType::Sub,
+                "up" => FilterType::Up,
+                "avg" => FilterType::Avg,
+                "paeth" => FilterType::Paeth,
+                _ => FilterType::Adaptive,
+            };
+            backend::EncodingFormat::Png(compression_type, filter_type)
         }
-    } else {
-        backend::EncodingFormat::Png
+        "ppm" => backend::EncodingFormat::Ppm,
+        _ => {
+            log::error!(
+                "Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm"
+            );
+            exit(1);
+        }
     };
 
-    if extension != backend::EncodingFormat::Png {
-        log::debug!("Using custom extension: {:#?}", extension);
-    }
+    // if extension != backend::EncodingFormat::Png {
+    //     log::debug!("Using custom extension: {:#?}", extension);
+    // }
 
     if args.is_present("stdout") {
         let stdout = stdout();
@@ -146,7 +174,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
 
             time + match extension {
-                backend::EncodingFormat::Png => "-wayshot.png",
+                backend::EncodingFormat::Png(_, _) => "-wayshot.png",
                 backend::EncodingFormat::Jpg => "-wayshot.jpg",
                 backend::EncodingFormat::Ppm => "-wayshot.ppm",
             }
