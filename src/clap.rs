@@ -41,6 +41,7 @@ pub fn set_flags() -> Command<'static> {
             arg!(-e --extension <FILE_EXTENSION>)
                 .required(false)
                 .takes_value(true)
+                .default_value("png")
                 .help("Set image encoder (Png is default)"),
         )
         .arg(
@@ -55,6 +56,20 @@ pub fn set_flags() -> Command<'static> {
                 .takes_value(true)
                 .conflicts_with("slurp")
                 .help("Choose a particular display to screenshot"),
+        )
+        .arg(
+            arg!(-C --png_compression_type <TYPE>)
+                .required(false)
+                .takes_value(true)
+                .default_value("fast")
+                .help("Set png compression type"),
+        )
+        .arg(
+            arg!(-F --png_filter_type <TYPE>)
+                .required(false)
+                .takes_value(true)
+                .default_value("adaptive")
+                .help("Set png compression type"),
         );
     app
 }

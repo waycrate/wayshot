@@ -21,7 +21,7 @@ use nix::{
 use image::{
     codecs::{
         jpeg::JpegEncoder,
-        png::PngEncoder,
+        png::{CompressionType, FilterType, PngEncoder},
         pnm::{self, PnmEncoder},
     },
     ColorType,
@@ -87,7 +87,7 @@ pub enum EncodingFormat {
     /// Jpeg / jpg encoder.
     Jpg,
     /// Png encoder.
-    Png,
+    Png(CompressionType, FilterType),
     /// Ppm encoder
     Ppm,
 }
@@ -372,8 +372,8 @@ pub fn write_to_file(
             )?;
             output_file.flush()?;
         }
-        EncodingFormat::Png => {
-            PngEncoder::new(&mut output_file).write_image(
+        EncodingFormat::Png(c, f) => {
+            PngEncoder::new_with_quality(&mut output_file, c, f).write_image(
                 &frame_copy.frame_mmap,
                 frame_copy.frame_format.width,
                 frame_copy.frame_format.height,
