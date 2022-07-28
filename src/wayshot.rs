@@ -111,7 +111,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let extension = if args.is_present("extension") {
-        let ext = args.value_of("extension").unwrap().trim();
+        let ext: &str = &args.value_of("extension").unwrap().trim().to_lowercase();
         match ext {
             "jpeg" | "jpg" => backend::EncodingFormat::Jpg,
             "png" => backend::EncodingFormat::Png,

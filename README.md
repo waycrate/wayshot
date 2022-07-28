@@ -13,7 +13,10 @@
   </p>
 </p>
 
-# Usage:
+# Some usage examples:
+
+NOTE: Read `man 7 wayshot` for more examples.
+NOTE: Read `man wayshot` for flag information.
 
 Region Selection:
 
@@ -25,12 +28,6 @@ Fullscreen:
 
 ```bash
 wayshot
-```
-
-Custom file path:
-
-```bash
-wayshot -f ../screenshot.png --extension jpg
 ```
 
 Screenshot and copy to clipboard:
@@ -45,18 +42,6 @@ Pick a hex color code, using ImageMagick:
 wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-|egrep "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
 ```
 
-Pick a hex color code without using ImageMagick:
-
-```bash
-wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout -e ppm | tail -c 3 | od -An -tuC | xargs printf '#%02X%02X%02X\n'
-```
-
-Pick a color, using ImageMagick:
-
-```bash
-wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-
-```
-
 # Known bugs:
 
 Multi monitor systems break on `--slurp` usage. This is quite the tricky bug and will need some refactoring which we're currently working on. (https://github.com/waycrate/wayshot/issues/7)
@@ -69,6 +54,7 @@ Multi monitor systems break on `--slurp` usage. This is quite the tricky bug and
 
 ## Compile time dependencies:
 
+-   scdoc (If present, man-pages will be generated.)
 -   rustup
 -   make
 

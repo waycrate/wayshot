@@ -4,7 +4,7 @@ pub fn set_flags() -> Command<'static> {
     let app = Command::new("wayshot")
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
-        .about("Simple screenshot tool for wlroots based compositors")
+        .about("Screenshot tool for compositors implementing zwlr_screencopy_v1.")
         .arg(
             arg!(-d - -debug)
                 .required(false)
