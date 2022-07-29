@@ -17,12 +17,12 @@ install:
 	@mkdir -p $(TARGET_DIR)
 	@cp $(SOURCE_DIR)/$(BINARY) $(TARGET_DIR)
 	@chmod +x $(TARGET_DIR)/$(BINARY)
-	@cp ./docs/*.1.gz $(MAN1_DIR)
-	@cp ./docs/*.7.gz $(MAN7_DIR)
+	@find ./docs -type f -iname "*.1.gz" -exec cp {} $(MAN1_DIR) \;
+	@find ./docs -type f -iname "*.7.gz" -exec cp {} $(MAN7_DIR) \;
 
 uninstall:
-	@rm $(TARGET_DIR)/$(BINARY)
-	@rm /usr/share/man/**/wayshot.*
+	@rm -f $(TARGET_DIR)/$(BINARY)
+	@rm -f /usr/share/man/**/wayshot.*
 
 check:
 	@cargo fmt
