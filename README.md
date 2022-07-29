@@ -16,6 +16,7 @@
 # Some usage examples:
 
 NOTE: Read `man 7 wayshot` for more examples.
+
 NOTE: Read `man wayshot` for flag information.
 
 Region Selection:
