@@ -1,6 +1,16 @@
-use std::{fs::read_dir, process::Command};
+use std::{fs::read_dir, io::ErrorKind, process::exit, process::Command};
 
 fn main() {
+    // Check if scdoc command exists
+    match Command::new("scdoc").spawn() {
+        Err(e) => {
+            if let ErrorKind::NotFound = e.kind() {
+                exit(0);
+            }
+        }
+        _ => {}
+    }
+
     let mut man_pages: Vec<(String, String)> = Vec::new();
     for path in read_dir("./docs").unwrap() {
         let path = path.unwrap();
