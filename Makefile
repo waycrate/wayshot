@@ -13,7 +13,7 @@ build:
 run:
 	@cargo run
 
-install:
+install: build
 	@mkdir -p $(TARGET_DIR)
 	@cp $(SOURCE_DIR)/$(BINARY) $(TARGET_DIR)
 	@chmod +x $(TARGET_DIR)/$(BINARY)
