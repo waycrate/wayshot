@@ -1,4 +1,10 @@
-use std::{fs::read_dir, io::ErrorKind, process::exit, process::Command};
+use std::{
+    fs::{read_dir, File, OpenOptions},
+    io::ErrorKind,
+    path::Path,
+    process::exit,
+    process::{Command, Stdio},
+};
 
 fn main() {
     // Check if scdoc command exists
@@ -25,9 +31,14 @@ fn main() {
     }
 
     for man_page in man_pages {
-        _ = Command::new("sh")
-            .arg("-c")
-            .arg(format!("scdoc <{}>{}", man_page.0, man_page.1))
+        let output = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(Path::new(&man_page.1))
+            .unwrap();
+        _ = Command::new("scdoc")
+            .stdin(Stdio::from(File::open(man_page.0).unwrap()))
+            .stdout(output)
             .spawn();
     }
 }

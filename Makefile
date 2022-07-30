@@ -31,6 +31,7 @@ check:
 
 clean:
 	@cargo clean
+	@rm -f ./docs/*.1.gz
 
 setup:
 	@rustup install stable
