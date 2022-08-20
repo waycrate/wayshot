@@ -1,5 +1,5 @@
 [package]
-authors = ["\nShinyzenith <https://shinyzenith.xyz> ", " Cmeissl <https://github.com/cmeissl> ", " Victor Berger <https://github.com/vberger>"]
+authors = ["Shinyzenith <https://shinyzenith.xyz>"]
 description = "Screenshot tool for wlroots based compositors implementing the zwlr_screencopy_v1 protocol."
 documentation = "https://docs.rs/crate/wayshot/latest"
 edition = "2021"

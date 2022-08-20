@@ -28,3 +28,16 @@ jobs:
     - name: Check formatting
       run: |
         cargo fmt -- --check
+
+  documentation:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Check docs
+      run: |
+        sudo apt update
+        sudo apt install --no-install-recommends scdoc
+        for file in $(find . -type f -iwholename "./docs/*.scd"); do scdoc < $file > /dev/null; done
