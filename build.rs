@@ -35,8 +35,11 @@ fn main() {
     }
 
     for man_page in man_pages {
-        let output =
-            OpenOptions::new().write(true).create(true).open(Path::new(&man_page.1)).unwrap();
+        let output = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(Path::new(&man_page.1))
+            .unwrap();
         _ = Command::new("scdoc")
             .stdin(Stdio::from(File::open(man_page.0).unwrap()))
             .stdout(output)
