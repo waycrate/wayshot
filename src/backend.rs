@@ -82,7 +82,7 @@ pub struct CaptureRegion {
 }
 
 /// Supported image encoding formats.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum EncodingFormat {
     /// Jpeg / jpg encoder.
     Jpg,
