@@ -8,14 +8,17 @@ keywords = ["screenshot", "wayland", "wlroots"]
 license = "BSD-2-Clause"
 name = "wayshot"
 repository = "https://git.sr.ht/~shinyzenith/wayshot"
-version = "1.2.1"
+version = "1.2.2"
 exclude = [
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
 	"contrib/*",
-	"docs/*",
+	"docs/assets/*",
 	"release.sh",
 ]
+
+[build-dependencies]
+flate2 = "1.0.24"
 
 [dependencies]
 clap = "3.1.18"

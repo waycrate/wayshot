@@ -1,5 +1,4 @@
 extern crate flate2;
-
 use flate2::{write::GzEncoder, Compression};
 use std::{
     fs::{read_dir, File, OpenOptions},
