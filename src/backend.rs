@@ -24,9 +24,7 @@ use image::{
         png::PngEncoder,
         pnm::{self, PnmEncoder},
     },
-    ColorType,
-    ColorType::Rgba8,
-    ImageEncoder,
+    ColorType, ImageEncoder,
 };
 
 use memmap2::MmapMut;
@@ -39,6 +37,8 @@ use wayland_protocols::wlr::unstable::screencopy::v1::client::{
     zwlr_screencopy_frame_v1, zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
     zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
 };
+
+use crate::convert::create_converter;
 
 /// Type of frame supported by the compositor. For now we only support Argb8888, Xrgb8888, and
 /// Xbgr8888.
@@ -201,7 +201,11 @@ pub fn capture_output_frame(
         .find(|frame| {
             matches!(
                 frame.format,
-                wl_shm::Format::Argb8888 | wl_shm::Format::Xrgb8888 | wl_shm::Format::Xbgr8888
+                wl_shm::Format::Xbgr2101010
+                    | wl_shm::Format::Abgr2101010
+                    | wl_shm::Format::Argb8888
+                    | wl_shm::Format::Xrgb8888
+                    | wl_shm::Format::Xbgr8888
             )
         })
         .copied();
@@ -253,20 +257,14 @@ pub fn capture_output_frame(
                     // Create a writeable memory map backed by a mem_file.
                     let mut frame_mmap = unsafe { MmapMut::map_mut(&mem_file)? };
                     let data = &mut *frame_mmap;
-                    let frame_color_type = match frame_format.format {
-                        wl_shm::Format::Argb8888 | wl_shm::Format::Xrgb8888 => {
-                            // Swap out b with r as these formats are in little endian notation.
-                            for chunk in data.chunks_exact_mut(4) {
-                                chunk.swap(0, 2);
-                            }
-                            Rgba8
-                        }
-                        wl_shm::Format::Xbgr8888 => Rgba8,
-                        unsupported_format => {
-                            log::error!("Unsupported buffer format: {:?}", unsupported_format);
-                            log::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
-                            exit(1);
-                        }
+                    let frame_color_type = if let Some(converter) =
+                        create_converter(frame_format.format)
+                    {
+                        converter.convert_inplace(data)
+                    } else {
+                        log::error!("Unsupported buffer format: {:?}", frame_format.format);
+                        log::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
+                        exit(1);
                     };
                     return Ok(FrameCopy {
                         frame_format,

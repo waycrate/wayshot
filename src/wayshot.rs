@@ -11,6 +11,7 @@ use wayland_client::{protocol::wl_output::WlOutput, Display};
 
 mod backend;
 mod clap;
+mod convert;
 mod output;
 
 // TODO: Create a xdg-shell surface, check for the enter event, grab the output from it.
