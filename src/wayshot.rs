@@ -18,6 +18,41 @@ mod output;
 //
 // TODO: Patch multiple output bug via multiple images composited into 1.
 
+fn parse_geometry(g: &str) -> Option<backend::CaptureRegion> {
+    let tail = g.trim();
+    let x_coordinate: i32;
+    let y_coordinate: i32;
+    let width: i32;
+    let height: i32;
+
+    if tail.contains(',') {
+        // this accepts: "%d,%d %dx%d"
+        let (head, tail) = tail.split_once(',')?;
+        x_coordinate = head.parse::<i32>().ok()?;
+        let (head, tail) = tail.split_once(' ')?;
+        y_coordinate = head.parse::<i32>().ok()?;
+        let (head, tail) = tail.split_once('x')?;
+        width = head.parse::<i32>().ok()?;
+        height = tail.parse::<i32>().ok()?;
+    } else {
+        // this accepts: "%d %d %d %d"
+        let (head, tail) = tail.split_once(' ')?;
+        x_coordinate = head.parse::<i32>().ok()?;
+        let (head, tail) = tail.split_once(' ')?;
+        y_coordinate = head.parse::<i32>().ok()?;
+        let (head, tail) = tail.split_once(' ')?;
+        width = head.parse::<i32>().ok()?;
+        height = tail.parse::<i32>().ok()?;
+    }
+
+    Some(backend::CaptureRegion {
+        x_coordinate,
+        y_coordinate,
+        width,
+        height,
+    })
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args = clap::set_flags().get_matches();
     env::set_var("RUST_LOG", "wayshot=info");
@@ -62,25 +97,21 @@ fn main() -> Result<(), Box<dyn Error>> {
             log::error!("Failed to recieve geometry.");
             exit(1);
         }
-        let slurp: Vec<_> = args.value_of("slurp").unwrap().trim().split(' ').collect();
-        let slurp: Vec<i32> = slurp.iter().map(|i| i.parse::<i32>().unwrap()).collect();
-        let x_coordinate = slurp[0];
-        let y_coordinate = slurp[1];
-        let width = slurp[2];
-        let height = slurp[3];
+        let region: backend::CaptureRegion = parse_geometry(args.value_of("slurp").unwrap())
+            .expect("Invalid geometry specification");
 
         let outputs = output::get_all_outputs(display.clone());
         let mut intersecting_outputs: Vec<output::OutputInfo> = Vec::new();
         for output in outputs {
-            let x1: i32 = cmp::max(output.dimensions.x, x_coordinate);
-            let y1: i32 = cmp::max(output.dimensions.y, y_coordinate);
+            let x1: i32 = cmp::max(output.dimensions.x, region.x_coordinate);
+            let y1: i32 = cmp::max(output.dimensions.y, region.y_coordinate);
             let x2: i32 = cmp::min(
                 output.dimensions.x + output.dimensions.width,
-                x_coordinate + width,
+                region.x_coordinate + region.width,
             );
             let y2: i32 = cmp::min(
                 output.dimensions.y + output.dimensions.height,
-                y_coordinate + height,
+                region.y_coordinate + region.height,
             );
 
             let width = x2 - x1;
@@ -96,17 +127,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         // NOTE: Figure out box bounds for multi monitor screenshot.
 
-        backend::capture_output_frame(
-            display,
-            cursor_overlay,
-            output,
-            Some(backend::CaptureRegion {
-                x_coordinate,
-                y_coordinate,
-                width,
-                height,
-            }),
-        )?
+        backend::capture_output_frame(display, cursor_overlay, output, Some(region))?
     } else {
         backend::capture_output_frame(display, cursor_overlay, output, None)?
     };
