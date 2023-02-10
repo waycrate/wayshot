@@ -40,9 +40,11 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 *-o*, *--output*
 	Choose a particular display (wl_output) to screenshot.
 
-*-s*, *--slurp*
+*-s*, *--slurp* <GEOMETRY>
 	Choose a portion of your display to screenshot using the slurp program.
-	https://github.com/emersion/slurp
+	https://github.com/emersion/slurp . Valid arguments have the form
+	"%x %y %w %h" or "%x,%y %wx%h", where for example "%w" is an integer giving
+	the width of the region.
 
 *--stdout*
 	Emit image data to stdout. The following flag is helpful to pipe image data
