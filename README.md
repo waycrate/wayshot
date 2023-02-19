@@ -22,7 +22,7 @@ NOTE: Read `man wayshot` for flag information.
 Region Selection:
 
 ```bash
-wayshot -s "$(slurp -f '%x %y %w %h')"
+wayshot -s "$(slurp)"
 ```
 
 Fullscreen:
@@ -40,7 +40,7 @@ wayshot --stdout | wl-copy
 Pick a hex color code, using ImageMagick:
 
 ```bash
-wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-|egrep "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
+wayshot -s "$(slurp -p)" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-|egrep "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
 ```
 
 # Known bugs:
