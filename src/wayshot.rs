@@ -7,7 +7,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use wayland_client::{protocol::wl_output::WlOutput, Display};
+use wayland_client::{
+    globals::{registry_queue_init, GlobalListContents},
+    protocol::{wl_output::WlOutput, wl_registry},
+    Connection, QueueHandle,
+};
 
 mod backend;
 mod clap;
@@ -53,6 +57,20 @@ fn parse_geometry(g: &str) -> Option<backend::CaptureRegion> {
     })
 }
 
+struct WayshotState {}
+
+impl wayland_client::Dispatch<wl_registry::WlRegistry, GlobalListContents> for WayshotState {
+    fn event(
+        _: &mut WayshotState,
+        _: &wl_registry::WlRegistry,
+        _: wl_registry::Event,
+        _: &GlobalListContents,
+        _: &Connection,
+        _: &QueueHandle<WayshotState>,
+    ) {
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args = clap::set_flags().get_matches();
     env::set_var("RUST_LOG", "wayshot=info");
@@ -64,7 +82,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
     log::trace!("Logger initialized.");
 
-    let display = Display::connect_to_env()?;
+    let mut conn = Connection::connect_to_env().unwrap();
+    let (mut globals, _) = registry_queue_init::<WayshotState>(&conn).unwrap();
 
     let mut cursor_overlay: i32 = 0;
     if args.is_present("cursor") {
@@ -72,7 +91,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if args.is_present("listoutputs") {
-        let valid_outputs = output::get_all_outputs(display);
+        let valid_outputs = output::get_all_outputs(&mut globals, &mut conn);
         for output in valid_outputs {
             log::info!("{:#?}", output.name);
         }
@@ -82,10 +101,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let output: WlOutput = if args.is_present("output") {
         output::get_wloutput(
             args.value_of("output").unwrap().trim().to_string(),
-            output::get_all_outputs(display.clone()),
+            output::get_all_outputs(&mut globals, &mut conn),
         )
     } else {
-        output::get_all_outputs(display.clone())
+        output::get_all_outputs(&mut globals, &mut conn)
             .first()
             .unwrap()
             .wl_output
@@ -100,7 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let region: backend::CaptureRegion = parse_geometry(args.value_of("slurp").unwrap())
             .expect("Invalid geometry specification");
 
-        let outputs = output::get_all_outputs(display.clone());
+        let outputs = output::get_all_outputs(&mut globals, &mut conn);
         let mut intersecting_outputs: Vec<output::OutputInfo> = Vec::new();
         for output in outputs {
             let x1: i32 = cmp::max(output.dimensions.x, region.x_coordinate);
@@ -127,9 +146,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         // NOTE: Figure out box bounds for multi monitor screenshot.
 
-        backend::capture_output_frame(display, cursor_overlay, output, Some(region))?
+        backend::capture_output_frame(
+            &mut globals,
+            &mut conn,
+            cursor_overlay,
+            output,
+            Some(region),
+        )?
     } else {
-        backend::capture_output_frame(display, cursor_overlay, output, None)?
+        backend::capture_output_frame(&mut globals, &mut conn, cursor_overlay, output, None)?
     };
 
     let extension = if args.is_present("extension") {
