@@ -1,7 +1,12 @@
-use std::{cell::RefCell, process::exit, rc::Rc};
-use wayland_client::{protocol::wl_output, protocol::wl_output::WlOutput, Display, GlobalManager};
-use wayland_protocols::unstable::xdg_output::v1::client::{
-    zxdg_output_manager_v1::ZxdgOutputManagerV1, zxdg_output_v1,
+use std::{process::exit, sync::Arc, sync::Mutex};
+use wayland_client::{
+    delegate_noop,
+    globals::GlobalList,
+    protocol::{wl_output, wl_output::WlOutput, wl_registry, wl_registry::WlRegistry},
+    Connection, Dispatch, QueueHandle,
+};
+use wayland_protocols::xdg::xdg_output::zv1::client::{
+    zxdg_output_manager_v1::ZxdgOutputManagerV1, zxdg_output_v1, zxdg_output_v1::ZxdgOutputV1,
 };
 
 #[derive(Debug, Clone)]
@@ -19,20 +24,106 @@ pub struct OutputPositioning {
     pub height: i32,
 }
 
-pub fn get_all_outputs(display: Display) -> Vec<OutputInfo> {
+struct OutputCaptureState {
+    outputs: Vec<OutputInfo>,
+}
+
+impl Dispatch<WlRegistry, ()> for OutputCaptureState {
+    fn event(
+        _: &mut Self,
+        wl_registry: &WlRegistry,
+        event: wl_registry::Event,
+        _: &(),
+        _: &Connection,
+        qh: &QueueHandle<Self>,
+    ) {
+        /* > The name event is sent after binding the output object. This event
+         * is only sent once per output object, and the name does not change
+         * over the lifetime of the wl_output global. */
+
+        if let wl_registry::Event::Global {
+            name,
+            interface,
+            version,
+        } = event
+        {
+            if interface == "wl_output" {
+                if version >= 4 {
+                    let _ = wl_registry.bind::<wl_output::WlOutput, _, _>(name, 4, qh, ());
+                } else {
+                    log::error!("Ignoring a wl_output with version < 4.");
+                }
+            }
+        }
+    }
+}
+
+impl Dispatch<WlOutput, ()> for OutputCaptureState {
+    fn event(
+        state: &mut Self,
+        wl_output: &WlOutput,
+        event: wl_output::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        /* > The name event is sent after binding the output object. This event
+         * is only sent once per output object, and the name does not change
+         * over the lifetime of the wl_output global. */
+        if let wl_output::Event::Name { name } = event {
+            state.outputs.push(OutputInfo {
+                wl_output: wl_output.clone(),
+                name,
+                dimensions: OutputPositioning {
+                    x: 0,
+                    y: 0,
+                    width: 0,
+                    height: 0,
+                },
+            });
+        }
+    }
+}
+
+delegate_noop!(OutputCaptureState: ignore ZxdgOutputManagerV1);
+
+impl Dispatch<ZxdgOutputV1, Arc<Mutex<OutputPositioning>>> for OutputCaptureState {
+    fn event(
+        _: &mut Self,
+        _: &ZxdgOutputV1,
+        event: zxdg_output_v1::Event,
+        outpos: &Arc<Mutex<OutputPositioning>>,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        if let Ok(mut output_positioning) = outpos.lock() {
+            match event {
+                zxdg_output_v1::Event::LogicalPosition { x, y } => {
+                    output_positioning.x = x;
+                    output_positioning.y = y;
+                    log::debug!("Logical position event fired!");
+                }
+                zxdg_output_v1::Event::LogicalSize { width, height } => {
+                    output_positioning.width = width;
+                    output_positioning.height = height;
+                    log::debug!("Logical size event fired!");
+                }
+                _ => {}
+            };
+        }
+    }
+}
+
+pub fn get_all_outputs(globals: &mut GlobalList, conn: &mut Connection) -> Vec<OutputInfo> {
     // Connecting to wayland environment.
-    let mut event_queue = display.create_event_queue();
-    let attached_display = (*display).clone().attach(event_queue.token());
-
-    // Instantiating the global manager.
-    let globals = GlobalManager::new(&attached_display);
-    event_queue.sync_roundtrip(&mut (), |_, _, _| {}).unwrap();
-
-    let mut data: Vec<OutputInfo> = Vec::new();
-    let outputs: Rc<RefCell<Vec<OutputInfo>>> = Rc::new(RefCell::new(Vec::new()));
+    let mut state = OutputCaptureState {
+        outputs: Vec::new(),
+    };
+    let mut event_queue = conn.new_event_queue::<OutputCaptureState>();
+    let qh = event_queue.handle();
 
     // Bind to xdg_output global.
-    let zxdg_output_manager = match globals.instantiate_exact::<ZxdgOutputManagerV1>(3) {
+    let zxdg_output_manager = match globals.bind::<ZxdgOutputManagerV1, _, _>(&qh, 3..=3, ()) {
         Ok(x) => x,
         Err(e) => {
             log::error!("Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?");
@@ -40,68 +131,29 @@ pub fn get_all_outputs(display: Display) -> Vec<OutputInfo> {
         }
     };
 
-    // Fetch all outputs and it's name.
-    globals
-        .instantiate_exact::<WlOutput>(4)
-        .expect("Failed to bind to wl_output global.")
-        .quick_assign({
-            let outputs = outputs.clone();
-            move |output, event, _| {
-                if let wl_output::Event::Name { name } = event {
-                    outputs.borrow_mut().push(OutputInfo {
-                        wl_output: output.detach(),
-                        name,
-                        dimensions: OutputPositioning {
-                            x: 0,
-                            y: 0,
-                            width: 0,
-                            height: 0,
-                        },
-                    });
-                }
-            }
-        });
-    event_queue.sync_roundtrip(&mut (), |_, _, _| {}).unwrap();
+    // Fetch all outputs; when their names arrive, add them to the list
+    let _ = conn.display().get_registry(&qh, ());
+    event_queue.roundtrip(&mut state).unwrap();
+    event_queue.roundtrip(&mut state).unwrap();
 
-    // We loop over each output and get it's position data.
-    for mut output in outputs.borrow().iter().cloned() {
-        let output_position: Rc<RefCell<OutputPositioning>> =
-            Rc::new(RefCell::new(OutputPositioning {
+    // We loop over each output and get its position data.
+    let mut data: Vec<OutputInfo> = Vec::new();
+    for mut output in state.outputs.clone() {
+        let output_position: Arc<Mutex<OutputPositioning>> =
+            Arc::new(Mutex::new(OutputPositioning {
                 x: 0,
                 y: 0,
                 width: 0,
                 height: 0,
             }));
 
-        // Callback to set X, Y, Width, and Height.
-        zxdg_output_manager
-            .get_xdg_output(&output.wl_output)
-            .quick_assign({
-                let output_position = output_position.clone();
-                move |_, event, _| {
-                    match event {
-                        zxdg_output_v1::Event::LogicalPosition { x, y } => {
-                            output_position.borrow_mut().x = x;
-                            output_position.borrow_mut().y = y;
-                            log::debug!("Logical position event fired!");
-                        }
-                        zxdg_output_v1::Event::LogicalSize { width, height } => {
-                            output_position.borrow_mut().width = width;
-                            output_position.borrow_mut().height = height;
-                            log::debug!("Logical size event fired!");
-                        }
-                        _ => {}
-                    };
-                }
-            });
-
-        // Exhaust the internal buffer queue until we get our required data.
-        event_queue
-            .sync_roundtrip(&mut (), |_, _, _| unreachable!())
-            .unwrap();
+        let xdg_output =
+            zxdg_output_manager.get_xdg_output(&output.wl_output, &qh, output_position.clone());
+        event_queue.roundtrip(&mut state).unwrap();
+        xdg_output.destroy();
 
         // Set the output dimensions
-        output.dimensions = output_position.take();
+        output.dimensions = output_position.lock().unwrap().clone();
         data.push(output);
     }
     if data.is_empty() {
