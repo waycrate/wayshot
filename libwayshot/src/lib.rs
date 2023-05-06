@@ -1,3 +1,5 @@
+mod convert;
+
 use std::{
     error::Error,
     ffi::CStr,

@@ -13,16 +13,14 @@ use wayland_client::{
     Connection, QueueHandle,
 };
 
-mod backend;
 mod clap;
-mod convert;
 mod output;
 
 // TODO: Create a xdg-shell surface, check for the enter event, grab the output from it.
 //
 // TODO: Patch multiple output bug via multiple images composited into 1.
 
-fn parse_geometry(g: &str) -> Option<backend::CaptureRegion> {
+fn parse_geometry(g: &str) -> Option<libwayshot::CaptureRegion> {
     let tail = g.trim();
     let x_coordinate: i32;
     let y_coordinate: i32;
@@ -49,7 +47,7 @@ fn parse_geometry(g: &str) -> Option<backend::CaptureRegion> {
         height = tail.parse::<i32>().ok()?;
     }
 
-    Some(backend::CaptureRegion {
+    Some(libwayshot::CaptureRegion {
         x_coordinate,
         y_coordinate,
         width,
@@ -111,12 +109,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             .clone()
     };
 
-    let frame_copy: backend::FrameCopy = if args.is_present("slurp") {
+    let frame_copy: libwayshot::FrameCopy = if args.is_present("slurp") {
         if args.value_of("slurp").unwrap() == "" {
             log::error!("Failed to recieve geometry.");
             exit(1);
         }
-        let region: backend::CaptureRegion = parse_geometry(args.value_of("slurp").unwrap())
+        let region: libwayshot::CaptureRegion = parse_geometry(args.value_of("slurp").unwrap())
             .expect("Invalid geometry specification");
 
         let outputs = output::get_all_outputs(&mut globals, &mut conn);
@@ -146,7 +144,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         // NOTE: Figure out box bounds for multi monitor screenshot.
 
-        backend::capture_output_frame(
+        libwayshot::capture_output_frame(
             &mut globals,
             &mut conn,
             cursor_overlay,
@@ -154,32 +152,32 @@ fn main() -> Result<(), Box<dyn Error>> {
             Some(region),
         )?
     } else {
-        backend::capture_output_frame(&mut globals, &mut conn, cursor_overlay, output, None)?
+        libwayshot::capture_output_frame(&mut globals, &mut conn, cursor_overlay, output, None)?
     };
 
     let extension = if args.is_present("extension") {
         let ext: &str = &args.value_of("extension").unwrap().trim().to_lowercase();
         match ext {
-            "jpeg" | "jpg" => backend::EncodingFormat::Jpg,
-            "png" => backend::EncodingFormat::Png,
-            "ppm" => backend::EncodingFormat::Ppm,
+            "jpeg" | "jpg" => libwayshot::EncodingFormat::Jpg,
+            "png" => libwayshot::EncodingFormat::Png,
+            "ppm" => libwayshot::EncodingFormat::Ppm,
             _ => {
                 log::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm");
                 exit(1);
             }
         }
     } else {
-        backend::EncodingFormat::Png
+        libwayshot::EncodingFormat::Png
     };
 
-    if extension != backend::EncodingFormat::Png {
+    if extension != libwayshot::EncodingFormat::Png {
         log::debug!("Using custom extension: {:#?}", extension);
     }
 
     if args.is_present("stdout") {
         let stdout = stdout();
         let writer = BufWriter::new(stdout.lock());
-        backend::write_to_file(writer, extension, frame_copy)?;
+        libwayshot::write_to_file(writer, extension, frame_copy)?;
     } else {
         let path = if args.is_present("file") {
             args.value_of("file").unwrap().trim().to_string()
@@ -193,13 +191,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
 
             time + match extension {
-                backend::EncodingFormat::Png => "-wayshot.png",
-                backend::EncodingFormat::Jpg => "-wayshot.jpg",
-                backend::EncodingFormat::Ppm => "-wayshot.ppm",
+                libwayshot::EncodingFormat::Png => "-wayshot.png",
+                libwayshot::EncodingFormat::Jpg => "-wayshot.jpg",
+                libwayshot::EncodingFormat::Ppm => "-wayshot.ppm",
             }
         };
 
-        backend::write_to_file(File::create(path)?, extension, frame_copy)?;
+        libwayshot::write_to_file(File::create(path)?, extension, frame_copy)?;
     }
 
     Ok(())
