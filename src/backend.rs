@@ -42,7 +42,13 @@ use wayland_protocols_wlr::screencopy::v1::client::{
     zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
 };
 
-use crate::convert::create_converter;
+use crate::convert::{create_copy_converter, create_in_place_converter};
+
+#[derive(Debug)]
+pub enum FrameData {
+    InPlace(MmapMut),
+    Copied(Vec<u8>),
+}
 
 /// Type of frame supported by the compositor. For now we only support Argb8888, Xrgb8888, and
 /// Xbgr8888.
@@ -69,7 +75,7 @@ enum FrameState {
 pub struct FrameCopy {
     pub frame_format: FrameFormat,
     pub frame_color_type: ColorType,
-    pub frame_mmap: MmapMut,
+    pub frame_data: FrameData,
 }
 
 /// Struct to store region capture details.
@@ -228,6 +234,7 @@ pub fn capture_output_frame(
                     | wl_shm::Format::Argb8888
                     | wl_shm::Format::Xrgb8888
                     | wl_shm::Format::Xbgr8888
+                    | wl_shm::Format::Rgb565
             )
         })
         .copied();
@@ -279,10 +286,16 @@ pub fn capture_output_frame(
                     // Create a writeable memory map backed by a mem_file.
                     let mut frame_mmap = unsafe { MmapMut::map_mut(&mem_file)? };
                     let data = &mut *frame_mmap;
-                    let frame_color_type = if let Some(converter) =
-                        create_converter(frame_format.format)
+                    let (frame_color_type, frame_data) = if let Some(converter) =
+                        create_in_place_converter(frame_format.format)
                     {
-                        converter.convert_inplace(data)
+                        (
+                            converter.convert_in_place(data),
+                            FrameData::InPlace(frame_mmap),
+                        )
+                    } else if let Some(converter) = create_copy_converter(frame_format.format) {
+                        let (color_type, frame_vec) = converter.convert_copy(data);
+                        (color_type, FrameData::Copied(frame_vec))
                     } else {
                         log::error!("Unsupported buffer format: {:?}", frame_format.format);
                         log::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
@@ -291,7 +304,7 @@ pub fn capture_output_frame(
                     return Ok(FrameCopy {
                         frame_format,
                         frame_color_type,
-                        frame_mmap,
+                        frame_data,
                     });
                 }
             }
@@ -384,10 +397,14 @@ pub fn write_to_file(
         "Writing to disk with encoding format: {:#?}",
         encoding_format
     );
+    let frame_slice: &[u8] = match &frame_copy.frame_data {
+        FrameData::InPlace(x) => x,
+        FrameData::Copied(x) => x,
+    };
     match encoding_format {
         EncodingFormat::Jpg => {
             JpegEncoder::new(&mut output_file).write_image(
-                &frame_copy.frame_mmap,
+                frame_slice,
                 frame_copy.frame_format.width,
                 frame_copy.frame_format.height,
                 frame_copy.frame_color_type,
@@ -396,7 +413,7 @@ pub fn write_to_file(
         }
         EncodingFormat::Png => {
             PngEncoder::new(&mut output_file).write_image(
-                &frame_copy.frame_mmap,
+                frame_slice,
                 frame_copy.frame_format.width,
                 frame_copy.frame_format.height,
                 frame_copy.frame_color_type,
@@ -408,7 +425,7 @@ pub fn write_to_file(
                 let mut data = Vec::with_capacity(
                     (3 * frame_copy.frame_format.width * frame_copy.frame_format.height) as _,
                 );
-                for chunk in frame_copy.frame_mmap.chunks_exact(4) {
+                for chunk in frame_slice.chunks_exact(4) {
                     data.extend_from_slice(&chunk[..3]);
                 }
                 data
