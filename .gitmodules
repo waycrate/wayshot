@@ -1,0 +1,3 @@
+[submodule "xdg-desktop-portal-wlr"]
+	path = xdg-desktop-portal-wlr
+	url = https://github.com/waycrate/xdg-desktop-portal-wlr
