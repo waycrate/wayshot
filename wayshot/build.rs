@@ -20,7 +20,7 @@ fn main() {
     }
 
     // We just append "out" so it's easy to find all the scdoc output later in line 38.
-    let man_pages: Vec<(String, String)> = read_and_replace_by_ext("./docs", ".scd", ".out");
+    let man_pages: Vec<(String, String)> = read_and_replace_by_ext("../docs", ".scd", ".out");
     for man_page in man_pages {
         let output = OpenOptions::new()
             .write(true)
@@ -35,7 +35,7 @@ fn main() {
 
     // Gzipping the man pages
     let scdoc_output_files: Vec<(String, String)> =
-        read_and_replace_by_ext("./docs", ".out", ".gz");
+        read_and_replace_by_ext("../docs", ".out", ".gz");
     for scdoc_output in scdoc_output_files {
         let mut input = BufReader::new(File::open(scdoc_output.0).unwrap());
         let output = OpenOptions::new()
