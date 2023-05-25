@@ -378,9 +378,9 @@ fn create_shm_fd() -> std::io::Result<RawFd> {
 /// Write an instance of FrameCopy to anything that implements Write trait. Eg: Stdout or a file
 /// on the disk.
 pub fn write_to_file(
-    mut output_file: impl Write,
+    mut output_file: &mut impl Write,
     encoding_format: EncodingFormat,
-    frame_copy: FrameCopy,
+    frame_copy: &FrameCopy,
 ) -> Result<(), Box<dyn Error>> {
     log::debug!(
         "Writing to disk with encoding format: {:#?}",

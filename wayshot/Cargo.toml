@@ -31,6 +31,8 @@ wayland-protocols = { version = "0.30.0", features=["client", "unstable"] }
 
 libwayshot = { path = "../libwayshot" }
 
+image = { version = "0.24", default-features = false, features = ["jpeg", "png", "pnm"] }
+
 [[bin]]
 name = "wayshot"
 path = "src/wayshot.rs"

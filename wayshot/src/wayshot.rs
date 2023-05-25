@@ -2,11 +2,12 @@ use std::{
     cmp, env,
     error::Error,
     fs::File,
-    io::{stdout, BufWriter},
+    io::{stdout, BufWriter, Cursor, Write},
     process::exit,
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use libwayshot::CaptureRegion;
 use wayland_client::{
     globals::{registry_queue_init, GlobalListContents},
     protocol::{wl_output::WlOutput, wl_registry},
@@ -69,6 +70,11 @@ impl wayland_client::Dispatch<wl_registry::WlRegistry, GlobalListContents> for W
     }
 }
 
+struct MutiCaptureMessage {
+    output: WlOutput,
+    region: CaptureRegion,
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args = clap::set_flags().get_matches();
     env::set_var("RUST_LOG", "wayshot=info");
@@ -109,7 +115,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             .clone()
     };
 
-    let frame_copy: libwayshot::FrameCopy = if args.is_present("slurp") {
+    let frame_copy: (Vec<libwayshot::FrameCopy>, Option<(i32, i32)>) = if args.is_present("slurp") {
+        let mut framecopys = Vec::new();
         if args.value_of("slurp").unwrap() == "" {
             log::error!("Failed to recieve geometry.");
             exit(1);
@@ -118,8 +125,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             .expect("Invalid geometry specification");
 
         let outputs = output::get_all_outputs(&mut globals, &mut conn);
-        let mut intersecting_outputs: Vec<output::OutputInfo> = Vec::new();
-        for output in outputs {
+        let mut intersecting_outputs: Vec<MutiCaptureMessage> = Vec::new();
+        for output in outputs.iter() {
             let x1: i32 = cmp::max(output.dimensions.x, region.x_coordinate);
             let y1: i32 = cmp::max(output.dimensions.y, region.y_coordinate);
             let x2: i32 = cmp::min(
@@ -135,24 +142,46 @@ fn main() -> Result<(), Box<dyn Error>> {
             let height = y2 - y1;
 
             if !(width <= 0 || height <= 0) {
-                intersecting_outputs.push(output);
+                let true_x = region.x_coordinate - output.dimensions.x;
+                let true_y = region.y_coordinate - output.dimensions.y;
+                let true_region = CaptureRegion {
+                    x_coordinate: true_x,
+                    y_coordinate: true_y,
+                    width: region.width,
+                    height: region.height,
+                };
+                intersecting_outputs.push(MutiCaptureMessage {
+                    output: output.wl_output.clone(),
+                    region: true_region,
+                });
             }
         }
         if intersecting_outputs.is_empty() {
             log::error!("Provided capture region doesn't intersect with any outputs!");
             exit(1);
         }
-        // NOTE: Figure out box bounds for multi monitor screenshot.
 
-        libwayshot::capture_output_frame(
-            &mut globals,
-            &mut conn,
-            cursor_overlay,
-            output,
-            Some(region),
-        )?
+        for ouput_info in intersecting_outputs {
+            framecopys.push(libwayshot::capture_output_frame(
+                &mut globals,
+                &mut conn,
+                cursor_overlay,
+                ouput_info.output.clone(),
+                Some(ouput_info.region),
+            )?);
+        }
+        (framecopys, Some((region.width, region.height)))
     } else {
-        libwayshot::capture_output_frame(&mut globals, &mut conn, cursor_overlay, output, None)?
+        (
+            vec![libwayshot::capture_output_frame(
+                &mut globals,
+                &mut conn,
+                cursor_overlay,
+                output,
+                None,
+            )?],
+            None,
+        )
     };
 
     let extension = if args.is_present("extension") {
@@ -173,32 +202,82 @@ fn main() -> Result<(), Box<dyn Error>> {
     if extension != libwayshot::EncodingFormat::Png {
         log::debug!("Using custom extension: {:#?}", extension);
     }
-
-    if args.is_present("stdout") {
-        let stdout = stdout();
-        let writer = BufWriter::new(stdout.lock());
-        libwayshot::write_to_file(writer, extension, frame_copy)?;
-    } else {
-        let path = if args.is_present("file") {
-            args.value_of("file").unwrap().trim().to_string()
+    if frame_copy.0.len() == 1 {
+        let frame_copy = &frame_copy.0[0];
+        if args.is_present("stdout") {
+            let stdout = stdout();
+            let mut writer = BufWriter::new(stdout.lock());
+            libwayshot::write_to_file(&mut writer, extension, frame_copy)?;
         } else {
-            let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
-                Ok(n) => n.as_secs().to_string(),
-                Err(_) => {
-                    log::error!("SystemTime before UNIX EPOCH!");
-                    exit(1);
+            let path = if args.is_present("file") {
+                args.value_of("file").unwrap().trim().to_string()
+            } else {
+                let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
+                    Ok(n) => n.as_secs().to_string(),
+                    Err(_) => {
+                        log::error!("SystemTime before UNIX EPOCH!");
+                        exit(1);
+                    }
+                };
+
+                time + match extension {
+                    libwayshot::EncodingFormat::Png => "-wayshot.png",
+                    libwayshot::EncodingFormat::Jpg => "-wayshot.jpg",
+                    libwayshot::EncodingFormat::Ppm => "-wayshot.ppm",
                 }
             };
 
-            time + match extension {
-                libwayshot::EncodingFormat::Png => "-wayshot.png",
-                libwayshot::EncodingFormat::Jpg => "-wayshot.jpg",
-                libwayshot::EncodingFormat::Ppm => "-wayshot.ppm",
-            }
-        };
+            libwayshot::write_to_file(&mut File::create(path)?, extension, frame_copy)?;
+        }
+    } else {
+        let mut images = Vec::new();
+        let (frame_copy, region) = frame_copy;
+        let (width, height) = region.unwrap();
+        for frame_copy in frame_copy {
+            let mut buff = Cursor::new(Vec::new());
+            libwayshot::write_to_file(&mut buff, extension, &frame_copy)?;
+            let image = image::load_from_memory(buff.get_ref())?;
+            let image = image::imageops::resize(
+                &image,
+                width as u32,
+                height as u32,
+                image::imageops::FilterType::Gaussian,
+            );
+            images.push(image);
+        }
+        use image::imageops::overlay;
+        let mut image_bottom = images[0].clone();
+        for image in images {
+            overlay(&mut image_bottom, &image, 0, 0);
+        }
+        if args.is_present("stdout") {
+            let stdout = stdout();
+            let mut buff = Cursor::new(Vec::new());
 
-        libwayshot::write_to_file(File::create(path)?, extension, frame_copy)?;
+            let mut writer = BufWriter::new(stdout.lock());
+            image_bottom.write_to(&mut buff, image::ImageFormat::Png)?;
+            writer.write_all(buff.get_ref())?;
+        } else {
+            let path = if args.is_present("file") {
+                args.value_of("file").unwrap().trim().to_string()
+            } else {
+                let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
+                    Ok(n) => n.as_secs().to_string(),
+                    Err(_) => {
+                        log::error!("SystemTime before UNIX EPOCH!");
+                        exit(1);
+                    }
+                };
+
+                time + match extension {
+                    libwayshot::EncodingFormat::Png => "-wayshot.png",
+                    libwayshot::EncodingFormat::Jpg => "-wayshot.jpg",
+                    libwayshot::EncodingFormat::Ppm => "-wayshot.ppm",
+                }
+            };
+
+            image_bottom.save(path)?;
+        }
     }
-
     Ok(())
 }

@@ -508,6 +508,7 @@ dependencies = [
  "clap",
  "env_logger",
  "flate2",
+ "image",
  "libwayshot",
  "log",
  "wayland-client",
