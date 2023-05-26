@@ -115,74 +115,107 @@ fn main() -> Result<(), Box<dyn Error>> {
             .clone()
     };
 
-    let frame_copy: (Vec<libwayshot::FrameCopy>, Option<(i32, i32)>) = if args.is_present("slurp") {
-        let mut framecopys = Vec::new();
+    let captureregion = if args.is_present("slurp") {
         if args.value_of("slurp").unwrap() == "" {
             log::error!("Failed to recieve geometry.");
             exit(1);
         }
-        let region: libwayshot::CaptureRegion = parse_geometry(args.value_of("slurp").unwrap())
-            .expect("Invalid geometry specification");
-
-        let outputs = output::get_all_outputs(&mut globals, &mut conn);
-        let mut intersecting_outputs: Vec<MutiCaptureMessage> = Vec::new();
-        for output in outputs.iter() {
-            let x1: i32 = cmp::max(output.dimensions.x, region.x_coordinate);
-            let y1: i32 = cmp::max(output.dimensions.y, region.y_coordinate);
-            let x2: i32 = cmp::min(
-                output.dimensions.x + output.dimensions.width,
-                region.x_coordinate + region.width,
-            );
-            let y2: i32 = cmp::min(
-                output.dimensions.y + output.dimensions.height,
-                region.y_coordinate + region.height,
-            );
-
-            let width = x2 - x1;
-            let height = y2 - y1;
-
-            if !(width <= 0 || height <= 0) {
-                let true_x = region.x_coordinate - output.dimensions.x;
-                let true_y = region.y_coordinate - output.dimensions.y;
-                let true_region = CaptureRegion {
-                    x_coordinate: true_x,
-                    y_coordinate: true_y,
-                    width: region.width,
-                    height: region.height,
-                };
-                intersecting_outputs.push(MutiCaptureMessage {
-                    output: output.wl_output.clone(),
-                    region: true_region,
-                });
+        Some(
+            parse_geometry(args.value_of("slurp").unwrap())
+                .expect("Invalid geometry specification"),
+        )
+    } else if !args.is_present("output") {
+        let (mut startx, mut starty) = (0, 0);
+        let (mut endx, mut endy) = (0, 0);
+        let outputinfos = output::get_all_outputs(&mut globals, &mut conn);
+        for outputinfo in outputinfos {
+            if outputinfo.dimensions.x < startx {
+                startx = outputinfo.dimensions.x;
+            }
+            if outputinfo.dimensions.y < starty {
+                starty = outputinfo.dimensions.y;
+            }
+            if outputinfo.dimensions.x + outputinfo.dimensions.width > endx {
+                endx = outputinfo.dimensions.x + outputinfo.dimensions.width;
+            }
+            if outputinfo.dimensions.y + outputinfo.dimensions.height > endy {
+                endy = outputinfo.dimensions.y + outputinfo.dimensions.height;
             }
         }
-        if intersecting_outputs.is_empty() {
-            log::error!("Provided capture region doesn't intersect with any outputs!");
-            exit(1);
-        }
-
-        for ouput_info in intersecting_outputs {
-            framecopys.push(libwayshot::capture_output_frame(
-                &mut globals,
-                &mut conn,
-                cursor_overlay,
-                ouput_info.output.clone(),
-                Some(ouput_info.region),
-            )?);
-        }
-        (framecopys, Some((region.width, region.height)))
+        Some(CaptureRegion {
+            x_coordinate: startx,
+            y_coordinate: starty,
+            width: endx - startx,
+            height: endy - starty,
+        })
     } else {
-        (
-            vec![libwayshot::capture_output_frame(
-                &mut globals,
-                &mut conn,
-                cursor_overlay,
-                output,
-                None,
-            )?],
-            None,
-        )
+        None
     };
+
+    let frame_copy: (Vec<libwayshot::FrameCopy>, Option<(i32, i32)>) =
+        if let Some(region) = captureregion {
+            log::info!("region: {:?}", region);
+            let mut framecopys = Vec::new();
+
+            let outputs = output::get_all_outputs(&mut globals, &mut conn);
+            let mut intersecting_outputs: Vec<MutiCaptureMessage> = Vec::new();
+            for output in outputs.iter() {
+                let x1: i32 = cmp::max(output.dimensions.x, region.x_coordinate);
+                let y1: i32 = cmp::max(output.dimensions.y, region.y_coordinate);
+                let x2: i32 = cmp::min(
+                    output.dimensions.x + output.dimensions.width,
+                    region.x_coordinate + region.width,
+                );
+                let y2: i32 = cmp::min(
+                    output.dimensions.y + output.dimensions.height,
+                    region.y_coordinate + region.height,
+                );
+
+                let width = x2 - x1;
+                let height = y2 - y1;
+
+                if !(width <= 0 || height <= 0) {
+                    let true_x = region.x_coordinate - output.dimensions.x;
+                    let true_y = region.y_coordinate - output.dimensions.y;
+                    let true_region = CaptureRegion {
+                        x_coordinate: true_x,
+                        y_coordinate: true_y,
+                        width: region.width,
+                        height: region.height,
+                    };
+                    intersecting_outputs.push(MutiCaptureMessage {
+                        output: output.wl_output.clone(),
+                        region: true_region,
+                    });
+                }
+            }
+            if intersecting_outputs.is_empty() {
+                log::error!("Provided capture region doesn't intersect with any outputs!");
+                exit(1);
+            }
+
+            for ouput_info in intersecting_outputs {
+                framecopys.push(libwayshot::capture_output_frame(
+                    &mut globals,
+                    &mut conn,
+                    cursor_overlay,
+                    ouput_info.output.clone(),
+                    Some(ouput_info.region),
+                )?);
+            }
+            (framecopys, Some((region.width, region.height)))
+        } else {
+            (
+                vec![libwayshot::capture_output_frame(
+                    &mut globals,
+                    &mut conn,
+                    cursor_overlay,
+                    output,
+                    None,
+                )?],
+                None,
+            )
+        };
 
     let extension = if args.is_present("extension") {
         let ext: &str = &args.value_of("extension").unwrap().trim().to_lowercase();
