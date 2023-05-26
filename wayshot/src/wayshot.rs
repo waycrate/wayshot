@@ -75,6 +75,11 @@ struct MutiCaptureMessage {
     region: CaptureRegion,
 }
 
+enum CaptureWay {
+    Region(CaptureRegion),
+    WayOutput(WlOutput),
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args = clap::set_flags().get_matches();
     env::set_var("RUST_LOG", "wayshot=info");
@@ -102,25 +107,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         exit(1);
     }
 
-    let output: WlOutput = if args.is_present("output") {
-        output::get_wloutput(
-            args.value_of("output").unwrap().trim().to_string(),
-            output::get_all_outputs(&mut globals, &mut conn),
-        )
-    } else {
-        output::get_all_outputs(&mut globals, &mut conn)
-            .first()
-            .unwrap()
-            .wl_output
-            .clone()
-    };
-
-    let captureregion = if args.is_present("slurp") {
+    let capture_area = if args.is_present("slurp") {
         if args.value_of("slurp").unwrap() == "" {
             log::error!("Failed to recieve geometry.");
             exit(1);
         }
-        Some(
+        CaptureWay::Region(
             parse_geometry(args.value_of("slurp").unwrap())
                 .expect("Invalid geometry specification"),
         )
@@ -142,19 +134,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                 endy = outputinfo.dimensions.y + outputinfo.dimensions.height;
             }
         }
-        Some(CaptureRegion {
+        CaptureWay::Region(CaptureRegion {
             x_coordinate: startx,
             y_coordinate: starty,
             width: endx - startx,
             height: endy - starty,
         })
     } else {
-        None
+        CaptureWay::WayOutput(output::get_wloutput(
+            args.value_of("output").unwrap().trim().to_string(),
+            output::get_all_outputs(&mut globals, &mut conn),
+        ))
     };
 
-    let frame_copy: (Vec<libwayshot::FrameCopy>, Option<(i32, i32)>) =
-        if let Some(region) = captureregion {
-            log::info!("region: {:?}", region);
+    let frame_copy: (Vec<libwayshot::FrameCopy>, Option<(i32, i32)>) = match capture_area {
+        CaptureWay::Region(region) => {
             let mut framecopys = Vec::new();
 
             let outputs = output::get_all_outputs(&mut globals, &mut conn);
@@ -204,19 +198,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 )?);
             }
             (framecopys, Some((region.width, region.height)))
-        } else {
-            (
-                vec![libwayshot::capture_output_frame(
-                    &mut globals,
-                    &mut conn,
-                    cursor_overlay,
-                    output,
-                    None,
-                )?],
+        }
+        CaptureWay::WayOutput(output) => (
+            vec![libwayshot::capture_output_frame(
+                &mut globals,
+                &mut conn,
+                cursor_overlay,
+                output,
                 None,
-            )
-        };
-
+            )?],
+            None,
+        ),
+    };
     let extension = if args.is_present("extension") {
         let ext: &str = &args.value_of("extension").unwrap().trim().to_lowercase();
         match ext {
