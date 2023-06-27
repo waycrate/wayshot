@@ -281,7 +281,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut buff = Cursor::new(Vec::new());
 
             let mut writer = BufWriter::new(stdout.lock());
-            image_bottom.write_to(&mut buff, image::ImageFormat::Png)?;
+            image_bottom.write_to(&mut buff, extension)?;
             writer.write_all(buff.get_ref())?;
         } else {
             let path = if args.is_present("file") {

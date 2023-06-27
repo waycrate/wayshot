@@ -98,6 +98,16 @@ pub enum EncodingFormat {
     Ppm,
 }
 
+impl From<EncodingFormat> for image::ImageOutputFormat {
+    fn from(value: EncodingFormat) -> Self {
+        match value {
+            EncodingFormat::Jpg => image::ImageFormat::Jpeg.into(),
+            EncodingFormat::Png => image::ImageFormat::Png.into(),
+            EncodingFormat::Ppm => image::ImageFormat::Pnm.into(),
+        }
+    }
+}
+
 struct CaptureFrameState {
     formats: Vec<FrameFormat>,
     state: Option<FrameState>,
