@@ -22,14 +22,10 @@ const SHIFT10BITS_2: u32 = 10;
 /// isn't possible. Conversion is happening inplace.
 pub fn create_converter(format: wl_shm::Format) -> Option<Box<dyn Convert>> {
     match format {
-        wl_shm::Format::Xbgr8888 | wl_shm::Format::Abgr8888 => {
-            Some(Box::new(ConvertNone::default()))
-        }
-        wl_shm::Format::Xrgb8888 | wl_shm::Format::Argb8888 => {
-            Some(Box::new(ConvertRGB8::default()))
-        }
+        wl_shm::Format::Xbgr8888 | wl_shm::Format::Abgr8888 => Some(Box::<ConvertNone>::default()),
+        wl_shm::Format::Xrgb8888 | wl_shm::Format::Argb8888 => Some(Box::<ConvertRGB8>::default()),
         wl_shm::Format::Xbgr2101010 | wl_shm::Format::Abgr2101010 => {
-            Some(Box::new(ConvertBGR10::default()))
+            Some(Box::<ConvertBGR10>::default())
         }
         _ => None,
     }

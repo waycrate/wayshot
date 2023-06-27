@@ -98,6 +98,26 @@ pub enum EncodingFormat {
     Ppm,
 }
 
+impl From<EncodingFormat> for image::ImageOutputFormat {
+    fn from(format: EncodingFormat) -> Self {
+        match format {
+            EncodingFormat::Jpg => image::ImageFormat::Jpeg.into(),
+            EncodingFormat::Png => image::ImageFormat::Png.into(),
+            EncodingFormat::Ppm => image::ImageFormat::Pnm.into(),
+        }
+    }
+}
+
+impl From<EncodingFormat> for &str {
+    fn from(format: EncodingFormat) -> Self {
+        match format {
+            EncodingFormat::Jpg => "jpg",
+            EncodingFormat::Png => "png",
+            EncodingFormat::Ppm => "ppm",
+        }
+    }
+}
+
 struct CaptureFrameState {
     formats: Vec<FrameFormat>,
     state: Option<FrameState>,
@@ -378,9 +398,9 @@ fn create_shm_fd() -> std::io::Result<RawFd> {
 /// Write an instance of FrameCopy to anything that implements Write trait. Eg: Stdout or a file
 /// on the disk.
 pub fn write_to_file(
-    mut output_file: impl Write,
+    mut output_file: &mut impl Write,
     encoding_format: EncodingFormat,
-    frame_copy: FrameCopy,
+    frame_copy: &FrameCopy,
 ) -> Result<(), Box<dyn Error>> {
     log::debug!(
         "Writing to disk with encoding format: {:#?}",
