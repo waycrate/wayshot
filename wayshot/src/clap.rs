@@ -8,6 +8,7 @@ pub fn set_flags() -> Command<'static> {
         .arg(
             arg!(-d - -debug)
                 .required(false)
+                .conflicts_with("stdout")
                 .takes_value(false)
                 .help("Enable debug mode"),
         )
