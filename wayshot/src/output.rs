@@ -3,7 +3,7 @@ use wayland_client::{
     delegate_noop,
     globals::GlobalList,
     protocol::{wl_output, wl_output::WlOutput, wl_registry, wl_registry::WlRegistry},
-    Connection, Dispatch, QueueHandle,
+    Connection, Dispatch, QueueHandle, WEnum,
 };
 use wayland_protocols::xdg::xdg_output::zv1::client::{
     zxdg_output_manager_v1::ZxdgOutputManagerV1, zxdg_output_v1, zxdg_output_v1::ZxdgOutputV1,
@@ -13,6 +13,7 @@ use wayland_protocols::xdg::xdg_output::zv1::client::{
 pub struct OutputInfo {
     pub wl_output: WlOutput,
     pub name: String,
+    pub transform: wl_output::Transform,
     pub dimensions: OutputPositioning,
 }
 
@@ -30,7 +31,7 @@ struct OutputCaptureState {
 
 impl Dispatch<WlRegistry, ()> for OutputCaptureState {
     fn event(
-        _: &mut Self,
+        state: &mut Self,
         wl_registry: &WlRegistry,
         event: wl_registry::Event,
         _: &(),
@@ -49,7 +50,18 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
         {
             if interface == "wl_output" {
                 if version >= 4 {
-                    let _ = wl_registry.bind::<wl_output::WlOutput, _, _>(name, 4, qh, ());
+                    let output = wl_registry.bind::<wl_output::WlOutput, _, _>(name, 4, qh, ());
+                    state.outputs.push(OutputInfo {
+                        wl_output: output,
+                        name: "".to_string(),
+                        transform: wl_output::Transform::Normal,
+                        dimensions: OutputPositioning {
+                            x: 0,
+                            y: 0,
+                            width: 0,
+                            height: 0,
+                        },
+                    });
                 } else {
                     log::error!("Ignoring a wl_output with version < 4.");
                 }
@@ -67,20 +79,23 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        /* > The name event is sent after binding the output object. This event
-         * is only sent once per output object, and the name does not change
-         * over the lifetime of the wl_output global. */
-        if let wl_output::Event::Name { name } = event {
-            state.outputs.push(OutputInfo {
-                wl_output: wl_output.clone(),
-                name,
-                dimensions: OutputPositioning {
-                    x: 0,
-                    y: 0,
-                    width: 0,
-                    height: 0,
-                },
-            });
+        let output: &mut OutputInfo = state
+            .outputs
+            .iter_mut()
+            .find(|x| x.wl_output == *wl_output)
+            .unwrap();
+
+        match event {
+            wl_output::Event::Name { name } => {
+                output.name = name;
+            }
+            wl_output::Event::Geometry {
+                transform: WEnum::Value(transform),
+                ..
+            } => {
+                output.transform = transform;
+            }
+            _ => (),
         }
     }
 }
