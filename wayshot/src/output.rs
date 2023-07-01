@@ -1,4 +1,4 @@
-use std::{process::exit, sync::Arc, sync::Mutex};
+use std::process::exit;
 use wayland_client::{
     delegate_noop,
     globals::GlobalList,
@@ -87,30 +87,30 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
 
 delegate_noop!(OutputCaptureState: ignore ZxdgOutputManagerV1);
 
-impl Dispatch<ZxdgOutputV1, Arc<Mutex<OutputPositioning>>> for OutputCaptureState {
+impl Dispatch<ZxdgOutputV1, usize> for OutputCaptureState {
     fn event(
-        _: &mut Self,
+        state: &mut Self,
         _: &ZxdgOutputV1,
         event: zxdg_output_v1::Event,
-        outpos: &Arc<Mutex<OutputPositioning>>,
+        index: &usize,
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        if let Ok(mut output_positioning) = outpos.lock() {
-            match event {
-                zxdg_output_v1::Event::LogicalPosition { x, y } => {
-                    output_positioning.x = x;
-                    output_positioning.y = y;
-                    log::debug!("Logical position event fired!");
-                }
-                zxdg_output_v1::Event::LogicalSize { width, height } => {
-                    output_positioning.width = width;
-                    output_positioning.height = height;
-                    log::debug!("Logical size event fired!");
-                }
-                _ => {}
-            };
-        }
+        let output_info = state.outputs.get_mut(*index).unwrap();
+
+        match event {
+            zxdg_output_v1::Event::LogicalPosition { x, y } => {
+                output_info.dimensions.x = x;
+                output_info.dimensions.y = y;
+                log::debug!("Logical position event fired!");
+            }
+            zxdg_output_v1::Event::LogicalSize { width, height } => {
+                output_info.dimensions.width = width;
+                output_info.dimensions.height = height;
+                log::debug!("Logical size event fired!");
+            }
+            _ => {}
+        };
     }
 }
 
@@ -136,32 +136,26 @@ pub fn get_all_outputs(globals: &mut GlobalList, conn: &mut Connection) -> Vec<O
     event_queue.roundtrip(&mut state).unwrap();
     event_queue.roundtrip(&mut state).unwrap();
 
-    // We loop over each output and get its position data.
-    let mut data: Vec<OutputInfo> = Vec::new();
-    for mut output in state.outputs.clone() {
-        let output_position: Arc<Mutex<OutputPositioning>> =
-            Arc::new(Mutex::new(OutputPositioning {
-                x: 0,
-                y: 0,
-                width: 0,
-                height: 0,
-            }));
+    let mut xdg_outputs: Vec<ZxdgOutputV1> = Vec::new();
 
-        let xdg_output =
-            zxdg_output_manager.get_xdg_output(&output.wl_output, &qh, output_position.clone());
-        event_queue.roundtrip(&mut state).unwrap();
-        xdg_output.destroy();
-
-        // Set the output dimensions
-        output.dimensions = output_position.lock().unwrap().clone();
-        data.push(output);
+    // We loop over each output and request its position data.
+    for (index, output) in state.outputs.clone().iter().enumerate() {
+        let xdg_output = zxdg_output_manager.get_xdg_output(&output.wl_output, &qh, index);
+        xdg_outputs.push(xdg_output);
     }
-    if data.is_empty() {
+
+    event_queue.roundtrip(&mut state).unwrap();
+
+    for xdg_output in xdg_outputs {
+        xdg_output.destroy();
+    }
+
+    if state.outputs.is_empty() {
         log::error!("Compositor did not advertise any wl_output devices!");
         exit(1);
     }
-    log::debug!("Outputs detected: {:#?}", data);
-    data
+    log::debug!("Outputs detected: {:#?}", state.outputs);
+    state.outputs
 }
 
 /// Get a wl_output object from the output name.
