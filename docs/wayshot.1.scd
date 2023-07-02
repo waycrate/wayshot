@@ -50,11 +50,6 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 	Emit image data to stdout. The following flag is helpful to pipe image data
 	to other programs.
 
-# KNOWN BUGS
-
-Feel free to send patches for the following:
-- *--slurp* flag does not work as intended on multi monitor systems. After multiple attempts at fixing this I have failed time and again.
-
 # SEE ALSO
 	- wayshot(7)
 
