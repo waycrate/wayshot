@@ -33,7 +33,11 @@ use wayland_client::{
     delegate_noop,
     globals::GlobalList,
     protocol::{
-        wl_buffer::WlBuffer, wl_output::WlOutput, wl_shm, wl_shm::Format, wl_shm::WlShm,
+        wl_buffer::WlBuffer,
+        wl_output::{self, WlOutput},
+        wl_shm,
+        wl_shm::Format,
+        wl_shm::WlShm,
         wl_shm_pool::WlShmPool,
     },
     Connection, Dispatch, QueueHandle,
@@ -72,6 +76,7 @@ pub struct FrameCopy {
     pub frame_format: FrameFormat,
     pub frame_color_type: ColorType,
     pub frame_mmap: MmapMut,
+    pub transform: wl_output::Transform,
 }
 
 /// Struct to store region capture details.
@@ -192,6 +197,7 @@ pub fn capture_output_frame(
     conn: &mut Connection,
     cursor_overlay: i32,
     output: WlOutput,
+    transform: wl_output::Transform,
     capture_region: Option<CaptureRegion>,
 ) -> Result<FrameCopy, Box<dyn Error>> {
     // Connecting to wayland environment.
@@ -314,6 +320,7 @@ pub fn capture_output_frame(
                         frame_format,
                         frame_color_type,
                         frame_mmap,
+                        transform,
                     });
                 }
             }

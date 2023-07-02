@@ -172,14 +172,3 @@ pub fn get_all_outputs(globals: &mut GlobalList, conn: &mut Connection) -> Vec<O
     log::debug!("Outputs detected: {:#?}", state.outputs);
     state.outputs
 }
-
-/// Get a wl_output object from the output name.
-pub fn get_wloutput(name: String, outputs: Vec<OutputInfo>) -> WlOutput {
-    for output in outputs {
-        if output.name == name {
-            return output.wl_output;
-        }
-    }
-    log::error!("Error: No output of name \"{}\" was found", name);
-    exit(1);
-}
