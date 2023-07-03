@@ -344,7 +344,7 @@ fn create_shm_fd() -> std::io::Result<RawFd> {
     loop {
         // Create a file that closes on succesful execution and seal it's operations.
         match memfd::memfd_create(
-            CStr::from_bytes_with_nul(b"wayshot\0").unwrap(),
+            CStr::from_bytes_with_nul(b"libwayshot\0").unwrap(),
             memfd::MemFdCreateFlag::MFD_CLOEXEC | memfd::MemFdCreateFlag::MFD_ALLOW_SEALING,
         ) {
             Ok(fd) => {
@@ -368,7 +368,7 @@ fn create_shm_fd() -> std::io::Result<RawFd> {
     // Fallback to using shm_open.
     let sys_time = SystemTime::now();
     let mut mem_file_handle = format!(
-        "/wayshot-{}",
+        "/libwayshot-{}",
         sys_time.duration_since(UNIX_EPOCH).unwrap().subsec_nanos()
     );
     loop {
@@ -396,7 +396,7 @@ fn create_shm_fd() -> std::io::Result<RawFd> {
             Err(nix::errno::Errno::EEXIST) => {
                 // If a file with that handle exists then change the handle
                 mem_file_handle = format!(
-                    "/wayshot-{}",
+                    "/libwayshot-{}",
                     sys_time.duration_since(UNIX_EPOCH).unwrap().subsec_nanos()
                 );
                 continue;
