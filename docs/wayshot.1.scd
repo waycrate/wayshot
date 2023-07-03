@@ -29,6 +29,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 		- jpg
 		- png (Default encoder)
 		- ppm
+		- qoi
 
 *-f*, *--file*
 	Set a custom file path. The default path is `./{current_unix_timestamp}-wayshot.{encoder}`

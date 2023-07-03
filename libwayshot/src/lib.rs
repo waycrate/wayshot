@@ -23,6 +23,7 @@ use image::{
         jpeg::JpegEncoder,
         png::PngEncoder,
         pnm::{self, PnmEncoder},
+        qoi::QoiEncoder,
     },
     ColorType, ImageEncoder,
 };
@@ -99,8 +100,10 @@ pub enum EncodingFormat {
     Jpg,
     /// Png encoder.
     Png,
-    /// Ppm encoder
+    /// Ppm encoder.
     Ppm,
+    /// Qoi encoder.
+    Qoi,
 }
 
 impl From<EncodingFormat> for image::ImageOutputFormat {
@@ -109,6 +112,7 @@ impl From<EncodingFormat> for image::ImageOutputFormat {
             EncodingFormat::Jpg => image::ImageFormat::Jpeg.into(),
             EncodingFormat::Png => image::ImageFormat::Png.into(),
             EncodingFormat::Ppm => image::ImageFormat::Pnm.into(),
+            EncodingFormat::Qoi => image::ImageFormat::Qoi.into(),
         }
     }
 }
@@ -119,6 +123,7 @@ impl From<EncodingFormat> for &str {
             EncodingFormat::Jpg => "jpg",
             EncodingFormat::Png => "png",
             EncodingFormat::Ppm => "ppm",
+            EncodingFormat::Qoi => "qoi",
         }
     }
 }
@@ -425,6 +430,15 @@ pub fn write_to_file(
         }
         EncodingFormat::Png => {
             PngEncoder::new(&mut output_file).write_image(
+                &frame_copy.frame_mmap,
+                frame_copy.frame_format.width,
+                frame_copy.frame_format.height,
+                frame_copy.frame_color_type,
+            )?;
+            output_file.flush()?;
+        }
+        EncodingFormat::Qoi => {
+            QoiEncoder::new(&mut output_file).write_image(
                 &frame_copy.frame_mmap,
                 frame_copy.frame_format.width,
                 frame_copy.frame_format.height,

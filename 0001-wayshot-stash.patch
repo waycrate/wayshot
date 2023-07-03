@@ -1,0 +1,183 @@
+From a26d79af2673efb5b8a2d1aa1db70ef21cdf0cb2 Mon Sep 17 00:00:00 2001
+From: Shinyzenith <aakashsensharma@gmail.com>
+Date: Sun, 2 Jul 2023 20:23:58 +0530
+Subject: [PATCH] stash
+
+Signed-off-by: Shinyzenith <aakashsensharma@gmail.com>
+---
+ Cargo.lock             | 10 ++++++++++
+ docs/wayshot.1.scd     |  1 +
+ docs/wayshot.7.scd     |  4 ++--
+ libwayshot/Cargo.toml  |  2 +-
+ libwayshot/src/lib.rs  | 20 ++++++++++++++++----
+ wayshot/src/wayshot.rs |  4 +++-
+ 6 files changed, 33 insertions(+), 8 deletions(-)
+
+diff --git a/Cargo.lock b/Cargo.lock
+index 65437c6..54c3f8d 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -173,6 +173,7 @@ dependencies = [
+  "num-rational",
+  "num-traits",
+  "png",
++ "qoi",
+ ]
+ 
+ [[package]]
+@@ -358,6 +359,15 @@ dependencies = [
+  "unicode-ident",
+ ]
+ 
++[[package]]
++name = "qoi"
++version = "0.4.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "7f6d64c71eb498fe9eae14ce4ec935c555749aef511cca85b5568910d6e48001"
++dependencies = [
++ "bytemuck",
++]
++
+ [[package]]
+ name = "quick-xml"
+ version = "0.23.1"
+diff --git a/docs/wayshot.1.scd b/docs/wayshot.1.scd
+index c45b581..7f01aa0 100644
+--- a/docs/wayshot.1.scd
++++ b/docs/wayshot.1.scd
+@@ -29,6 +29,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
+ 		- jpg
+ 		- png (Default encoder)
+ 		- ppm
++		- qoi
+ 
+ *-f*, *--file*
+ 	Set a custom file path. The default path is `./{current_unix_timestamp}-wayshot.{encoder}`
+diff --git a/docs/wayshot.7.scd b/docs/wayshot.7.scd
+index 6ac3f11..ca204fa 100644
+--- a/docs/wayshot.7.scd
++++ b/docs/wayshot.7.scd
+@@ -9,7 +9,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
+ *wayshot* [_options_]
+ 
+ # REGION SELECTION
+-wayshot -s "$(slurp -f '%x %y %w %h')"
++wayshot -s "$(slurp)"
+ 
+ # FULLSCREEN
+ 
+@@ -30,7 +30,7 @@ wayshot -o eDP-1
+ 
+ # PICK A HEX COLOR CODE, USING IMAGEMAGICk
+ 
+-wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-|egrep "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
++wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
+ 
+ # PICK A HEX COLOR CODE WITHOUT USING IMAGEMAGICK
+ 
+diff --git a/libwayshot/Cargo.toml b/libwayshot/Cargo.toml
+index 8b8b2a4..6c2d3dc 100644
+--- a/libwayshot/Cargo.toml
++++ b/libwayshot/Cargo.toml
+@@ -9,7 +9,7 @@ version = "0.1.0"
+ edition = "2021"
+ 
+ [dependencies]
+-image = { version = "0.24", default-features = false, features = ["jpeg", "png", "pnm"] }
++image = { version = "0.24", default-features = false, features = ["jpeg", "png", "pnm", "qoi"] }
+ log = "0.4.17"
+ memmap2 = "0.5.10"
+ nix = "0.26.2"
+diff --git a/libwayshot/src/lib.rs b/libwayshot/src/lib.rs
+index a0adbf9..f9513e0 100644
+--- a/libwayshot/src/lib.rs
++++ b/libwayshot/src/lib.rs
+@@ -23,6 +23,7 @@ use image::{
+         jpeg::JpegEncoder,
+         png::PngEncoder,
+         pnm::{self, PnmEncoder},
++        qoi::QoiEncoder,
+     },
+     ColorType, ImageEncoder,
+ };
+@@ -94,8 +95,10 @@ pub enum EncodingFormat {
+     Jpg,
+     /// Png encoder.
+     Png,
+-    /// Ppm encoder
++    /// Ppm encoder.
+     Ppm,
++    // Qoi encoder.
++    Qoi,
+ }
+ 
+ struct CaptureFrameState {
+@@ -312,7 +315,7 @@ fn create_shm_fd() -> std::io::Result<RawFd> {
+     loop {
+         // Create a file that closes on succesful execution and seal it's operations.
+         match memfd::memfd_create(
+-            CStr::from_bytes_with_nul(b"wayshot\0").unwrap(),
++            CStr::from_bytes_with_nul(b"libwayshot\0").unwrap(),
+             memfd::MemFdCreateFlag::MFD_CLOEXEC | memfd::MemFdCreateFlag::MFD_ALLOW_SEALING,
+         ) {
+             Ok(fd) => {
+@@ -336,7 +339,7 @@ fn create_shm_fd() -> std::io::Result<RawFd> {
+     // Fallback to using shm_open.
+     let sys_time = SystemTime::now();
+     let mut mem_file_handle = format!(
+-        "/wayshot-{}",
++        "/libwayshot-{}",
+         sys_time.duration_since(UNIX_EPOCH).unwrap().subsec_nanos()
+     );
+     loop {
+@@ -364,7 +367,7 @@ fn create_shm_fd() -> std::io::Result<RawFd> {
+             Err(nix::errno::Errno::EEXIST) => {
+                 // If a file with that handle exists then change the handle
+                 mem_file_handle = format!(
+-                    "/wayshot-{}",
++                    "/libwayshot-{}",
+                     sys_time.duration_since(UNIX_EPOCH).unwrap().subsec_nanos()
+                 );
+                 continue;
+@@ -405,6 +408,15 @@ pub fn write_to_file(
+             )?;
+             output_file.flush()?;
+         }
++        EncodingFormat::Qoi => {
++            QoiEncoder::new(&mut output_file).write_image(
++                &frame_copy.frame_mmap,
++                frame_copy.frame_format.width,
++                frame_copy.frame_format.height,
++                frame_copy.frame_color_type,
++            )?;
++            output_file.flush()?;
++        }
+         EncodingFormat::Ppm => {
+             let rgb8_data = if let ColorType::Rgba8 = frame_copy.frame_color_type {
+                 let mut data = Vec::with_capacity(
+diff --git a/wayshot/src/wayshot.rs b/wayshot/src/wayshot.rs
+index f8458cd..b5162eb 100644
+--- a/wayshot/src/wayshot.rs
++++ b/wayshot/src/wayshot.rs
+@@ -161,8 +161,9 @@ fn main() -> Result<(), Box<dyn Error>> {
+             "jpeg" | "jpg" => libwayshot::EncodingFormat::Jpg,
+             "png" => libwayshot::EncodingFormat::Png,
+             "ppm" => libwayshot::EncodingFormat::Ppm,
++            "qoi" => libwayshot::EncodingFormat::Qoi,
+             _ => {
+-                log::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm");
++                log::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm\n5) qoi");
+                 exit(1);
+             }
+         }
+@@ -194,6 +195,7 @@ fn main() -> Result<(), Box<dyn Error>> {
+                 libwayshot::EncodingFormat::Png => "-wayshot.png",
+                 libwayshot::EncodingFormat::Jpg => "-wayshot.jpg",
+                 libwayshot::EncodingFormat::Ppm => "-wayshot.ppm",
++                libwayshot::EncodingFormat::Qoi => "-wayshot.qoi",
+             }
+         };
+ 
+-- 
+2.41.0
+

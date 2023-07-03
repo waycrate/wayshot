@@ -62,8 +62,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             "jpeg" | "jpg" => libwayshot::EncodingFormat::Jpg,
             "png" => libwayshot::EncodingFormat::Png,
             "ppm" => libwayshot::EncodingFormat::Ppm,
+            "qoi" => libwayshot::EncodingFormat::Qoi,
             _ => {
-                log::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm");
+                log::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm\n5) qoi");
                 exit(1);
             }
         }
