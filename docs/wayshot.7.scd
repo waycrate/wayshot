@@ -9,7 +9,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 *wayshot* [_options_]
 
 # REGION SELECTION
-wayshot -s "$(slurp -f '%x %y %w %h')"
+wayshot -s "$(slurp)"
 
 # FULLSCREEN
 
@@ -30,15 +30,15 @@ wayshot -o eDP-1
 
 # PICK A HEX COLOR CODE, USING IMAGEMAGICk
 
-wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-|egrep "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
+wayshot -s "$(slurp)" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
 
 # PICK A HEX COLOR CODE WITHOUT USING IMAGEMAGICK
 
-wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout -e ppm | tail -c 3 | od -An -tuC | xargs printf '#%02X%02X%02X\n'
+wayshot -s "$(slurp -p)" --stdout -e ppm | tail -c 3 | od -An -tuC | xargs printf '#%02X%02X%02X\n'
 
 # PICK A COLOR, USING IMAGEMAGICK
 
-wayshot -s "$(slurp -p -f '%x %y %w %h')" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-
+wayshot -s "$(slurp -p)" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-
 
 # AUTHORS
 
