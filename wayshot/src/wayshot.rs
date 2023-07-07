@@ -54,15 +54,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
     log::trace!("Logger initialized.");
 
-    let extension = if args.get_flag("extension") {
-        let ext: &str = &args
-            .get_one::<&str>("extension")
-            .unwrap()
-            .trim()
-            .to_lowercase();
+    let extension = if let Some(extension) = args.get_one::<String>("extension") {
+        let ext = extension.trim().to_lowercase();
         log::debug!("Using custom extension: {:#?}", ext);
 
-        match ext {
+        match ext.as_str() {
             "jpeg" | "jpg" => libwayshot::EncodingFormat::Jpg,
             "png" => libwayshot::EncodingFormat::Png,
             "ppm" => libwayshot::EncodingFormat::Ppm,
@@ -81,8 +77,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if args.get_flag("stdout") {
         file_is_stdout = true;
-    } else if args.get_flag("file") {
-        file_path = Some(args.get_one::<String>("file").unwrap().trim().to_string());
+    } else if let Some(filepath) = args.get_one::<String>("file") {
+        file_path = Some(filepath.trim().to_string());
     } else {
         file_path = Some(utils::get_default_file_name(extension));
     }
@@ -103,20 +99,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         cursor_overlay = 1;
     }
 
-    let capture_area = if args.get_flag("slurp") {
-        match utils::parse_geometry(args.get_one::<&str>("slurp").unwrap()) {
+    let capture_area = if let Some(slurpregion) = args.get_one::<String>("slurp") {
+        match utils::parse_geometry(slurpregion) {
             Some(region) => (wl_output::Transform::Normal, region),
             None => {
                 log::error!("Invalid geometry specification");
                 exit(1);
             }
         }
-    } else if args.get_flag("output") {
-        let output_name = args.get_one::<&str>("output").unwrap().trim().to_string();
+    } else if let Some(output_name) = args.get_one::<String>("output") {
         let outputs = output::get_all_outputs(&mut globals, &mut conn);
         let mut capture_info = None;
         for output in outputs {
-            if output.name == output_name {
+            if &output.name == output_name {
                 capture_info = Some((
                     output.transform,
                     CaptureRegion {
