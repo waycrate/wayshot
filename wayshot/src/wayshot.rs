@@ -129,7 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        if let None = capture_info {
+        if capture_info.is_none() {
             log::error!("No output found!\n");
             exit(1);
         }
@@ -213,7 +213,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let frame_copy = &frame_copy.0[0];
 
         buffer = Cursor::new(Vec::new());
-        libwayshot::write_to_file(&mut buffer, extension, &frame_copy)?;
+        libwayshot::write_to_file(&mut buffer, extension, frame_copy)?;
 
         let image = image::load_from_memory(buffer.get_ref())?;
         composited_image = image_util::rotate_image_buffer(
