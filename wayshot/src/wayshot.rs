@@ -47,15 +47,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = clap::set_flags().get_matches();
     env::set_var("RUST_LOG", "wayshot=info");
 
-    if args.is_present("debug") {
+    if args.get_flag("debug") {
         env::set_var("RUST_LOG", "wayshot=trace");
     }
 
     env_logger::init();
     log::trace!("Logger initialized.");
 
-    let extension = if args.is_present("extension") {
-        let ext: &str = &args.value_of("extension").unwrap().trim().to_lowercase();
+    let extension = if args.get_flag("extension") {
+        let ext: &str = &args
+            .get_one::<&str>("extension")
+            .unwrap()
+            .trim()
+            .to_lowercase();
         log::debug!("Using custom extension: {:#?}", ext);
 
         match ext {
@@ -75,10 +79,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut file_is_stdout: bool = false;
     let mut file_path: Option<String> = None;
 
-    if args.is_present("stdout") {
+    if args.get_flag("stdout") {
         file_is_stdout = true;
-    } else if args.is_present("file") {
-        file_path = Some(args.value_of("file").unwrap().trim().to_string());
+    } else if args.get_flag("file") {
+        file_path = Some(args.get_one::<String>("file").unwrap().trim().to_string());
     } else {
         file_path = Some(utils::get_default_file_name(extension));
     }
@@ -86,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut conn = Connection::connect_to_env().unwrap();
     let (mut globals, _) = registry_queue_init::<WayshotState>(&conn).unwrap();
 
-    if args.is_present("listoutputs") {
+    if args.get_flag("listoutputs") {
         let valid_outputs = output::get_all_outputs(&mut globals, &mut conn);
         for output in valid_outputs {
             log::info!("{:#?}", output.name);
@@ -95,20 +99,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let mut cursor_overlay: i32 = 0;
-    if args.is_present("cursor") {
+    if args.get_flag("cursor") {
         cursor_overlay = 1;
     }
 
-    let capture_area = if args.is_present("slurp") {
-        match utils::parse_geometry(args.value_of("slurp").unwrap()) {
+    let capture_area = if args.get_flag("slurp") {
+        match utils::parse_geometry(args.get_one::<&str>("slurp").unwrap()) {
             Some(region) => (wl_output::Transform::Normal, region),
             None => {
                 log::error!("Invalid geometry specification");
                 exit(1);
             }
         }
-    } else if args.is_present("output") {
-        let output_name = args.value_of("output").unwrap().trim().to_string();
+    } else if args.get_flag("output") {
+        let output_name = args.get_one::<&str>("output").unwrap().trim().to_string();
         let outputs = output::get_all_outputs(&mut globals, &mut conn);
         let mut capture_info = None;
         for output in outputs {
