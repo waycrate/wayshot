@@ -57,4 +57,12 @@ pub fn set_flags() -> Command {
                 .conflicts_with("slurp")
                 .help("Choose a particular display to screenshot"),
         )
+        .arg(
+            arg!(--chooseoutput)
+                .required(false)
+                .action(ArgAction::SetTrue)
+                .conflicts_with("slurp")
+                .conflicts_with("output")
+                .help("Present a fuzzy selector for outputs"),
+        )
 }

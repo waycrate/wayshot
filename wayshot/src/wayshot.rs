@@ -21,6 +21,8 @@ mod image_util;
 mod output;
 mod utils;
 
+use dialoguer::{theme::ColorfulTheme, FuzzySelect};
+
 // TODO: Create a xdg-shell surface, check for the enter event, grab the output from it.
 
 struct WayshotState {}
@@ -41,6 +43,20 @@ struct IntersectingOutput {
     output: WlOutput,
     region: CaptureRegion,
     transform: wl_output::Transform,
+}
+
+fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
+where
+    T: ToString,
+{
+    let Ok(selection) = FuzzySelect::with_theme(&ColorfulTheme::default())
+        .with_prompt("Choose Screen")
+        .default(0)
+        .items(ouputs)
+        .interact() else {
+        return None;
+    };
+    Some(selection)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -130,6 +146,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
 
         capture_info.unwrap()
+    } else if args.get_flag("chooseoutput") {
+        let outputs = output::get_all_outputs(&mut globals, &mut conn);
+        let output_names: Vec<String> = outputs
+            .iter()
+            .map(|display| display.name.to_string())
+            .collect();
+        if let Some(index) = select_ouput(&output_names) {
+            (
+                outputs[index].transform,
+                CaptureRegion {
+                    x_coordinate: outputs[index].dimensions.x,
+                    y_coordinate: outputs[index].dimensions.y,
+                    width: outputs[index].dimensions.width,
+                    height: outputs[index].dimensions.height,
+                },
+            )
+        } else {
+            log::error!("No output found!\n");
+            exit(1);
+        }
     } else {
         let output = &output::get_all_outputs(&mut globals, &mut conn)[0];
         (

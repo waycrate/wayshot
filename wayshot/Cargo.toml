@@ -26,6 +26,8 @@ libwayshot = { version="0.1.2", path = "../libwayshot" }
 
 image = { version = "0.24", default-features = false, features = ["jpeg", "png", "pnm"] }
 
+dialoguer = { version = "0.10.4", features = ["fuzzy-select"] }
+
 [[bin]]
 name = "wayshot"
 path = "src/wayshot.rs"
