@@ -9,7 +9,8 @@ version = "0.1.2"
 edition = "2021"
 
 [dependencies]
-image = { version = "0.24", default-features = false, features = ["jpeg", "png", "pnm", "qoi"] }
+anyhow = "1"
+image = { version = "0.24", default-features = false }
 log = "0.4.19"
 memmap2 = "0.7.1"
 nix = "0.26.2"
