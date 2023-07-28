@@ -3,7 +3,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-pub fn parse_geometry(g: &str) -> Option<libwayshot::CaptureRegion> {
+use libwayshot::CaptureRegion;
+
+pub fn parse_geometry(g: &str) -> Option<CaptureRegion> {
     let tail = g.trim();
     let x_coordinate: i32;
     let y_coordinate: i32;
@@ -30,7 +32,7 @@ pub fn parse_geometry(g: &str) -> Option<libwayshot::CaptureRegion> {
         height = tail.parse::<i32>().ok()?;
     }
 
-    Some(libwayshot::CaptureRegion {
+    Some(CaptureRegion {
         x_coordinate,
         y_coordinate,
         width,
@@ -38,7 +40,42 @@ pub fn parse_geometry(g: &str) -> Option<libwayshot::CaptureRegion> {
     })
 }
 
-pub fn get_default_file_name(extension: libwayshot::EncodingFormat) -> String {
+/// Supported image encoding formats.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum EncodingFormat {
+    /// Jpeg / jpg encoder.
+    Jpg,
+    /// Png encoder.
+    Png,
+    /// Ppm encoder.
+    Ppm,
+    /// Qoi encoder.
+    Qoi,
+}
+
+impl From<EncodingFormat> for image::ImageOutputFormat {
+    fn from(format: EncodingFormat) -> Self {
+        match format {
+            EncodingFormat::Jpg => image::ImageFormat::Jpeg.into(),
+            EncodingFormat::Png => image::ImageFormat::Png.into(),
+            EncodingFormat::Ppm => image::ImageFormat::Pnm.into(),
+            EncodingFormat::Qoi => image::ImageFormat::Qoi.into(),
+        }
+    }
+}
+
+impl From<EncodingFormat> for &str {
+    fn from(format: EncodingFormat) -> Self {
+        match format {
+            EncodingFormat::Jpg => "jpg",
+            EncodingFormat::Png => "png",
+            EncodingFormat::Ppm => "ppm",
+            EncodingFormat::Qoi => "qoi",
+        }
+    }
+}
+
+pub fn get_default_file_name(extension: EncodingFormat) -> String {
     let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(n) => n.as_secs().to_string(),
         Err(_) => {
