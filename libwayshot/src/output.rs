@@ -1,5 +1,8 @@
 use wayland_client::protocol::{wl_output, wl_output::WlOutput};
 
+/// Represents an accessible wayland output.
+///
+/// Do not instantiate, instead use [`crate::WayshotConnection::get_all_outputs`].
 #[derive(Debug, Clone)]
 pub struct OutputInfo {
     pub wl_output: WlOutput,

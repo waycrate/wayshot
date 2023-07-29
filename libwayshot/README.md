@@ -8,3 +8,15 @@
   </p>
 </p>
 
+# `libwayshot`
+
+`libwayshot` is a convenient wrapper over the wlroots screenshot protocol that provides a simple API to take screenshots with.
+
+# Example usage
+
+```rust
+use libwayshot::WayshotConnection;
+
+let wayshot_connection = WayshotConnection::new().unwrap();
+let image_buffer = wayshot_connection.screenshot_all().unwrap();
+```

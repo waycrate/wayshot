@@ -1,3 +1,8 @@
+//! `libwayshot` is a convenient wrapper over the wlroots screenshot protocol
+//! that provides a simple API to take screenshots with.
+//!
+//! To get started, look at [`WayshotConnection`].
+
 mod convert;
 mod dispatch;
 mod image_util;
@@ -58,6 +63,12 @@ struct IntersectingOutput {
     transform: Transform,
 }
 
+/// # Example usage
+///
+/// ```
+/// let wayshot_connection = WayshotConnection::new().unwrap();
+/// let image_buffer = wayshot_connection.screenshot_all().unwrap();
+/// ```
 #[derive(Debug)]
 pub struct WayshotConnection {
     conn: Connection,
@@ -71,12 +82,14 @@ impl WayshotConnection {
         Self::from_connection(conn)
     }
 
+    /// Recommended if you already have a [`wayland_client::Connection`].
     pub fn from_connection(conn: Connection) -> Result<Self> {
         let (globals, _) = registry_queue_init::<WayshotState>(&conn)?;
 
         Ok(Self { conn, globals })
     }
 
+    /// Fetch all accessible wayland outputs.
     pub fn get_all_outputs(&self) -> Vec<OutputInfo> {
         // Connecting to wayland environment.
         let mut state = OutputCaptureState {
@@ -326,6 +339,7 @@ impl WayshotConnection {
         Ok((framecopys, Some((region.width, region.height))))
     }
 
+    /// Take a screenshot from the specified region.
     pub fn screenshot(
         &self,
         capture_area: (Transform, CaptureRegion),
@@ -369,6 +383,7 @@ impl WayshotConnection {
         Ok(composited_image)
     }
 
+    /// Take a screenshot from all of the specified outputs.
     pub fn screenshot_outputs(
         &self,
         outputs: Vec<OutputInfo>,
@@ -407,6 +422,7 @@ impl WayshotConnection {
         self.screenshot((Transform::Normal, capture_region), cursor_overlay)
     }
 
+    /// Take a screenshot from all accessible outputs.
     pub fn screenshot_all(&self, cursor_overlay: bool) -> Result<RgbaImage> {
         self.screenshot_outputs(self.get_all_outputs(), cursor_overlay)
     }
