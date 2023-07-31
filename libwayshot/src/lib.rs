@@ -22,8 +22,10 @@ use image::{imageops::overlay, DynamicImage, RgbaImage};
 use memmap2::MmapMut;
 use wayland_client::{
     globals::{registry_queue_init, GlobalList},
-    protocol::{wl_output, wl_output::WlOutput},
-    protocol::{wl_shm, wl_shm::WlShm},
+    protocol::{
+        wl_output::{Transform, WlOutput},
+        wl_shm::{self, WlShm},
+    },
     Connection,
 };
 use wayland_protocols::xdg::xdg_output::zv1::client::{
@@ -33,7 +35,6 @@ use wayland_protocols_wlr::screencopy::v1::client::{
     zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
     zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
 };
-pub use wl_output::Transform;
 
 use crate::{
     convert::create_converter,
@@ -144,7 +145,7 @@ impl WayshotConnection {
         &self,
         cursor_overlay: i32,
         output: WlOutput,
-        transform: wl_output::Transform,
+        transform: Transform,
         capture_region: Option<CaptureRegion>,
     ) -> Result<FrameCopy> {
         // Connecting to wayland environment.
@@ -283,44 +284,41 @@ impl WayshotConnection {
 
     fn create_frame_copy(
         &self,
-        capture_area: (Transform, CaptureRegion),
+        capture_region: CaptureRegion,
         cursor_overlay: i32,
     ) -> Result<Frame> {
-        let transform = capture_area.0;
-        let region = capture_area.1;
-
         let mut framecopys: Vec<FrameCopy> = Vec::new();
 
         let outputs = self.get_all_outputs();
         let mut intersecting_outputs: Vec<IntersectingOutput> = Vec::new();
         for output in outputs.iter() {
-            let x1: i32 = cmp::max(output.dimensions.x, region.x_coordinate);
-            let y1: i32 = cmp::max(output.dimensions.y, region.y_coordinate);
+            let x1: i32 = cmp::max(output.dimensions.x, capture_region.x_coordinate);
+            let y1: i32 = cmp::max(output.dimensions.y, capture_region.y_coordinate);
             let x2: i32 = cmp::min(
                 output.dimensions.x + output.dimensions.width,
-                region.x_coordinate + region.width,
+                capture_region.x_coordinate + capture_region.width,
             );
             let y2: i32 = cmp::min(
                 output.dimensions.y + output.dimensions.height,
-                region.y_coordinate + region.height,
+                capture_region.y_coordinate + capture_region.height,
             );
 
             let width = x2 - x1;
             let height = y2 - y1;
 
             if !(width <= 0 || height <= 0) {
-                let true_x = region.x_coordinate - output.dimensions.x;
-                let true_y = region.y_coordinate - output.dimensions.y;
+                let true_x = capture_region.x_coordinate - output.dimensions.x;
+                let true_y = capture_region.y_coordinate - output.dimensions.y;
                 let true_region = CaptureRegion {
                     x_coordinate: true_x,
                     y_coordinate: true_y,
-                    width: region.width,
-                    height: region.height,
+                    width: capture_region.width,
+                    height: capture_region.height,
                 };
                 intersecting_outputs.push(IntersectingOutput {
                     output: output.wl_output.clone(),
                     region: true_region,
-                    transform,
+                    transform: output.transform,
                 });
             }
         }
@@ -337,16 +335,19 @@ impl WayshotConnection {
                 Some(intersecting_output.region),
             )?);
         }
-        Ok((framecopys, Some((region.width, region.height))))
+        Ok((
+            framecopys,
+            Some((capture_region.width, capture_region.height)),
+        ))
     }
 
     /// Take a screenshot from the specified region.
     pub fn screenshot(
         &self,
-        capture_area: (Transform, CaptureRegion),
+        capture_region: CaptureRegion,
         cursor_overlay: bool,
     ) -> Result<RgbaImage> {
-        let frame_copy = self.create_frame_copy(capture_area, cursor_overlay as i32)?;
+        let frame_copy = self.create_frame_copy(capture_region, cursor_overlay as i32)?;
 
         let mut composited_image;
 
@@ -420,7 +421,7 @@ impl WayshotConnection {
             width: x2 - x1,
             height: y2 - y1,
         };
-        self.screenshot((Transform::Normal, capture_region), cursor_overlay)
+        self.screenshot(capture_region, cursor_overlay)
     }
 
     /// Take a screenshot from all accessible outputs.

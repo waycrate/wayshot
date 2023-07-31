@@ -5,7 +5,7 @@ use std::{
     process::exit,
 };
 
-use libwayshot::{Transform, WayshotConnection};
+use libwayshot::WayshotConnection;
 
 mod clap;
 mod utils;
@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let image_buffer = if let Some(slurp_region) = args.get_one::<String>("slurp") {
         if let Some(region) = utils::parse_geometry(slurp_region) {
-            wayshot_conn.screenshot((Transform::Normal, region), cursor_overlay)?
+            wayshot_conn.screenshot(region, cursor_overlay)?
         } else {
             log::error!("Invalid geometry specification");
             exit(1);
