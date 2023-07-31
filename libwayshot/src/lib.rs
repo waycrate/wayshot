@@ -63,6 +63,7 @@ struct IntersectingOutput {
     transform: Transform,
 }
 
+/// Struct to store wayland connection and globals list.
 /// # Example usage
 ///
 /// ```
