@@ -19,7 +19,7 @@ clap = "4.3.11"
 env_logger = { version = "0.10.0", default-features = false, features = ["auto-color", "color"] }
 log = "0.4.19"
 
-libwayshot = { version="0.1.2", path = "../libwayshot" }
+libwayshot = { version="0.2.0", path = "../libwayshot" }
 
 image = { version = "0.24", default-features = false, features = ["jpeg", "png", "pnm", "qoi"] }
 
