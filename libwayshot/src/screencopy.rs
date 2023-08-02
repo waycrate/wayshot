@@ -4,7 +4,6 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use anyhow::{anyhow, bail, Result};
 use image::{ColorType, DynamicImage, ImageBuffer, Pixel};
 use memmap2::MmapMut;
 use nix::{
@@ -13,6 +12,8 @@ use nix::{
     unistd,
 };
 use wayland_client::protocol::{wl_output, wl_shm::Format};
+
+use crate::{Error, Result};
 
 /// Type of frame supported by the compositor. For now we only support Argb8888, Xrgb8888, and
 /// Xbgr8888.
@@ -32,7 +33,7 @@ where
     P: Pixel<Subpixel = u8>,
 {
     ImageBuffer::from_vec(frame_format.width, frame_format.height, frame_mmap.to_vec())
-        .ok_or(anyhow!("buffer too large"))
+        .ok_or(Error::BufferTooSmall)
 }
 
 /// The copied frame comprising of the FrameFormat, ColorType (Rgba8), and a memory backed shm
@@ -46,7 +47,7 @@ pub struct FrameCopy {
 }
 
 impl TryFrom<&FrameCopy> for DynamicImage {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_from(value: &FrameCopy) -> Result<Self> {
         Ok(match value.frame_color_type {
@@ -58,7 +59,7 @@ impl TryFrom<&FrameCopy> for DynamicImage {
                 &value.frame_format,
                 &value.frame_mmap,
             )?),
-            _ => bail!("invalid image color type"),
+            _ => return Err(Error::InvalidColor),
         })
     }
 }

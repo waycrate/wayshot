@@ -5,6 +5,7 @@
 
 mod convert;
 mod dispatch;
+mod error;
 mod image_util;
 pub mod output;
 mod screencopy;
@@ -17,7 +18,6 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use anyhow::{bail, Result};
 use image::{imageops::overlay, DynamicImage, RgbaImage};
 use memmap2::MmapMut;
 use wayland_client::{
@@ -42,6 +42,8 @@ use crate::{
     output::OutputInfo,
     screencopy::{create_shm_fd, FrameCopy},
 };
+
+pub use crate::error::{Error, Result};
 
 type Frame = (Vec<FrameCopy>, Option<(i32, i32)>);
 
@@ -392,7 +394,7 @@ impl WayshotConnection {
         cursor_overlay: bool,
     ) -> Result<RgbaImage> {
         if outputs.is_empty() {
-            bail!("no outputs supplied");
+            return Err(Error::NoOutputs);
         }
 
         let x1 = outputs
