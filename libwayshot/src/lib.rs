@@ -75,8 +75,8 @@ struct IntersectingOutput {
 /// ```
 #[derive(Debug)]
 pub struct WayshotConnection {
-    conn: Connection,
-    globals: GlobalList,
+    pub conn: Connection,
+    pub globals: GlobalList,
 }
 
 impl WayshotConnection {
