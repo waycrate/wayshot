@@ -7,6 +7,7 @@ use wayland_client::protocol::{wl_output, wl_output::WlOutput};
 pub struct OutputInfo {
     pub wl_output: WlOutput,
     pub name: String,
+    pub description: String,
     pub transform: wl_output::Transform,
     pub dimensions: OutputPositioning,
 }
