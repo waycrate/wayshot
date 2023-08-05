@@ -379,8 +379,8 @@ impl WayshotConnection {
                 images.push(image);
             }
             composited_image = images[0].clone();
-            for image in images {
-                overlay(&mut composited_image, &image, 0, 0);
+            for image in images.iter().skip(1) {
+                overlay(&mut composited_image, image, 0, 0);
             }
         }
 
