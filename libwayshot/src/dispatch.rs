@@ -54,6 +54,7 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
                     state.outputs.push(OutputInfo {
                         wl_output: output,
                         name: "".to_string(),
+                        description: String::new(),
                         transform: wl_output::Transform::Normal,
                         dimensions: OutputPositioning {
                             x: 0,
@@ -88,6 +89,9 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
         match event {
             wl_output::Event::Name { name } => {
                 output.name = name;
+            }
+            wl_output::Event::Description { description } => {
+                output.description = description;
             }
             wl_output::Event::Geometry {
                 transform: WEnum::Value(transform),
