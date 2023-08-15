@@ -146,7 +146,7 @@ impl WayshotConnection {
     fn capture_output_frame(
         &self,
         cursor_overlay: i32,
-        output: WlOutput,
+        output: &WlOutput,
         transform: Transform,
         capture_region: Option<CaptureRegion>,
     ) -> Result<FrameCopy> {
@@ -176,7 +176,7 @@ impl WayshotConnection {
         let frame: ZwlrScreencopyFrameV1 = if let Some(region) = capture_region {
             screencopy_manager.capture_output_region(
                 cursor_overlay,
-                &output,
+                output,
                 region.x_coordinate,
                 region.y_coordinate,
                 region.width,
@@ -185,7 +185,7 @@ impl WayshotConnection {
                 (),
             )
         } else {
-            screencopy_manager.capture_output(cursor_overlay, &output, &qh, ())
+            screencopy_manager.capture_output(cursor_overlay, output, &qh, ())
         };
 
         // Empty internal event buffer until buffer_done is set to true which is when the Buffer done
@@ -332,7 +332,7 @@ impl WayshotConnection {
         for intersecting_output in intersecting_outputs {
             framecopys.push(self.capture_output_frame(
                 cursor_overlay,
-                intersecting_output.output.clone(),
+                &intersecting_output.output,
                 intersecting_output.transform,
                 Some(intersecting_output.region),
             )?);
