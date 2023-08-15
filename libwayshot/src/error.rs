@@ -21,4 +21,10 @@ pub enum Error {
     Global(#[from] GlobalError),
     #[error("connect error: {0}")]
     Connect(#[from] ConnectError),
+    #[error("framecopy failed")]
+    FramecopyFailed,
+    #[error("No supported buffer format")]
+    NoSupportedBufferFormat,
+    #[error("Cannot find Wayland protocols")]
+    ProtocolNotFound(String),
 }
