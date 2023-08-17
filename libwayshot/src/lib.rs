@@ -77,24 +77,39 @@ struct IntersectingOutput {
 pub struct WayshotConnection {
     pub conn: Connection,
     pub globals: GlobalList,
+    pub output_infos: Vec<OutputInfo>,
 }
 
 impl WayshotConnection {
     pub fn new() -> Result<Self> {
         let conn = Connection::connect_to_env()?;
 
-        Self::from_connection(conn)
+        let mut initone = Self::from_connection(conn)?;
+        initone.get_all_outputs_init()?;
+        Ok(initone)
     }
 
     /// Recommended if you already have a [`wayland_client::Connection`].
     pub fn from_connection(conn: Connection) -> Result<Self> {
         let (globals, _) = registry_queue_init::<WayshotState>(&conn)?;
 
-        Ok(Self { conn, globals })
+        Ok(Self {
+            conn,
+            globals,
+            output_infos: Vec::new(),
+        })
     }
 
+    pub fn get_all_outputs(&self) -> &Vec<OutputInfo> {
+        &self.output_infos
+    }
+
+    pub fn refresh_outputs(&mut self) -> Result<()> {
+        self.get_all_outputs_init()?;
+        Ok(())
+    }
     /// Fetch all accessible wayland outputs.
-    pub fn get_all_outputs(&self) -> Vec<OutputInfo> {
+    fn get_all_outputs_init(&mut self) -> Result<()> {
         // Connecting to wayland environment.
         let mut state = OutputCaptureState {
             outputs: Vec::new(),
@@ -117,8 +132,8 @@ impl WayshotConnection {
 
         // Fetch all outputs; when their names arrive, add them to the list
         let _ = self.conn.display().get_registry(&qh, ());
-        event_queue.roundtrip(&mut state).unwrap();
-        event_queue.roundtrip(&mut state).unwrap();
+        event_queue.roundtrip(&mut state)?;
+        event_queue.roundtrip(&mut state)?;
 
         let mut xdg_outputs: Vec<ZxdgOutputV1> = Vec::new();
 
@@ -128,7 +143,7 @@ impl WayshotConnection {
             xdg_outputs.push(xdg_output);
         }
 
-        event_queue.roundtrip(&mut state).unwrap();
+        event_queue.roundtrip(&mut state)?;
 
         for xdg_output in xdg_outputs {
             xdg_output.destroy();
@@ -139,7 +154,9 @@ impl WayshotConnection {
             exit(1);
         }
         log::debug!("Outputs detected: {:#?}", state.outputs);
-        state.outputs
+        self.output_infos = state.outputs;
+
+        Ok(())
     }
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
@@ -390,7 +407,7 @@ impl WayshotConnection {
     /// Take a screenshot from all of the specified outputs.
     pub fn screenshot_outputs(
         &self,
-        outputs: Vec<OutputInfo>,
+        outputs: &Vec<OutputInfo>,
         cursor_overlay: bool,
     ) -> Result<RgbaImage> {
         if outputs.is_empty() {
