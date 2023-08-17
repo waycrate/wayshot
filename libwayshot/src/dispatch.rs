@@ -21,7 +21,7 @@ use wayland_protocols_wlr::screencopy::v1::client::{
 };
 
 use crate::{
-    output::{OutputInfo, OutputPositioning},
+    output::{OutputInfo, OutputPositioning, WlOutputMode},
     screencopy::FrameFormat,
 };
 
@@ -62,6 +62,10 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
                             width: 0,
                             height: 0,
                         },
+                        mode: WlOutputMode {
+                            width: 0,
+                            height: 0,
+                        },
                     });
                 } else {
                     log::error!("Ignoring a wl_output with version < 4.");
@@ -92,6 +96,9 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
             }
             wl_output::Event::Description { description } => {
                 output.description = description;
+            }
+            wl_output::Event::Mode { width, height, .. } => {
+                output.mode = WlOutputMode { width, height };
             }
             wl_output::Event::Geometry {
                 transform: WEnum::Value(transform),
