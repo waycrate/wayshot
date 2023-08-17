@@ -157,6 +157,7 @@ impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
+        println!("ssss");
         match event {
             zwlr_screencopy_frame_v1::Event::Buffer {
                 format,

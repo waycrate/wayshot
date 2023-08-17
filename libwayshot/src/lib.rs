@@ -191,6 +191,7 @@ impl WayshotConnection {
         // Empty internal event buffer until buffer_done is set to true which is when the Buffer done
         // event is fired, aka the capture from the compositor is succesful.
         while !state.buffer_done.load(Ordering::SeqCst) {
+            println!("sss");
             event_queue.blocking_dispatch(&mut state)?;
         }
 
@@ -291,7 +292,7 @@ impl WayshotConnection {
     ) -> Result<Frame> {
         let mut framecopys: Vec<FrameCopy> = Vec::new();
 
-        let outputs = self.get_all_outputs();
+        let outputs = WayshotConnection::new().unwrap().get_all_outputs();
         let mut intersecting_outputs: Vec<IntersectingOutput> = Vec::new();
         for output in outputs.iter() {
             let x1: i32 = cmp::max(output.dimensions.x, capture_region.x_coordinate);
@@ -428,6 +429,9 @@ impl WayshotConnection {
 
     /// Take a screenshot from all accessible outputs.
     pub fn screenshot_all(&self, cursor_overlay: bool) -> Result<RgbaImage> {
-        self.screenshot_outputs(self.get_all_outputs(), cursor_overlay)
+        self.screenshot_outputs(
+            WayshotConnection::new().unwrap().get_all_outputs(),
+            cursor_overlay,
+        )
     }
 }
