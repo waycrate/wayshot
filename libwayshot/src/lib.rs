@@ -84,9 +84,10 @@ impl WayshotConnection {
     pub fn new() -> Result<Self> {
         let conn = Connection::connect_to_env()?;
 
-        let mut initone = Self::from_connection(conn)?;
-        initone.get_all_outputs_init()?;
-        Ok(initone)
+        let mut initial_state = Self::from_connection(conn)?;
+        initial_state.get_all_outputs_init()?;
+
+        Ok(initial_state)
     }
 
     /// Recommended if you already have a [`wayland_client::Connection`].
@@ -100,15 +101,17 @@ impl WayshotConnection {
         })
     }
 
+    /// Fetch all accessible wayland outputs.
     pub fn get_all_outputs(&self) -> &Vec<OutputInfo> {
         &self.output_infos
     }
 
+    /// refresh the outputs, to get new outputs
     pub fn refresh_outputs(&mut self) -> Result<()> {
         self.get_all_outputs_init()?;
         Ok(())
     }
-    /// Fetch all accessible wayland outputs.
+
     fn get_all_outputs_init(&mut self) -> Result<()> {
         // Connecting to wayland environment.
         let mut state = OutputCaptureState {
@@ -404,7 +407,7 @@ impl WayshotConnection {
         Ok(composited_image)
     }
 
-    // shot one ouput
+    /// shot one ouput
     pub fn screenshot_signal_output(
         &self,
         output_info: &OutputInfo,
