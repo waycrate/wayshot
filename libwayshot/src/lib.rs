@@ -404,6 +404,22 @@ impl WayshotConnection {
         Ok(composited_image)
     }
 
+    // shot one ouput
+    pub fn screenshot_signal_output(
+        &self,
+        output_info: &OutputInfo,
+        cursor_overlay: bool,
+    ) -> Result<RgbaImage> {
+        let frame_copy = self.capture_output_frame(
+            cursor_overlay as i32,
+            &output_info.wl_output,
+            output_info.transform,
+            None,
+        )?;
+        let dynamicimage: DynamicImage = (&frame_copy).try_into()?;
+        Ok(dynamicimage.into_rgba8())
+    }
+
     /// Take a screenshot from all of the specified outputs.
     pub fn screenshot_outputs(
         &self,
