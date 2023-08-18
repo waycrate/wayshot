@@ -404,7 +404,7 @@ impl WayshotConnection {
     }
 
     /// shot one ouput
-    pub fn screenshot_signal_output(
+    pub fn screenshot_single_output(
         &self,
         output_info: &OutputInfo,
         cursor_overlay: bool,
@@ -415,8 +415,8 @@ impl WayshotConnection {
             output_info.transform,
             None,
         )?;
-        let dynamicimage: DynamicImage = (&frame_copy).try_into()?;
-        Ok(dynamicimage.into_rgba8())
+        let dynamic_image: DynamicImage = (&frame_copy).try_into()?;
+        Ok(dynamic_image.into_rgba8())
     }
 
     /// Take a screenshot from all of the specified outputs.
