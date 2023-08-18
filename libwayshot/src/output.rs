@@ -10,6 +10,13 @@ pub struct OutputInfo {
     pub description: String,
     pub transform: wl_output::Transform,
     pub dimensions: OutputPositioning,
+    pub mode: WlOutputMode,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+pub struct WlOutputMode {
+    pub width: i32,
+    pub height: i32,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
