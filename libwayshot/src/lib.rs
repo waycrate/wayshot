@@ -97,7 +97,7 @@ impl WayshotConnection {
             output_infos: Vec::new(),
         };
 
-        initial_state.get_all_outputs_init()?;
+        initial_state.refresh_outputs()?;
 
         Ok(initial_state)
     }
@@ -109,11 +109,6 @@ impl WayshotConnection {
 
     /// refresh the outputs, to get new outputs
     pub fn refresh_outputs(&mut self) -> Result<()> {
-        self.get_all_outputs_init()?;
-        Ok(())
-    }
-
-    fn get_all_outputs_init(&mut self) -> Result<()> {
         // Connecting to wayland environment.
         let mut state = OutputCaptureState {
             outputs: Vec::new(),
