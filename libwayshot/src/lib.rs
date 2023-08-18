@@ -77,6 +77,7 @@ struct IntersectingOutput {
 pub struct WayshotConnection {
     pub conn: Connection,
     pub globals: GlobalList,
+    output_infos: Vec<OutputInfo>,
 }
 
 impl WayshotConnection {
@@ -90,11 +91,24 @@ impl WayshotConnection {
     pub fn from_connection(conn: Connection) -> Result<Self> {
         let (globals, _) = registry_queue_init::<WayshotState>(&conn)?;
 
-        Ok(Self { conn, globals })
+        let mut initial_state = Self {
+            conn,
+            globals,
+            output_infos: Vec::new(),
+        };
+
+        initial_state.refresh_outputs()?;
+
+        Ok(initial_state)
     }
 
     /// Fetch all accessible wayland outputs.
-    pub fn get_all_outputs(&self) -> Vec<OutputInfo> {
+    pub fn get_all_outputs(&self) -> &Vec<OutputInfo> {
+        &self.output_infos
+    }
+
+    /// refresh the outputs, to get new outputs
+    pub fn refresh_outputs(&mut self) -> Result<()> {
         // Connecting to wayland environment.
         let mut state = OutputCaptureState {
             outputs: Vec::new(),
@@ -117,8 +131,8 @@ impl WayshotConnection {
 
         // Fetch all outputs; when their names arrive, add them to the list
         let _ = self.conn.display().get_registry(&qh, ());
-        event_queue.roundtrip(&mut state).unwrap();
-        event_queue.roundtrip(&mut state).unwrap();
+        event_queue.roundtrip(&mut state)?;
+        event_queue.roundtrip(&mut state)?;
 
         let mut xdg_outputs: Vec<ZxdgOutputV1> = Vec::new();
 
@@ -128,7 +142,7 @@ impl WayshotConnection {
             xdg_outputs.push(xdg_output);
         }
 
-        event_queue.roundtrip(&mut state).unwrap();
+        event_queue.roundtrip(&mut state)?;
 
         for xdg_output in xdg_outputs {
             xdg_output.destroy();
@@ -139,7 +153,9 @@ impl WayshotConnection {
             exit(1);
         }
         log::debug!("Outputs detected: {:#?}", state.outputs);
-        state.outputs
+        self.output_infos = state.outputs;
+
+        Ok(())
     }
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
@@ -387,10 +403,26 @@ impl WayshotConnection {
         Ok(composited_image)
     }
 
+    /// shot one ouput
+    pub fn screenshot_single_output(
+        &self,
+        output_info: &OutputInfo,
+        cursor_overlay: bool,
+    ) -> Result<RgbaImage> {
+        let frame_copy = self.capture_output_frame(
+            cursor_overlay as i32,
+            &output_info.wl_output,
+            output_info.transform,
+            None,
+        )?;
+        let dynamic_image: DynamicImage = (&frame_copy).try_into()?;
+        Ok(dynamic_image.into_rgba8())
+    }
+
     /// Take a screenshot from all of the specified outputs.
     pub fn screenshot_outputs(
         &self,
-        outputs: Vec<OutputInfo>,
+        outputs: &Vec<OutputInfo>,
         cursor_overlay: bool,
     ) -> Result<RgbaImage> {
         if outputs.is_empty() {

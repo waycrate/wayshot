@@ -92,11 +92,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     } else if let Some(output_name) = args.get_one::<String>("output") {
         let outputs = wayshot_conn.get_all_outputs();
-        if let Some(output) = outputs
-            .into_iter()
-            .find(|output| &output.name == output_name)
-        {
-            wayshot_conn.screenshot_outputs(vec![output], cursor_overlay)?
+        if let Some(output) = outputs.iter().find(|output| &output.name == output_name) {
+            wayshot_conn.screenshot_single_output(output, cursor_overlay)?
         } else {
             log::error!("No output found!\n");
             exit(1);
@@ -108,7 +105,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map(|display| display.name.to_string())
             .collect();
         if let Some(index) = select_ouput(&output_names) {
-            wayshot_conn.screenshot_outputs(vec![outputs[index].clone()], cursor_overlay)?
+            wayshot_conn.screenshot_single_output(&outputs[index], cursor_overlay)?
         } else {
             log::error!("No output found!\n");
             exit(1);
