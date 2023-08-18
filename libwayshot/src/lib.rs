@@ -77,7 +77,7 @@ struct IntersectingOutput {
 pub struct WayshotConnection {
     pub conn: Connection,
     pub globals: GlobalList,
-    pub output_infos: Vec<OutputInfo>,
+    output_infos: Vec<OutputInfo>,
 }
 
 impl WayshotConnection {
