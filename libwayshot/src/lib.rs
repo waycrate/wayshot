@@ -84,21 +84,22 @@ impl WayshotConnection {
     pub fn new() -> Result<Self> {
         let conn = Connection::connect_to_env()?;
 
-        let mut initial_state = Self::from_connection(conn)?;
-        initial_state.get_all_outputs_init()?;
-
-        Ok(initial_state)
+        Self::from_connection(conn)
     }
 
     /// Recommended if you already have a [`wayland_client::Connection`].
     pub fn from_connection(conn: Connection) -> Result<Self> {
         let (globals, _) = registry_queue_init::<WayshotState>(&conn)?;
 
-        Ok(Self {
+        let mut initial_state = Self {
             conn,
             globals,
             output_infos: Vec::new(),
-        })
+        };
+
+        initial_state.get_all_outputs_init()?;
+
+        Ok(initial_state)
     }
 
     /// Fetch all accessible wayland outputs.
