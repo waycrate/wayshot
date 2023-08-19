@@ -20,7 +20,6 @@ use std::{
 
 use image::{imageops::overlay, DynamicImage, RgbaImage};
 use memmap2::MmapMut;
-use screencopy::FrameFormat;
 use wayland_client::{
     globals::{registry_queue_init, GlobalList},
     protocol::{
@@ -41,7 +40,7 @@ use crate::{
     convert::create_converter,
     dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState},
     output::OutputInfo,
-    screencopy::{create_shm_fd, FrameCopy},
+    screencopy::{create_shm_fd, FrameCopy, FrameFormat},
 };
 
 pub use crate::error::{Error, Result};
