@@ -165,7 +165,19 @@ impl WayshotConnection {
     }
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
+    /// And write data to fd
+    /// It can be used in screencast
     pub fn capture_output_frame_shm_fd<T: AsRawFd>(
+        &self,
+        cursor_overlay: i32,
+        output: &WlOutput,
+        fd: T,
+        capture_region: Option<CaptureRegion>,
+    ) -> Result<FrameFormat> {
+        self.capture_output_frame_shm_fd_inner(cursor_overlay, output, fd, None, capture_region)
+    }
+
+    fn capture_output_frame_shm_fd_inner<T: AsRawFd>(
         &self,
         cursor_overlay: i32,
         output: &WlOutput,
@@ -306,7 +318,7 @@ impl WayshotConnection {
         // Create a writeable memory map backed by a mem_file.
         let mem_file = unsafe { File::from_raw_fd(fd.as_raw_fd()) };
 
-        let frame_format = self.capture_output_frame_shm_fd(
+        let frame_format = self.capture_output_frame_shm_fd_inner(
             cursor_overlay,
             output,
             fd,
