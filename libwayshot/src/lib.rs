@@ -13,7 +13,7 @@ mod screencopy;
 use std::{
     cmp,
     fs::File,
-    os::unix::prelude::FromRawFd,
+    os::{fd::AsRawFd, unix::prelude::FromRawFd},
     process::exit,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -40,10 +40,15 @@ use crate::{
     convert::create_converter,
     dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState},
     output::OutputInfo,
-    screencopy::{create_shm_fd, FrameCopy},
+    screencopy::{create_shm_fd, FrameCopy, FrameFormat},
 };
 
 pub use crate::error::{Error, Result};
+
+pub mod reexport {
+    use wayland_client::protocol::wl_output;
+    pub use wl_output::{Transform, WlOutput};
+}
 
 type Frame = (Vec<FrameCopy>, Option<(i32, i32)>);
 
@@ -159,13 +164,25 @@ impl WayshotConnection {
     }
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
-    fn capture_output_frame(
+    ///  Data will be written to fd.
+    pub fn capture_output_frame_shm_fd<T: AsRawFd>(
         &self,
         cursor_overlay: i32,
         output: &WlOutput,
-        transform: Transform,
+        fd: T,
         capture_region: Option<CaptureRegion>,
-    ) -> Result<FrameCopy> {
+    ) -> Result<FrameFormat> {
+        self.capture_output_frame_shm_fd_inner(cursor_overlay, output, fd, None, capture_region)
+    }
+
+    fn capture_output_frame_shm_fd_inner<T: AsRawFd>(
+        &self,
+        cursor_overlay: i32,
+        output: &WlOutput,
+        fd: T,
+        file: Option<&File>,
+        capture_region: Option<CaptureRegion>,
+    ) -> Result<FrameFormat> {
         // Connecting to wayland environment.
         let mut state = CaptureFrameState {
             formats: Vec::new(),
@@ -184,7 +201,10 @@ impl WayshotConnection {
             Ok(x) => x,
             Err(e) => {
                 log::error!("Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?");
-                panic!("{:#?}", e);
+                log::error!("err: {e}");
+                return Err(Error::ProtocolNotFound(
+                    "ZwlrScreencopy Manager not found".to_string(),
+                ));
             }
         };
 
@@ -236,21 +256,20 @@ impl WayshotConnection {
             Some(format) => format,
             None => {
                 log::error!("No suitable frame format found");
-                exit(1);
+                return Err(Error::NoSupportedBufferFormat);
             }
         };
 
         // Bytes of data in the frame = stride * height.
         let frame_bytes = frame_format.stride * frame_format.height;
-
+        if let Some(file) = file {
+            file.set_len(frame_bytes as u64)?;
+        }
         // Create an in memory file and return it's file descriptor.
-        let mem_fd = create_shm_fd()?;
-        let mem_file = unsafe { File::from_raw_fd(mem_fd) };
-        mem_file.set_len(frame_bytes as u64)?;
 
         // Instantiate shm global.
         let shm = self.globals.bind::<WlShm, _, _>(&qh, 1..=1, ()).unwrap();
-        let shm_pool = shm.create_pool(mem_fd, frame_bytes as i32, &qh, ());
+        let shm_pool = shm.create_pool(fd.as_raw_fd(), frame_bytes as i32, &qh, ());
         let buffer = shm_pool.create_buffer(
             0,
             frame_format.width as i32,
@@ -263,7 +282,6 @@ impl WayshotConnection {
 
         // Copy the pixel data advertised by the compositor into the buffer we just created.
         frame.copy(&buffer);
-
         // On copy the Ready / Failed events are fired by the frame object, so here we check for them.
         loop {
             // Basically reads, if frame state is not None then...
@@ -271,33 +289,56 @@ impl WayshotConnection {
                 match state {
                     FrameState::Failed => {
                         log::error!("Frame copy failed");
-                        exit(1);
+                        return Err(Error::FramecopyFailed);
                     }
                     FrameState::Finished => {
-                        // Create a writeable memory map backed by a mem_file.
-                        let mut frame_mmap = unsafe { MmapMut::map_mut(&mem_file)? };
-                        let data = &mut *frame_mmap;
-                        let frame_color_type = if let Some(converter) =
-                            create_converter(frame_format.format)
-                        {
-                            converter.convert_inplace(data)
-                        } else {
-                            log::error!("Unsupported buffer format: {:?}", frame_format.format);
-                            log::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
-                            exit(1);
-                        };
-                        return Ok(FrameCopy {
-                            frame_format,
-                            frame_color_type,
-                            frame_mmap,
-                            transform,
-                        });
+                        buffer.destroy();
+                        shm_pool.destroy();
+                        return Ok(frame_format);
                     }
                 }
             }
 
             event_queue.blocking_dispatch(&mut state)?;
         }
+    }
+
+    /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
+    fn capture_output_frame(
+        &self,
+        cursor_overlay: i32,
+        output: &WlOutput,
+        transform: Transform,
+        capture_region: Option<CaptureRegion>,
+    ) -> Result<FrameCopy> {
+        // Create an in memory file and return it's file descriptor.
+        let fd = create_shm_fd()?;
+        // Create a writeable memory map backed by a mem_file.
+        let mem_file = unsafe { File::from_raw_fd(fd.as_raw_fd()) };
+
+        let frame_format = self.capture_output_frame_shm_fd_inner(
+            cursor_overlay,
+            output,
+            fd,
+            Some(&mem_file),
+            capture_region,
+        )?;
+
+        let mut frame_mmap = unsafe { MmapMut::map_mut(&mem_file)? };
+        let data = &mut *frame_mmap;
+        let frame_color_type = if let Some(converter) = create_converter(frame_format.format) {
+            converter.convert_inplace(data)
+        } else {
+            log::error!("Unsupported buffer format: {:?}", frame_format.format);
+            log::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
+            return Err(Error::NoSupportedBufferFormat);
+        };
+        Ok(FrameCopy {
+            frame_format,
+            frame_color_type,
+            frame_mmap,
+            transform,
+        })
     }
 
     fn create_frame_copy(
