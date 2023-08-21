@@ -165,7 +165,6 @@ impl WayshotConnection {
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
     /// And write data to fd
-    /// It can be used in screencast
     pub fn capture_output_frame_shm_fd<T: AsRawFd>(
         &self,
         cursor_overlay: i32,
