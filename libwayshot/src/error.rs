@@ -25,6 +25,6 @@ pub enum Error {
     FramecopyFailed,
     #[error("No supported buffer format")]
     NoSupportedBufferFormat,
-    #[error("Cannot find Wayland protocols")]
+    #[error("Cannot find required wayland protocol")]
     ProtocolNotFound(String),
 }
