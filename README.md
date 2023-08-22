@@ -58,8 +58,6 @@ wayshot -s "$(slurp -p)" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-|gr
 -   scdoc (If present, man-pages will be generated.)
 -   rustup
 -   make
--	meson (Required to build XDPW.)
--	ninja (Required to build XDPW.)
 
 ## Compiling:
 
