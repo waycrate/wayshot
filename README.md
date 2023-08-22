@@ -13,6 +13,10 @@
   </p>
 </p>
 
+# Portal integration
+
+[xdg-desktop-portal-luminous](https://github.com/waycrate/xdg-desktop-portal-luminous) is a xdg-desktop-portal backend for wlroots based compositors, providing screenshot and screencast capabilities.
+
 # Some usage examples:
 
 NOTE: Read `man 7 wayshot` for more examples.
