@@ -20,32 +20,23 @@
             name = "Wayshot-devel";
             nativeBuildInputs = with pkgs; [
               # Compilers
-              clang
-              cmake
-              meson
-              ninja
               cargo
               rustc
               scdoc
 
               # Libs
-              inih
-              pipewire
-              wayland
-              systemd
-              mesa
               wayland-protocols
+              wayland
 
               # Tools
-              rustfmt
+              wayland-scanner
               clippy
-              pkg-config
               gdb
               gnumake
               rust-analyzer
+              rustfmt
               strace
               valgrind
-              wayland-scanner
             ];
           };
         });
