@@ -45,6 +45,12 @@ pub fn set_flags() -> Command {
                 .help("Set image encoder (Png is default)"),
         )
         .arg(
+            arg!(--sleep <SLEEP_TIME>)
+                .required(false)
+                .action(ArgAction::Set)
+                .help("Take screenshot after some seconds"),
+        )
+        .arg(
             arg!(-l - -listoutputs)
                 .required(false)
                 .action(ArgAction::SetTrue)

@@ -22,7 +22,8 @@ where
         .with_prompt("Choose Screen")
         .default(0)
         .items(ouputs)
-        .interact() else {
+        .interact()
+    else {
         return None;
     };
     Some(selection)
@@ -38,6 +39,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     env_logger::init();
     log::trace!("Logger initialized.");
+
+    if let Some(sleeptime) = args.get_one::<String>("sleep") {
+        std::thread::sleep(std::time::Duration::from_secs(sleeptime.parse().unwrap()));
+    }
 
     let extension = if let Some(extension) = args.get_one::<String>("extension") {
         let ext = extension.trim().to_lowercase();
