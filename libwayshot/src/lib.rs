@@ -13,7 +13,10 @@ mod screencopy;
 use std::{
     cmp,
     fs::File,
-    os::{fd::AsRawFd, unix::prelude::FromRawFd},
+    os::{
+        fd::{AsFd, AsRawFd},
+        unix::prelude::FromRawFd,
+    },
     process::exit,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -165,7 +168,7 @@ impl WayshotConnection {
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
     ///  Data will be written to fd.
-    pub fn capture_output_frame_shm_fd<T: AsRawFd>(
+    pub fn capture_output_frame_shm_fd<T: AsFd>(
         &self,
         cursor_overlay: i32,
         output: &WlOutput,
@@ -175,7 +178,7 @@ impl WayshotConnection {
         self.capture_output_frame_shm_fd_inner(cursor_overlay, output, fd, None, capture_region)
     }
 
-    fn capture_output_frame_shm_fd_inner<T: AsRawFd>(
+    fn capture_output_frame_shm_fd_inner<T: AsFd>(
         &self,
         cursor_overlay: i32,
         output: &WlOutput,
@@ -269,7 +272,7 @@ impl WayshotConnection {
 
         // Instantiate shm global.
         let shm = self.globals.bind::<WlShm, _, _>(&qh, 1..=1, ()).unwrap();
-        let shm_pool = shm.create_pool(fd.as_raw_fd(), frame_bytes as i32, &qh, ());
+        let shm_pool = shm.create_pool(fd.as_fd(), frame_bytes as i32, &qh, ());
         let buffer = shm_pool.create_buffer(
             0,
             frame_format.width as i32,
