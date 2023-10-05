@@ -1,6 +1,6 @@
 use std::{
     ffi::CStr,
-    os::unix::prelude::RawFd,
+    os::fd::{AsRawFd, IntoRawFd, OwnedFd},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -62,7 +62,7 @@ impl TryFrom<&FrameCopy> for RgbaImage {
 /// Return a RawFd to a shm file. We use memfd create on linux and shm_open for BSD support.
 /// You don't need to mess around with this function, it is only used by
 /// capture_output_frame.
-pub fn create_shm_fd() -> std::io::Result<RawFd> {
+pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
     // Only try memfd on linux and freebsd.
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     loop {
@@ -76,7 +76,7 @@ pub fn create_shm_fd() -> std::io::Result<RawFd> {
                 // F_SEAL_SRHINK = File cannot be reduced in size.
                 // F_SEAL_SEAL = Prevent further calls to fcntl().
                 let _ = fcntl::fcntl(
-                    fd,
+                    fd.as_raw_fd(),
                     fcntl::F_ADD_SEALS(
                         fcntl::SealFlag::F_SEAL_SHRINK | fcntl::SealFlag::F_SEAL_SEAL,
                     ),
@@ -112,7 +112,7 @@ pub fn create_shm_fd() -> std::io::Result<RawFd> {
         ) {
             Ok(fd) => match mman::shm_unlink(mem_file_handle.as_str()) {
                 Ok(_) => return Ok(fd),
-                Err(errno) => match unistd::close(fd) {
+                Err(errno) => match unistd::close(fd.into_raw_fd()) {
                     Ok(_) => return Err(std::io::Error::from(errno)),
                     Err(errno) => return Err(std::io::Error::from(errno)),
                 },

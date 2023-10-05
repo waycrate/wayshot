@@ -11,19 +11,19 @@ repository = "https://git.sr.ht/~shinyzenith/wayshot"
 version = "1.4.0-dev"
 
 [build-dependencies]
-flate2 = "1.0.26"
+flate2 = "1.0.27"
 
 [dependencies]
-clap = "4.3.11"
+clap = "4.4.6"
 
 env_logger = { version = "0.10.0", default-features = false, features = ["auto-color", "color"] }
-log = "0.4.19"
+log = "0.4.20"
 
 libwayshot = { version="0.2.0", path = "../libwayshot" }
 
 image = { version = "0.24", default-features = false, features = ["jpeg", "png", "pnm", "qoi"] }
 
-dialoguer = { version = "0.10.4", features = ["fuzzy-select"] }
+dialoguer = { version = "0.11.0", features = ["fuzzy-select"] }
 
 [[bin]]
 name = "wayshot"
