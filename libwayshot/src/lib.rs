@@ -18,7 +18,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use image::{imageops::overlay, DynamicImage, RgbaImage};
+use image::{imageops::overlay, RgbaImage};
 use memmap2::MmapMut;
 use wayland_client::{
     globals::{registry_queue_init, GlobalList},
@@ -414,9 +414,9 @@ impl WayshotConnection {
             let (width, height) = frame_copy.1.unwrap();
             let frame_copy = &frame_copy.0[0];
 
-            let image: DynamicImage = frame_copy.try_into()?;
+            let image = frame_copy.try_into()?;
             composited_image = image_util::rotate_image_buffer(
-                &image,
+                image,
                 frame_copy.transform,
                 width as u32,
                 height as u32,
@@ -426,9 +426,9 @@ impl WayshotConnection {
             let (frame_copy, region) = frame_copy;
             let (width, height) = region.unwrap();
             for frame_copy in frame_copy {
-                let image: DynamicImage = (&frame_copy).try_into()?;
+                let image = (&frame_copy).try_into()?;
                 let image = image_util::rotate_image_buffer(
-                    &image,
+                    image,
                     frame_copy.transform,
                     width as u32,
                     height as u32,
@@ -456,8 +456,7 @@ impl WayshotConnection {
             output_info.transform,
             None,
         )?;
-        let dynamic_image: DynamicImage = (&frame_copy).try_into()?;
-        Ok(dynamic_image.into_rgba8())
+        Ok((&frame_copy).try_into()?)
     }
 
     /// Take a screenshot from all of the specified outputs.

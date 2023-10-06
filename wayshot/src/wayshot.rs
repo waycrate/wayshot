@@ -22,7 +22,8 @@ where
         .with_prompt("Choose Screen")
         .default(0)
         .items(ouputs)
-        .interact() else {
+        .interact()
+    else {
         return None;
     };
     Some(selection)
