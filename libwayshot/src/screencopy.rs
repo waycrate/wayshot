@@ -52,7 +52,7 @@ impl TryFrom<&FrameCopy> for RgbaImage {
     fn try_from(value: &FrameCopy) -> Result<Self> {
         Ok(match value.frame_color_type {
             ColorType::Rgb8 | ColorType::Rgba8 => {
-                create_image_buffer(&value.frame_format, &value.frame_mmap)?.into()
+                create_image_buffer(&value.frame_format, &value.frame_mmap)?
             }
             _ => return Err(Error::InvalidColor),
         })

@@ -459,7 +459,7 @@ impl WayshotConnection {
             output_info.transform,
             None,
         )?;
-        Ok((&frame_copy).try_into()?)
+        (&frame_copy).try_into()
     }
 
     /// Take a screenshot from all of the specified outputs.
