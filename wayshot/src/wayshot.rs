@@ -36,7 +36,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         Level::INFO
     };
-    tracing_subscriber::fmt().with_max_level(level).init();
+    tracing_subscriber::fmt()
+        .with_max_level(level)
+        .with_writer(std::io::stderr)
+        .init();
 
     let extension = if let Some(extension) = args.get_one::<String>("extension") {
         let ext = extension.trim().to_lowercase();
