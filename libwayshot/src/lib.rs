@@ -129,7 +129,7 @@ impl WayshotConnection {
         ) {
             Ok(x) => x,
             Err(e) => {
-                log::error!("Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?");
+                tracing::error!("Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?");
                 panic!("{:#?}", e);
             }
         };
@@ -154,10 +154,10 @@ impl WayshotConnection {
         }
 
         if state.outputs.is_empty() {
-            log::error!("Compositor did not advertise any wl_output devices!");
+            tracing::error!("Compositor did not advertise any wl_output devices!");
             exit(1);
         }
-        log::debug!("Outputs detected: {:#?}", state.outputs);
+        tracing::debug!("Outputs detected: {:#?}", state.outputs);
         self.output_infos = state.outputs;
 
         Ok(())
@@ -204,8 +204,8 @@ impl WayshotConnection {
         ) {
             Ok(x) => x,
             Err(e) => {
-                log::error!("Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?");
-                log::error!("err: {e}");
+                tracing::error!("Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?");
+                tracing::error!("err: {e}");
                 return Err(Error::ProtocolNotFound(
                     "ZwlrScreencopy Manager not found".to_string(),
                 ));
@@ -234,7 +234,7 @@ impl WayshotConnection {
             event_queue.blocking_dispatch(&mut state)?;
         }
 
-        log::debug!(
+        tracing::debug!(
             "Received compositor frame buffer formats: {:#?}",
             state.formats
         );
@@ -253,13 +253,13 @@ impl WayshotConnection {
                 )
             })
             .copied();
-        log::debug!("Selected frame buffer format: {:#?}", frame_format);
+        tracing::debug!("Selected frame buffer format: {:#?}", frame_format);
 
         // Check if frame format exists.
         let frame_format = match frame_format {
             Some(format) => format,
             None => {
-                log::error!("No suitable frame format found");
+                tracing::error!("No suitable frame format found");
                 return Err(Error::NoSupportedBufferFormat);
             }
         };
@@ -301,7 +301,7 @@ impl WayshotConnection {
             if let Some(state) = state.state {
                 match state {
                     FrameState::Failed => {
-                        log::error!("Frame copy failed");
+                        tracing::error!("Frame copy failed");
                         return Err(Error::FramecopyFailed);
                     }
                     FrameState::Finished => {
@@ -358,8 +358,8 @@ impl WayshotConnection {
         let frame_color_type = if let Some(converter) = create_converter(frame_format.format) {
             converter.convert_inplace(data)
         } else {
-            log::error!("Unsupported buffer format: {:?}", frame_format.format);
-            log::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
+            tracing::error!("Unsupported buffer format: {:?}", frame_format.format);
+            tracing::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
             return Err(Error::NoSupportedBufferFormat);
         };
         Ok(FrameCopy {
@@ -411,7 +411,7 @@ impl WayshotConnection {
             }
         }
         if intersecting_outputs.is_empty() {
-            log::error!("Provided capture region doesn't intersect with any outputs!");
+            tracing::error!("Provided capture region doesn't intersect with any outputs!");
             exit(1);
         }
 
