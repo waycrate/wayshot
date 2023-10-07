@@ -10,6 +10,7 @@ mod image_util;
 pub mod output;
 mod screencopy;
 
+use rayon::prelude::*;
 use std::{
     cmp,
     fs::File,
@@ -50,7 +51,7 @@ pub mod reexport {
     pub use wl_output::{Transform, WlOutput};
 }
 
-type Frame = (Vec<FrameCopy>, Option<(i32, i32)>);
+type Frame = (Vec<FrameCopy>, (i32, i32));
 
 /// Struct to store region capture details.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -375,8 +376,6 @@ impl WayshotConnection {
         capture_region: CaptureRegion,
         cursor_overlay: i32,
     ) -> Result<Frame> {
-        let mut framecopys: Vec<FrameCopy> = Vec::new();
-
         let outputs = self.get_all_outputs();
         let mut intersecting_outputs: Vec<IntersectingOutput> = Vec::new();
         for output in outputs.iter() {
@@ -415,18 +414,19 @@ impl WayshotConnection {
             exit(1);
         }
 
-        for intersecting_output in intersecting_outputs {
-            framecopys.push(self.capture_output_frame(
-                cursor_overlay,
-                &intersecting_output.output,
-                intersecting_output.transform,
-                Some(intersecting_output.region),
-            )?);
-        }
-        Ok((
-            framecopys,
-            Some((capture_region.width, capture_region.height)),
-        ))
+        let frame_copies = intersecting_outputs
+            .par_iter()
+            .map(|intersecting_output| {
+                self.capture_output_frame(
+                    cursor_overlay,
+                    &intersecting_output.output,
+                    intersecting_output.transform,
+                    Some(intersecting_output.region),
+                )
+            })
+            .collect::<Result<_>>()?;
+
+        Ok((frame_copies, (capture_region.width, capture_region.height)))
     }
 
     /// Take a screenshot from the specified region.
@@ -435,42 +435,27 @@ impl WayshotConnection {
         capture_region: CaptureRegion,
         cursor_overlay: bool,
     ) -> Result<RgbaImage> {
-        let frame_copy = self.create_frame_copy(capture_region, cursor_overlay as i32)?;
+        let (frame_copies, (width, height)) =
+            self.create_frame_copy(capture_region, cursor_overlay as i32)?;
 
-        let mut composited_image;
-
-        if frame_copy.0.len() == 1 {
-            let (width, height) = frame_copy.1.unwrap();
-            let frame_copy = &frame_copy.0[0];
-
-            let image = frame_copy.try_into()?;
-            composited_image = image_util::rotate_image_buffer(
-                image,
-                frame_copy.transform,
-                width as u32,
-                height as u32,
-            );
-        } else {
-            let mut images = Vec::new();
-            let (frame_copy, region) = frame_copy;
-            let (width, height) = region.unwrap();
-            for frame_copy in frame_copy {
-                let image = (&frame_copy).try_into()?;
-                let image = image_util::rotate_image_buffer(
+        frame_copies
+            .par_iter()
+            .map(|frame_copy| -> Result<_> {
+                let image = frame_copy.try_into()?;
+                Ok(image_util::rotate_image_buffer(
                     image,
                     frame_copy.transform,
                     width as u32,
                     height as u32,
-                );
-                images.push(image);
-            }
-            composited_image = images[0].clone();
-            for image in images.iter().skip(1) {
-                overlay(&mut composited_image, image, 0, 0);
-            }
-        }
-
-        Ok(composited_image)
+                ))
+            })
+            .try_reduce_with(|mut merged_image, image| {
+                overlay(&mut merged_image, &image, 0, 0);
+                Ok(merged_image)
+            })
+            // If there are no frame copies, this will return None, but that
+            // shouldn't happen. Return error of no outputs just in case.
+            .ok_or(Error::NoOutputs)?
     }
 
     /// shot one ouput
