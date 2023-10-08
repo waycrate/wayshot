@@ -330,7 +330,6 @@ impl WayshotConnection {
         let frame_bytes = frame_format.stride * frame_format.height;
         file.set_len(frame_bytes as u64)?;
 
-        // Do the capture part
         self.capture_output_frame_inner(state, event_queue, frame, frame_format, file)
     }
 
