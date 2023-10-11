@@ -10,7 +10,7 @@ mod clap;
 mod utils;
 
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
-use tracing::Level;
+use tracing::{info, Level};
 
 use crate::utils::EncodingFormat;
 
@@ -41,6 +41,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .with_writer(std::io::stderr)
         .init();
 
+    info!("Starting");
     let extension = if let Some(extension) = args.get_one::<String>("extension") {
         let ext = extension.trim().to_lowercase();
         tracing::debug!("Using custom extension: {:#?}", ext);
