@@ -46,10 +46,10 @@ pub struct FrameCopy {
     pub transform: wl_output::Transform,
 }
 
-impl TryFrom<&FrameCopy> for RgbaImage {
+impl TryFrom<FrameCopy> for RgbaImage {
     type Error = Error;
 
-    fn try_from(value: &FrameCopy) -> Result<Self> {
+    fn try_from(value: FrameCopy) -> Result<Self> {
         Ok(match value.frame_color_type {
             ColorType::Rgb8 | ColorType::Rgba8 => {
                 create_image_buffer(&value.frame_format, &value.frame_mmap)?

@@ -16,6 +16,7 @@ use std::{
     os::fd::AsFd,
     process::exit,
     sync::atomic::{AtomicBool, Ordering},
+    thread,
 };
 
 use image::{imageops::overlay, RgbaImage};
@@ -50,7 +51,7 @@ pub mod reexport {
     pub use wl_output::{Transform, WlOutput};
 }
 
-type Frame = (Vec<FrameCopy>, Option<(i32, i32)>);
+type Frame = (Vec<FrameCopy>, (i32, i32));
 
 /// Struct to store region capture details.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -65,6 +66,7 @@ pub struct CaptureRegion {
     pub height: i32,
 }
 
+#[derive(Debug)]
 struct IntersectingOutput {
     output: WlOutput,
     region: CaptureRegion,
@@ -129,7 +131,7 @@ impl WayshotConnection {
         ) {
             Ok(x) => x,
             Err(e) => {
-                log::error!("Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?");
+                tracing::error!("Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?");
                 panic!("{:#?}", e);
             }
         };
@@ -139,13 +141,15 @@ impl WayshotConnection {
         event_queue.roundtrip(&mut state)?;
         event_queue.roundtrip(&mut state)?;
 
-        let mut xdg_outputs: Vec<ZxdgOutputV1> = Vec::new();
-
         // We loop over each output and request its position data.
-        for (index, output) in state.outputs.clone().iter().enumerate() {
-            let xdg_output = zxdg_output_manager.get_xdg_output(&output.wl_output, &qh, index);
-            xdg_outputs.push(xdg_output);
-        }
+        let xdg_outputs: Vec<ZxdgOutputV1> = state
+            .outputs
+            .iter()
+            .enumerate()
+            .map(|(index, output)| {
+                zxdg_output_manager.get_xdg_output(&output.wl_output, &qh, index)
+            })
+            .collect();
 
         event_queue.roundtrip(&mut state)?;
 
@@ -154,10 +158,10 @@ impl WayshotConnection {
         }
 
         if state.outputs.is_empty() {
-            log::error!("Compositor did not advertise any wl_output devices!");
+            tracing::error!("Compositor did not advertise any wl_output devices!");
             exit(1);
         }
-        log::debug!("Outputs detected: {:#?}", state.outputs);
+        tracing::debug!("Outputs detected: {:#?}", state.outputs);
         self.output_infos = state.outputs;
 
         Ok(())
@@ -204,8 +208,8 @@ impl WayshotConnection {
         ) {
             Ok(x) => x,
             Err(e) => {
-                log::error!("Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?");
-                log::error!("err: {e}");
+                tracing::error!("Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?");
+                tracing::error!("err: {e}");
                 return Err(Error::ProtocolNotFound(
                     "ZwlrScreencopy Manager not found".to_string(),
                 ));
@@ -234,7 +238,7 @@ impl WayshotConnection {
             event_queue.blocking_dispatch(&mut state)?;
         }
 
-        log::debug!(
+        tracing::debug!(
             "Received compositor frame buffer formats: {:#?}",
             state.formats
         );
@@ -253,13 +257,13 @@ impl WayshotConnection {
                 )
             })
             .copied();
-        log::debug!("Selected frame buffer format: {:#?}", frame_format);
+        tracing::debug!("Selected frame buffer format: {:#?}", frame_format);
 
         // Check if frame format exists.
         let frame_format = match frame_format {
             Some(format) => format,
             None => {
-                log::error!("No suitable frame format found");
+                tracing::error!("No suitable frame format found");
                 return Err(Error::NoSupportedBufferFormat);
             }
         };
@@ -301,7 +305,7 @@ impl WayshotConnection {
             if let Some(state) = state.state {
                 match state {
                     FrameState::Failed => {
-                        log::error!("Frame copy failed");
+                        tracing::error!("Frame copy failed");
                         return Err(Error::FramecopyFailed);
                     }
                     FrameState::Finished => {
@@ -318,13 +322,13 @@ impl WayshotConnection {
 
     fn capture_output_frame_shm_from_file(
         &self,
-        cursor_overlay: i32,
+        cursor_overlay: bool,
         output: &WlOutput,
         file: &File,
         capture_region: Option<CaptureRegion>,
     ) -> Result<FrameFormat> {
         let (state, event_queue, frame, frame_format) =
-            self.capture_output_frame_get_state(cursor_overlay, output, capture_region)?;
+            self.capture_output_frame_get_state(cursor_overlay as i32, output, capture_region)?;
 
         // Bytes of data in the frame = stride * height.
         let frame_bytes = frame_format.stride * frame_format.height;
@@ -336,7 +340,7 @@ impl WayshotConnection {
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
     fn capture_output_frame(
         &self,
-        cursor_overlay: i32,
+        cursor_overlay: bool,
         output: &WlOutput,
         transform: Transform,
         capture_region: Option<CaptureRegion>,
@@ -358,8 +362,8 @@ impl WayshotConnection {
         let frame_color_type = if let Some(converter) = create_converter(frame_format.format) {
             converter.convert_inplace(data)
         } else {
-            log::error!("Unsupported buffer format: {:?}", frame_format.format);
-            log::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
+            tracing::error!("Unsupported buffer format: {:?}", frame_format.format);
+            tracing::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
             return Err(Error::NoSupportedBufferFormat);
         };
         Ok(FrameCopy {
@@ -373,60 +377,65 @@ impl WayshotConnection {
     fn create_frame_copy(
         &self,
         capture_region: CaptureRegion,
-        cursor_overlay: i32,
+        cursor_overlay: bool,
     ) -> Result<Frame> {
-        let mut framecopys: Vec<FrameCopy> = Vec::new();
+        let frame_copies = thread::scope(|scope| -> Result<_> {
+            let join_handles = self
+                .get_all_outputs()
+                .into_iter()
+                .filter_map(|output| {
+                    let x1: i32 = cmp::max(output.dimensions.x, capture_region.x_coordinate);
+                    let y1: i32 = cmp::max(output.dimensions.y, capture_region.y_coordinate);
+                    let x2: i32 = cmp::min(
+                        output.dimensions.x + output.dimensions.width,
+                        capture_region.x_coordinate + capture_region.width,
+                    );
+                    let y2: i32 = cmp::min(
+                        output.dimensions.y + output.dimensions.height,
+                        capture_region.y_coordinate + capture_region.height,
+                    );
 
-        let outputs = self.get_all_outputs();
-        let mut intersecting_outputs: Vec<IntersectingOutput> = Vec::new();
-        for output in outputs.iter() {
-            let x1: i32 = cmp::max(output.dimensions.x, capture_region.x_coordinate);
-            let y1: i32 = cmp::max(output.dimensions.y, capture_region.y_coordinate);
-            let x2: i32 = cmp::min(
-                output.dimensions.x + output.dimensions.width,
-                capture_region.x_coordinate + capture_region.width,
-            );
-            let y2: i32 = cmp::min(
-                output.dimensions.y + output.dimensions.height,
-                capture_region.y_coordinate + capture_region.height,
-            );
+                    let width = x2 - x1;
+                    let height = y2 - y1;
 
-            let width = x2 - x1;
-            let height = y2 - y1;
+                    if width <= 0 || height <= 0 {
+                        return None;
+                    }
 
-            if !(width <= 0 || height <= 0) {
-                let true_x = capture_region.x_coordinate - output.dimensions.x;
-                let true_y = capture_region.y_coordinate - output.dimensions.y;
-                let true_region = CaptureRegion {
-                    x_coordinate: true_x,
-                    y_coordinate: true_y,
-                    width: capture_region.width,
-                    height: capture_region.height,
-                };
-                intersecting_outputs.push(IntersectingOutput {
-                    output: output.wl_output.clone(),
-                    region: true_region,
-                    transform: output.transform,
-                });
-            }
-        }
-        if intersecting_outputs.is_empty() {
-            log::error!("Provided capture region doesn't intersect with any outputs!");
-            exit(1);
-        }
+                    let true_x = capture_region.x_coordinate - output.dimensions.x;
+                    let true_y = capture_region.y_coordinate - output.dimensions.y;
+                    let true_region = CaptureRegion {
+                        x_coordinate: true_x,
+                        y_coordinate: true_y,
+                        width: capture_region.width,
+                        height: capture_region.height,
+                    };
+                    Some(IntersectingOutput {
+                        output: output.wl_output.clone(),
+                        region: true_region,
+                        transform: output.transform,
+                    })
+                })
+                .map(|intersecting_output| {
+                    scope.spawn(move || {
+                        self.capture_output_frame(
+                            cursor_overlay,
+                            &intersecting_output.output,
+                            intersecting_output.transform,
+                            Some(intersecting_output.region),
+                        )
+                    })
+                })
+                .collect::<Vec<_>>();
 
-        for intersecting_output in intersecting_outputs {
-            framecopys.push(self.capture_output_frame(
-                cursor_overlay,
-                &intersecting_output.output,
-                intersecting_output.transform,
-                Some(intersecting_output.region),
-            )?);
-        }
-        Ok((
-            framecopys,
-            Some((capture_region.width, capture_region.height)),
-        ))
+            join_handles
+                .into_iter()
+                .map(|join_handle| join_handle.join())
+                .flatten()
+                .collect::<Result<_>>()
+        })?;
+
+        Ok((frame_copies, (capture_region.width, capture_region.height)))
     }
 
     /// Take a screenshot from the specified region.
@@ -435,42 +444,54 @@ impl WayshotConnection {
         capture_region: CaptureRegion,
         cursor_overlay: bool,
     ) -> Result<RgbaImage> {
-        let frame_copy = self.create_frame_copy(capture_region, cursor_overlay as i32)?;
+        let (frame_copies, (width, height)) =
+            self.create_frame_copy(capture_region, cursor_overlay)?;
 
-        let mut composited_image;
+        thread::scope(|scope| {
+            let rotate_join_handles = frame_copies
+                .into_iter()
+                .map(|frame_copy| {
+                    scope.spawn(move || {
+                        let transform = frame_copy.transform;
+                        let image = frame_copy.try_into()?;
+                        Ok(image_util::rotate_image_buffer(
+                            image,
+                            transform,
+                            width as u32,
+                            height as u32,
+                        ))
+                    })
+                })
+                .collect::<Vec<_>>();
 
-        if frame_copy.0.len() == 1 {
-            let (width, height) = frame_copy.1.unwrap();
-            let frame_copy = &frame_copy.0[0];
-
-            let image = frame_copy.try_into()?;
-            composited_image = image_util::rotate_image_buffer(
-                image,
-                frame_copy.transform,
-                width as u32,
-                height as u32,
-            );
-        } else {
-            let mut images = Vec::new();
-            let (frame_copy, region) = frame_copy;
-            let (width, height) = region.unwrap();
-            for frame_copy in frame_copy {
-                let image = (&frame_copy).try_into()?;
-                let image = image_util::rotate_image_buffer(
-                    image,
-                    frame_copy.transform,
-                    width as u32,
-                    height as u32,
-                );
-                images.push(image);
-            }
-            composited_image = images[0].clone();
-            for image in images.iter().skip(1) {
-                overlay(&mut composited_image, image, 0, 0);
-            }
-        }
-
-        Ok(composited_image)
+            rotate_join_handles
+                .into_iter()
+                .map(|join_handle| join_handle.join())
+                .flatten()
+                .fold(
+                    None,
+                    |possible_overlayed_image_or_error: Option<Result<_>>, image: Result<_>| {
+                        if let Some(overlayed_image_or_error) = possible_overlayed_image_or_error {
+                            if let Ok(mut overlayed_image) = overlayed_image_or_error {
+                                if let Ok(image) = image {
+                                    overlay(&mut overlayed_image, &image, 0, 0);
+                                    Some(Ok(overlayed_image))
+                                } else {
+                                    Some(image)
+                                }
+                            } else {
+                                Some(image)
+                            }
+                        } else {
+                            Some(image)
+                        }
+                    },
+                )
+                .ok_or_else(|| {
+                    tracing::error!("Provided capture region doesn't intersect with any outputs!");
+                    Error::NoOutputs
+                })?
+        })
     }
 
     /// shot one ouput
@@ -480,12 +501,12 @@ impl WayshotConnection {
         cursor_overlay: bool,
     ) -> Result<RgbaImage> {
         let frame_copy = self.capture_output_frame(
-            cursor_overlay as i32,
+            cursor_overlay,
             &output_info.wl_output,
             output_info.transform,
             None,
         )?;
-        (&frame_copy).try_into()
+        frame_copy.try_into()
     }
 
     /// Take a screenshot from all of the specified outputs.
