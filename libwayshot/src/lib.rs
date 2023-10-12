@@ -19,7 +19,7 @@ use std::{
     thread,
 };
 
-use image::{imageops::overlay, RgbaImage};
+use image::{imageops::replace, RgbaImage};
 use memmap2::MmapMut;
 use wayland_client::{
     globals::{registry_queue_init, GlobalList},
@@ -474,7 +474,7 @@ impl WayshotConnection {
                         if let Some(overlayed_image_or_error) = possible_overlayed_image_or_error {
                             if let Ok(mut overlayed_image) = overlayed_image_or_error {
                                 if let Ok(image) = image {
-                                    overlay(&mut overlayed_image, &image, 0, 0);
+                                    replace(&mut overlayed_image, &image, 0, 0);
                                     Some(Ok(overlayed_image))
                                 } else {
                                     Some(image)
