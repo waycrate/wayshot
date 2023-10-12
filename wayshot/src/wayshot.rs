@@ -10,7 +10,7 @@ mod clap;
 mod utils;
 
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
-use tracing::{info, Level};
+use tracing::Level;
 
 use crate::utils::EncodingFormat;
 
