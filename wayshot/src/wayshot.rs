@@ -41,7 +41,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .with_writer(std::io::stderr)
         .init();
 
-    info!("Starting");
     let extension = if let Some(extension) = args.get_one::<String>("extension") {
         let ext = extension.trim().to_lowercase();
         tracing::debug!("Using custom extension: {:#?}", ext);
