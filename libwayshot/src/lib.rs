@@ -374,7 +374,7 @@ impl WayshotConnection {
         })
     }
 
-    pub fn create_frame_copy(
+    fn create_frame_copy(
         &self,
         capture_region: CaptureRegion,
         cursor_overlay: bool,
