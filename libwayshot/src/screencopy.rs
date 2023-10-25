@@ -25,6 +25,7 @@ pub struct FrameFormat {
     pub stride: u32,
 }
 
+#[tracing::instrument(skip(frame_mmap))]
 fn create_image_buffer<P>(
     frame_format: &FrameFormat,
     frame_mmap: &MmapMut,
@@ -32,6 +33,7 @@ fn create_image_buffer<P>(
 where
     P: Pixel<Subpixel = u8>,
 {
+    tracing::debug!("Creating image buffer");
     ImageBuffer::from_vec(frame_format.width, frame_format.height, frame_mmap.to_vec())
         .ok_or(Error::BufferTooSmall)
 }

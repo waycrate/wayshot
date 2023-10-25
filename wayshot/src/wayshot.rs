@@ -1,5 +1,4 @@
 use std::{
-    env,
     error::Error,
     io::{stdout, BufWriter, Cursor, Write},
     process::exit,
@@ -11,6 +10,7 @@ mod clap;
 mod utils;
 
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
+use tracing::Level;
 
 use crate::utils::EncodingFormat;
 
@@ -31,18 +31,19 @@ where
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = clap::set_flags().get_matches();
-    env::set_var("RUST_LOG", "wayshot=info");
-
-    if args.get_flag("debug") {
-        env::set_var("RUST_LOG", "wayshot=trace");
-    }
-
-    env_logger::init();
-    log::trace!("Logger initialized.");
+    let level = if args.get_flag("debug") {
+        Level::DEBUG
+    } else {
+        Level::INFO
+    };
+    tracing_subscriber::fmt()
+        .with_max_level(level)
+        .with_writer(std::io::stderr)
+        .init();
 
     let extension = if let Some(extension) = args.get_one::<String>("extension") {
         let ext = extension.trim().to_lowercase();
-        log::debug!("Using custom extension: {:#?}", ext);
+        tracing::debug!("Using custom extension: {:#?}", ext);
 
         match ext.as_str() {
             "jpeg" | "jpg" => EncodingFormat::Jpg,
@@ -50,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "ppm" => EncodingFormat::Ppm,
             "qoi" => EncodingFormat::Qoi,
             _ => {
-                log::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm\n5) qoi");
+                tracing::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm\n5) qoi");
                 exit(1);
             }
         }
@@ -74,7 +75,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if args.get_flag("listoutputs") {
         let valid_outputs = wayshot_conn.get_all_outputs();
         for output in valid_outputs {
-            log::info!("{:#?}", output.name);
+            tracing::info!("{:#?}", output.name);
         }
         exit(1);
     }
@@ -88,7 +89,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(region) = utils::parse_geometry(slurp_region) {
             wayshot_conn.screenshot(region, cursor_overlay)?
         } else {
-            log::error!("Invalid geometry specification");
+            tracing::error!("Invalid geometry specification");
             exit(1);
         }
     } else if let Some(output_name) = args.get_one::<String>("output") {
@@ -96,7 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(output) = outputs.iter().find(|output| &output.name == output_name) {
             wayshot_conn.screenshot_single_output(output, cursor_overlay)?
         } else {
-            log::error!("No output found!\n");
+            tracing::error!("No output found!\n");
             exit(1);
         }
     } else if args.get_flag("chooseoutput") {
@@ -108,7 +109,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(index) = select_ouput(&output_names) {
             wayshot_conn.screenshot_single_output(&outputs[index], cursor_overlay)?
         } else {
-            log::error!("No output found!\n");
+            tracing::error!("No output found!\n");
             exit(1);
         }
     } else {

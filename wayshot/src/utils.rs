@@ -79,7 +79,7 @@ pub fn get_default_file_name(extension: EncodingFormat) -> String {
     let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(n) => n.as_secs().to_string(),
         Err(_) => {
-            log::error!("SystemTime before UNIX EPOCH!");
+            tracing::error!("SystemTime before UNIX EPOCH!");
             exit(1);
         }
     };

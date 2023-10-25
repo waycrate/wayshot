@@ -1,6 +1,7 @@
 use image::RgbaImage;
 use wayland_client::protocol::wl_output::Transform;
 
+#[tracing::instrument(skip(image))]
 pub(crate) fn rotate_image_buffer(
     image: RgbaImage,
     transform: Transform,

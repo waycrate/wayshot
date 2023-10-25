@@ -25,6 +25,7 @@ use crate::{
     screencopy::FrameFormat,
 };
 
+#[derive(Debug)]
 pub struct OutputCaptureState {
     pub outputs: Vec<OutputInfo>,
 }
@@ -68,7 +69,7 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
                         },
                     });
                 } else {
-                    log::error!("Ignoring a wl_output with version < 4.");
+                    tracing::error!("Ignoring a wl_output with version < 4.");
                 }
             }
         }
@@ -128,12 +129,10 @@ impl Dispatch<ZxdgOutputV1, usize> for OutputCaptureState {
             zxdg_output_v1::Event::LogicalPosition { x, y } => {
                 output_info.dimensions.x = x;
                 output_info.dimensions.y = y;
-                log::debug!("Logical position event fired!");
             }
             zxdg_output_v1::Event::LogicalSize { width, height } => {
                 output_info.dimensions.width = width;
                 output_info.dimensions.height = height;
-                log::debug!("Logical size event fired!");
             }
             _ => {}
         };
@@ -156,6 +155,7 @@ pub struct CaptureFrameState {
 }
 
 impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
+    #[tracing::instrument(skip(frame), level = "trace")]
     fn event(
         frame: &mut Self,
         _: &ZwlrScreencopyFrameV1,
@@ -171,7 +171,6 @@ impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
                 height,
                 stride,
             } => {
-                log::debug!("Received Buffer event");
                 if let Value(f) = format {
                     frame.formats.push(FrameFormat {
                         format: f,
@@ -180,34 +179,31 @@ impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
                         stride,
                     })
                 } else {
-                    log::debug!("Received Buffer event with unidentified format");
+                    tracing::debug!("Received Buffer event with unidentified format");
                     exit(1);
                 }
-            }
-            zwlr_screencopy_frame_v1::Event::Flags { .. } => {
-                log::debug!("Received Flags event");
             }
             zwlr_screencopy_frame_v1::Event::Ready { .. } => {
                 // If the frame is successfully copied, a “flags” and a “ready” events are sent. Otherwise, a “failed” event is sent.
                 // This is useful when we call .copy on the frame object.
-                log::debug!("Received Ready event");
+                tracing::trace!("Received Ready event");
                 frame.state.replace(FrameState::Finished);
             }
             zwlr_screencopy_frame_v1::Event::Failed => {
-                log::debug!("Received Failed event");
+                tracing::trace!("Received Failed event");
                 frame.state.replace(FrameState::Failed);
             }
             zwlr_screencopy_frame_v1::Event::Damage { .. } => {
-                log::debug!("Received Damage event");
+                tracing::trace!("Received Damage event");
             }
             zwlr_screencopy_frame_v1::Event::LinuxDmabuf { .. } => {
-                log::debug!("Received LinuxDmaBuf event");
+                tracing::trace!("Received LinuxDmaBuf event");
             }
             zwlr_screencopy_frame_v1::Event::BufferDone => {
-                log::debug!("Received bufferdone event");
+                tracing::trace!("Received bufferdone event");
                 frame.buffer_done.store(true, Ordering::SeqCst);
             }
-            _ => unreachable!(),
+            _ => {}
         };
     }
 }
