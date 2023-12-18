@@ -38,6 +38,9 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 *-l*, *--listoutputs*
 	List all valid output names. This flag is generally used in combination with *-o* flag.
 
+*--chooseoutput*
+	Present a fuzzy selector for display (wl_output) selection.
+
 *-o*, *--output*
 	Choose a particular display (wl_output) to screenshot.
 
