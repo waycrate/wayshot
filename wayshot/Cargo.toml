@@ -8,7 +8,7 @@ keywords = ["screenshot", "wayland", "wlroots"]
 license = "BSD-2-Clause"
 name = "wayshot"
 repository = "https://git.sr.ht/~shinyzenith/wayshot"
-version = "1.4.0-dev"
+version = "1.3.1"
 
 [build-dependencies]
 flate2 = "1.0.27"
