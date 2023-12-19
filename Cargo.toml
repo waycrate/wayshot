@@ -1,6 +1,17 @@
 [workspace]
 resolver = "2"
-members = [
-	"wayshot",
-	"libwayshot",
-]
+members = ["wayshot", "libwayshot"]
+
+[workspace.package]
+authors = ["Shinyzenith <https://aakash.is-a.dev>"]
+homepage = "https://waycrate.github.io"
+description = "Screenshot crate for wlroots based compositors implementing the zwlr_screencopy_v1 protocol."
+keywords = ["screenshot", "wayland", "wlroots", "wayshot"]
+license = "BSD-2-Clause"
+repository = "https://git.sr.ht/~shinyzenith/wayshot"
+version = "0.3.2-dev"
+edition = "2021"
+
+[workspace.dependencies]
+libwayshot = { version = "0.3.2-dev", path = "./libwayshot" }
+tracing = "0.1.37"
