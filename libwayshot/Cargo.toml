@@ -1,11 +1,11 @@
 [package]
 name = "libwayshot"
+version = "0.3.2-dev"
 authors.workspace = true
 description.workspace = true
 keywords.workspace = true
 license.workspace = true
 repository.workspace = true
-version.workspace = true
 edition.workspace = true
 
 [dependencies]
