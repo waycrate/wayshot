@@ -19,7 +19,7 @@ use std::{
     thread,
 };
 
-use image::{imageops::overlay, RgbaImage};
+use image::{imageops::overlay, DynamicImage, RgbaImage};
 use memmap2::MmapMut;
 use wayland_client::{
     globals::{registry_queue_init, GlobalList},
@@ -254,6 +254,7 @@ impl WayshotConnection {
                         | wl_shm::Format::Argb8888
                         | wl_shm::Format::Xrgb8888
                         | wl_shm::Format::Xbgr8888
+                        | wl_shm::Format::Bgr888
                 )
             })
             .copied();
@@ -506,7 +507,8 @@ impl WayshotConnection {
             output_info.transform,
             None,
         )?;
-        frame_copy.try_into()
+        let image = DynamicImage::try_from(frame_copy)?;
+        Ok(image.into_rgba8())
     }
 
     /// Take a screenshot from all of the specified outputs.

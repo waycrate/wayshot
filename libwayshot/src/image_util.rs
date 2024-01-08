@@ -1,8 +1,8 @@
-use image::RgbaImage;
+use image::{DynamicImage, RgbaImage};
 use wayland_client::protocol::wl_output::Transform;
 
 pub(crate) fn rotate_image_buffer(
-    image: RgbaImage,
+    image: DynamicImage,
     transform: Transform,
     width: u32,
     height: u32,
@@ -24,7 +24,7 @@ pub(crate) fn rotate_image_buffer(
             let flipped_buffer = image::imageops::flip_horizontal(&image);
             image::imageops::rotate270(&flipped_buffer)
         }
-        _ => image,
+        _ => image.into_rgba8(),
     };
 
     if final_buffer.dimensions() == (width, height) {
