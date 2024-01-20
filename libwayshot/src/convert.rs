@@ -15,6 +15,9 @@ struct ConvertNone {}
 #[derive(Default)]
 struct ConvertRGB8 {}
 
+#[derive(Default)]
+struct ConvertBGR888 {}
+
 const SHIFT10BITS_1: u32 = 20;
 const SHIFT10BITS_2: u32 = 10;
 
@@ -27,6 +30,7 @@ pub fn create_converter(format: wl_shm::Format) -> Option<Box<dyn Convert>> {
         wl_shm::Format::Xbgr2101010 | wl_shm::Format::Abgr2101010 => {
             Some(Box::<ConvertBGR10>::default())
         }
+        wl_shm::Format::Bgr888 => Some(Box::<ConvertBGR888>::default()),
         _ => None,
     }
 }
@@ -67,5 +71,11 @@ impl Convert for ConvertBGR10 {
             chunk[3] = 255;
         }
         ColorType::Rgba8
+    }
+}
+
+impl Convert for ConvertBGR888 {
+    fn convert_inplace(&self, _data: &mut [u8]) -> ColorType {
+        ColorType::Rgb8
     }
 }

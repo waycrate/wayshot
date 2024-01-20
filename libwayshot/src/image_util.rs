@@ -1,40 +1,41 @@
-use image::RgbaImage;
+use image::{DynamicImage, GenericImageView};
 use wayland_client::protocol::wl_output::Transform;
 
 pub(crate) fn rotate_image_buffer(
-    image: RgbaImage,
+    image: DynamicImage,
     transform: Transform,
     width: u32,
     height: u32,
-) -> RgbaImage {
-    let final_buffer = match transform {
-        Transform::_90 => image::imageops::rotate90(&image),
-        Transform::_180 => image::imageops::rotate180(&image),
-        Transform::_270 => image::imageops::rotate270(&image),
-        Transform::Flipped => image::imageops::flip_horizontal(&image),
+) -> DynamicImage {
+    let final_image = match transform {
+        Transform::_90 => image::imageops::rotate90(&image).into(),
+        Transform::_180 => image::imageops::rotate180(&image).into(),
+        Transform::_270 => image::imageops::rotate270(&image).into(),
+        Transform::Flipped => image::imageops::flip_horizontal(&image).into(),
         Transform::Flipped90 => {
             let flipped_buffer = image::imageops::flip_horizontal(&image);
-            image::imageops::rotate90(&flipped_buffer)
+            image::imageops::rotate90(&flipped_buffer).into()
         }
         Transform::Flipped180 => {
             let flipped_buffer = image::imageops::flip_horizontal(&image);
-            image::imageops::rotate180(&flipped_buffer)
+            image::imageops::rotate180(&flipped_buffer).into()
         }
         Transform::Flipped270 => {
             let flipped_buffer = image::imageops::flip_horizontal(&image);
-            image::imageops::rotate270(&flipped_buffer)
+            image::imageops::rotate270(&flipped_buffer).into()
         }
         _ => image,
     };
 
-    if final_buffer.dimensions() == (width, height) {
-        return final_buffer;
+    if final_image.dimensions() == (width, height) {
+        return final_image;
     }
 
     image::imageops::resize(
-        &final_buffer,
+        &final_image,
         width,
         height,
         image::imageops::FilterType::Gaussian,
     )
+    .into()
 }

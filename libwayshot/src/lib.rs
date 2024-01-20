@@ -19,7 +19,7 @@ use std::{
     thread,
 };
 
-use image::{imageops::overlay, RgbaImage};
+use image::{imageops::overlay, DynamicImage};
 use memmap2::MmapMut;
 use wayland_client::{
     globals::{registry_queue_init, GlobalList},
@@ -254,6 +254,7 @@ impl WayshotConnection {
                         | wl_shm::Format::Argb8888
                         | wl_shm::Format::Xrgb8888
                         | wl_shm::Format::Xbgr8888
+                        | wl_shm::Format::Bgr888
                 )
             })
             .copied();
@@ -443,7 +444,7 @@ impl WayshotConnection {
         &self,
         capture_region: CaptureRegion,
         cursor_overlay: bool,
-    ) -> Result<RgbaImage> {
+    ) -> Result<DynamicImage> {
         let (frame_copies, (width, height)) =
             self.create_frame_copy(capture_region, cursor_overlay)?;
 
@@ -499,7 +500,7 @@ impl WayshotConnection {
         &self,
         output_info: &OutputInfo,
         cursor_overlay: bool,
-    ) -> Result<RgbaImage> {
+    ) -> Result<DynamicImage> {
         let frame_copy = self.capture_output_frame(
             cursor_overlay,
             &output_info.wl_output,
@@ -514,7 +515,7 @@ impl WayshotConnection {
         &self,
         outputs: &Vec<OutputInfo>,
         cursor_overlay: bool,
-    ) -> Result<RgbaImage> {
+    ) -> Result<DynamicImage> {
         if outputs.is_empty() {
             return Err(Error::NoOutputs);
         }
@@ -549,7 +550,7 @@ impl WayshotConnection {
     }
 
     /// Take a screenshot from all accessible outputs.
-    pub fn screenshot_all(&self, cursor_overlay: bool) -> Result<RgbaImage> {
+    pub fn screenshot_all(&self, cursor_overlay: bool) -> Result<DynamicImage> {
         self.screenshot_outputs(self.get_all_outputs(), cursor_overlay)
     }
 }
