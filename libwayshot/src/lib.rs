@@ -12,6 +12,7 @@ pub mod region;
 mod screencopy;
 
 use std::{
+    collections::HashSet,
     fs::File,
     os::fd::AsFd,
     process::exit,
@@ -19,6 +20,7 @@ use std::{
     thread,
 };
 
+use dispatch::LayerShellState;
 use image::{imageops::replace, DynamicImage};
 use memmap2::MmapMut;
 use region::{EmbeddedRegion, RegionCapturer};
@@ -27,6 +29,7 @@ use tracing::debug;
 use wayland_client::{
     globals::{registry_queue_init, GlobalList},
     protocol::{
+        wl_compositor::WlCompositor,
         wl_output::WlOutput,
         wl_shm::{self, WlShm},
     },
@@ -35,9 +38,15 @@ use wayland_client::{
 use wayland_protocols::xdg::xdg_output::zv1::client::{
     zxdg_output_manager_v1::ZxdgOutputManagerV1, zxdg_output_v1::ZxdgOutputV1,
 };
-use wayland_protocols_wlr::screencopy::v1::client::{
-    zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
-    zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
+use wayland_protocols_wlr::{
+    layer_shell::v1::client::{
+        zwlr_layer_shell_v1::{Layer, ZwlrLayerShellV1},
+        zwlr_layer_surface_v1::Anchor,
+    },
+    screencopy::v1::client::{
+        zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
+        zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
+    },
 };
 
 use crate::{
@@ -406,6 +415,87 @@ impl WayshotConnection {
         Ok(frame_copies)
     }
 
+    fn overlay_frames(&self, frames: &Vec<(FrameCopy, FrameGuard, OutputInfo)>) -> Result<()> {
+        let mut state = LayerShellState {
+            configured_outputs: HashSet::new(),
+        };
+        let mut event_queue: EventQueue<LayerShellState> =
+            self.conn.new_event_queue::<LayerShellState>();
+        let qh = event_queue.handle();
+
+        let compositor = match self.globals.bind::<WlCompositor, _, _>(&qh, 3..=3, ()) {
+            Ok(x) => x,
+            Err(e) => {
+                tracing::error!(
+                    "Failed to create compositor Does your compositor implement WlCompositor?"
+                );
+                tracing::error!("err: {e}");
+                return Err(Error::ProtocolNotFound(
+                    "WlCompositor not found".to_string(),
+                ));
+            }
+        };
+        let layer_shell = match self.globals.bind::<ZwlrLayerShellV1, _, _>(&qh, 1..=1, ()) {
+            Ok(x) => x,
+            Err(e) => {
+                tracing::error!(
+                    "Failed to create layer shell. Does your compositor implement WlrLayerShellV1?"
+                );
+                tracing::error!("err: {e}");
+                return Err(Error::ProtocolNotFound(
+                    "WlrLayerShellV1 not found".to_string(),
+                ));
+            }
+        };
+
+        for (frame_copy, frame_guard, output_info) in frames {
+            tracing::span!(
+                tracing::Level::DEBUG,
+                "overlay_frames::surface",
+                output = output_info.name.as_str()
+            )
+            .in_scope(|| -> Result<()> {
+                let surface = compositor.create_surface(&qh, ());
+
+                let layer_surface = layer_shell.get_layer_surface(
+                    &surface,
+                    Some(&output_info.wl_output),
+                    Layer::Top,
+                    "wayshot".to_string(),
+                    &qh,
+                    output_info.wl_output.clone(),
+                );
+
+                layer_surface.set_exclusive_zone(-1);
+                layer_surface.set_anchor(Anchor::Top | Anchor::Left);
+                layer_surface.set_size(
+                    frame_copy.frame_format.width,
+                    frame_copy.frame_format.height,
+                );
+
+                debug!("Committing surface creation changes.");
+                surface.commit();
+
+                debug!("Waiting for layer surface to be configured.");
+                while !state.configured_outputs.contains(&output_info.wl_output) {
+                    event_queue.blocking_dispatch(&mut state)?;
+                }
+
+                surface.set_buffer_transform(output_info.transform);
+                surface.set_buffer_scale(output_info.scale);
+                surface.attach(Some(&frame_guard.buffer), 0, 0);
+
+                debug!("Committing surface with attached buffer.");
+                surface.commit();
+
+                event_queue.blocking_dispatch(&mut state)?;
+
+                Ok(())
+            })?;
+        }
+        Ok(())
+    }
+
     /// Take a screenshot from the specified region.
     fn screenshot_region_capturer(
         &self,
@@ -445,6 +535,11 @@ impl WayshotConnection {
                         })
                     })
                     .collect(),
+                RegionCapturer::Freeze(_) => self
+                    .get_all_outputs()
+                    .into_iter()
+                    .map(|output_info| (output_info.clone(), None))
+                    .collect(),
             };
 
         let frames = self.capture_frame_copies(outputs_capture_regions, cursor_overlay)?;
@@ -452,6 +547,9 @@ impl WayshotConnection {
         let capture_region: LogicalRegion = match region_capturer {
             RegionCapturer::Outputs(ref outputs) => outputs.try_into()?,
             RegionCapturer::Region(region) => region,
+            RegionCapturer::Freeze(callback) => {
+                self.overlay_frames(&frames).and_then(|_| callback())?
+            }
         };
 
         thread::scope(|scope| {
@@ -529,6 +627,15 @@ impl WayshotConnection {
         self.screenshot_region_capturer(RegionCapturer::Region(capture_region), cursor_overlay)
     }
 
+    /// Take a screenshot, overlay the screenshot, run the callback, and then
+    /// unfreeze the screenshot and return the selected region.
+    pub fn screenshot_freeze(
+        &self,
+        callback: Box<dyn Fn() -> Result<LogicalRegion>>,
+        cursor_overlay: bool,
+    ) -> Result<DynamicImage> {
+        self.screenshot_region_capturer(RegionCapturer::Freeze(callback), cursor_overlay)
+    }
     /// shot one ouput
     pub fn screenshot_single_output(
         &self,
