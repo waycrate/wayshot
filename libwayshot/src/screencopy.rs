@@ -1,5 +1,5 @@
 use std::{
-    ffi::CStr,
+    ffi::CString,
     os::fd::{AsRawFd, IntoRawFd, OwnedFd},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -82,6 +82,16 @@ impl TryFrom<&FrameCopy> for DynamicImage {
     }
 }
 
+fn get_mem_file_handle() -> String {
+    format!(
+        "/libwayshot-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|time| time.subsec_nanos().to_string())
+            .unwrap_or("unknown".into())
+    )
+}
+
 /// Return a RawFd to a shm file. We use memfd create on linux and shm_open for BSD support.
 /// You don't need to mess around with this function, it is only used by
 /// capture_output_frame.
@@ -91,7 +101,7 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
     loop {
         // Create a file that closes on succesful execution and seal it's operations.
         match memfd::memfd_create(
-            CStr::from_bytes_with_nul(b"libwayshot\0").unwrap(),
+            CString::new("libwayshot")?.as_c_str(),
             memfd::MemFdCreateFlag::MFD_CLOEXEC | memfd::MemFdCreateFlag::MFD_ALLOW_SEALING,
         ) {
             Ok(fd) => {
@@ -113,11 +123,7 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
     }
 
     // Fallback to using shm_open.
-    let sys_time = SystemTime::now();
-    let mut mem_file_handle = format!(
-        "/libwayshot-{}",
-        sys_time.duration_since(UNIX_EPOCH).unwrap().subsec_nanos()
-    );
+    let mut mem_file_handle = get_mem_file_handle();
     loop {
         match mman::shm_open(
             // O_CREAT = Create file if does not exist.
@@ -142,10 +148,7 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
             },
             Err(nix::errno::Errno::EEXIST) => {
                 // If a file with that handle exists then change the handle
-                mem_file_handle = format!(
-                    "/libwayshot-{}",
-                    sys_time.duration_since(UNIX_EPOCH).unwrap().subsec_nanos()
-                );
+                mem_file_handle = get_mem_file_handle();
                 continue;
             }
             Err(nix::errno::Errno::EINTR) => continue,

@@ -15,7 +15,6 @@ use std::{
     collections::HashSet,
     fs::File,
     os::fd::AsFd,
-    process::exit,
     sync::atomic::{AtomicBool, Ordering},
     thread,
 };
@@ -68,8 +67,8 @@ pub mod reexport {
 /// # Example usage
 ///
 /// ```
-/// let wayshot_connection = WayshotConnection::new().unwrap();
-/// let image_buffer = wayshot_connection.screenshot_all().unwrap();
+/// let wayshot_connection = WayshotConnection::new()?;
+/// let image_buffer = wayshot_connection.screenshot_all()?;
 /// ```
 #[derive(Debug)]
 pub struct WayshotConnection {
@@ -150,7 +149,7 @@ impl WayshotConnection {
 
         if state.outputs.is_empty() {
             tracing::error!("Compositor did not advertise any wl_output devices!");
-            exit(1);
+            return Err(Error::NoOutputs);
         }
         tracing::trace!("Outputs detected: {:#?}", state.outputs);
         self.output_infos = state.outputs;
@@ -280,7 +279,7 @@ impl WayshotConnection {
         let frame_bytes = frame_format.stride * frame_format.height;
 
         // Instantiate shm global.
-        let shm = self.globals.bind::<WlShm, _, _>(&qh, 1..=1, ()).unwrap();
+        let shm = self.globals.bind::<WlShm, _, _>(&qh, 1..=1, ())?;
         let shm_pool = shm.create_pool(fd.as_fd(), frame_bytes as i32, &qh, ());
         let buffer = shm_pool.create_buffer(
             0,

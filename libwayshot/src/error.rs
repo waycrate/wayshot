@@ -1,7 +1,10 @@
 use std::{io, result};
 
 use thiserror::Error;
-use wayland_client::{globals::GlobalError, ConnectError, DispatchError};
+use wayland_client::{
+    globals::{BindError, GlobalError},
+    ConnectError, DispatchError,
+};
 
 pub type Result<T, E = Error> = result::Result<T, E>;
 
@@ -17,6 +20,8 @@ pub enum Error {
     Io(#[from] io::Error),
     #[error("dispatch error: {0}")]
     Dispatch(#[from] DispatchError),
+    #[error("bind error: {0}")]
+    Bind(#[from] BindError),
     #[error("global error: {0}")]
     Global(#[from] GlobalError),
     #[error("connect error: {0}")]

@@ -174,22 +174,22 @@ impl TryFrom<&Vec<OutputInfo>> for LogicalRegion {
             .iter()
             .map(|output| output.dimensions.x)
             .min()
-            .unwrap();
+            .ok_or(Error::NoOutputs)?;
         let y1 = output_info
             .iter()
             .map(|output| output.dimensions.y)
             .min()
-            .unwrap();
+            .ok_or(Error::NoOutputs)?;
         let x2 = output_info
             .iter()
             .map(|output| output.dimensions.x + output.dimensions.width)
             .max()
-            .unwrap();
+            .ok_or(Error::NoOutputs)?;
         let y2 = output_info
             .iter()
             .map(|output| output.dimensions.y + output.dimensions.height)
             .max()
-            .unwrap();
+            .ok_or(Error::NoOutputs)?;
         Ok(LogicalRegion {
             inner: Region {
                 x: x1,

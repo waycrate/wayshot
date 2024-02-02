@@ -17,6 +17,6 @@
 ```rust
 use libwayshot::WayshotConnection;
 
-let wayshot_connection = WayshotConnection::new().unwrap();
-let image_buffer = wayshot_connection.screenshot_all().unwrap();
+let wayshot_connection = WayshotConnection::new()?;
+let image_buffer = wayshot_connection.screenshot_all()?;
 ```

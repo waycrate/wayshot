@@ -1,10 +1,10 @@
 use std::{
     io::{stdout, BufWriter, Cursor, Write},
-    process::{exit, Command},
+    process::Command,
 };
 
 use clap::Parser;
-use eyre::Result;
+use eyre::{bail, Result};
 use libwayshot::{region::LogicalRegion, WayshotConnection};
 
 mod cli;
@@ -70,7 +70,7 @@ fn main() -> Result<()> {
         for output in valid_outputs {
             tracing::info!("{:#?}", output.name);
         }
-        exit(1);
+        return Ok(());
     }
 
     let image_buffer = if let Some(slurp_region) = cli.slurp {
@@ -94,8 +94,7 @@ fn main() -> Result<()> {
         if let Some(output) = outputs.iter().find(|output| output.name == output_name) {
             wayshot_conn.screenshot_single_output(output, cli.cursor)?
         } else {
-            tracing::error!("No output found!\n");
-            exit(1);
+            bail!("No output found!");
         }
     } else if cli.choose_output {
         let outputs = wayshot_conn.get_all_outputs();
@@ -106,8 +105,7 @@ fn main() -> Result<()> {
         if let Some(index) = select_ouput(&output_names) {
             wayshot_conn.screenshot_single_output(&outputs[index], cli.cursor)?
         } else {
-            tracing::error!("No output found!\n");
-            exit(1);
+            bail!("No output found!");
         }
     } else {
         wayshot_conn.screenshot_all(cli.cursor)?
