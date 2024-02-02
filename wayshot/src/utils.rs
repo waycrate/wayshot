@@ -1,6 +1,11 @@
-use eyre::{ContextCompat, Result};
+use clap::ValueEnum;
+use eyre::{bail, ContextCompat, Error, Result};
+
 use std::{
+    fmt::Display,
+    path::PathBuf,
     process::exit,
+    str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -47,16 +52,22 @@ pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
 }
 
 /// Supported image encoding formats.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum)]
 pub enum EncodingFormat {
-    /// Jpeg / jpg encoder.
+    /// JPG/JPEG encoder.
     Jpg,
-    /// Png encoder.
+    /// PNG encoder.
     Png,
-    /// Ppm encoder.
+    /// PPM encoder.
     Ppm,
-    /// Qoi encoder.
+    /// Qut encoder.
     Qoi,
+}
+
+impl Default for EncodingFormat {
+    fn default() -> Self {
+        Self::Png
+    }
 }
 
 impl From<EncodingFormat> for image::ImageOutputFormat {
@@ -67,6 +78,33 @@ impl From<EncodingFormat> for image::ImageOutputFormat {
             EncodingFormat::Ppm => image::ImageFormat::Pnm.into(),
             EncodingFormat::Qoi => image::ImageFormat::Qoi.into(),
         }
+    }
+}
+
+impl TryFrom<&PathBuf> for EncodingFormat {
+    type Error = Error;
+
+    fn try_from(value: &PathBuf) -> std::result::Result<Self, Self::Error> {
+        value
+            .extension()
+            .wrap_err_with(|| {
+                format!(
+                    "no extension in {} to deduce encoding format",
+                    value.display()
+                )
+            })
+            .and_then(|ext| {
+                ext.to_str().wrap_err_with(|| {
+                    format!("extension in {} is not valid unicode", value.display())
+                })
+            })
+            .and_then(|ext| ext.parse())
+    }
+}
+
+impl Display for EncodingFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", Into::<&str>::into(*self))
     }
 }
 
@@ -81,7 +119,21 @@ impl From<EncodingFormat> for &str {
     }
 }
 
-pub fn get_default_file_name(extension: EncodingFormat) -> String {
+impl FromStr for EncodingFormat {
+    type Err = Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Ok(match s {
+            "jpg" | "jpeg" => Self::Jpg,
+            "png" => Self::Png,
+            "ppm" => Self::Ppm,
+            "qoi" => Self::Qoi,
+            _ => bail!("unsupported extension '{s}'"),
+        })
+    }
+}
+
+pub fn get_default_file_name(extension: EncodingFormat) -> PathBuf {
     let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(n) => n.as_secs().to_string(),
         Err(_) => {
@@ -90,5 +142,5 @@ pub fn get_default_file_name(extension: EncodingFormat) -> String {
         }
     };
 
-    time + "-wayshot." + extension.into()
+    (time + "-wayshot." + extension.into()).into()
 }
