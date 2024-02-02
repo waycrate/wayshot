@@ -3,9 +3,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use libwayshot::CaptureRegion;
+use libwayshot::region::{LogicalRegion, Region};
 
-pub fn parse_geometry(g: &str) -> Option<CaptureRegion> {
+pub fn parse_geometry(g: &str) -> Option<LogicalRegion> {
     let tail = g.trim();
     let x_coordinate: i32;
     let y_coordinate: i32;
@@ -32,11 +32,13 @@ pub fn parse_geometry(g: &str) -> Option<CaptureRegion> {
         height = tail.parse::<i32>().ok()?;
     }
 
-    Some(CaptureRegion {
-        x_coordinate,
-        y_coordinate,
-        width,
-        height,
+    Some(LogicalRegion {
+        inner: Region {
+            x: x_coordinate,
+            y: y_coordinate,
+            width,
+            height,
+        },
     })
 }
 
