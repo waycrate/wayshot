@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use clap::arg;
 
 use clap::Parser;
+use eyre::WrapErr;
 
 use crate::utils::EncodingFormat;
 use clap::builder::TypedValueParser;
@@ -15,7 +16,7 @@ pub struct Cli {
     pub file: Option<PathBuf>,
 
     /// Log level to be used for printing to stderr
-    #[arg(long, default_value = "info", value_parser = clap::builder::PossibleValuesParser::new(["trace", "debug", "info", "warn", "error"]).map(|s| -> tracing::Level{ s.parse().unwrap()}))]
+    #[arg(long, default_value = "info", value_parser = clap::builder::PossibleValuesParser::new(["trace", "debug", "info", "warn", "error"]).map(|s| -> tracing::Level{ s.parse().wrap_err_with(|| format!("Failed to parse log level: {}", s)).unwrap()}))]
     pub log_level: tracing::Level,
 
     /// Arguments to call slurp with for selecting a region

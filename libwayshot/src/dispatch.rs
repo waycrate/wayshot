@@ -1,6 +1,5 @@
 use std::{
     collections::HashSet,
-    process::exit,
     sync::atomic::{AtomicBool, Ordering},
 };
 use wayland_client::{
@@ -86,11 +85,13 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        let output: &mut OutputInfo = state
-            .outputs
-            .iter_mut()
-            .find(|x| x.wl_output == *wl_output)
-            .unwrap();
+        let output: &mut OutputInfo =
+            if let Some(output) = state.outputs.iter_mut().find(|x| x.wl_output == *wl_output) {
+                output
+            } else {
+                tracing::error!("Received event for an output that is not registered: {event:#?}");
+                return;
+            };
 
         match event {
             wl_output::Event::Name { name } => {
@@ -129,7 +130,14 @@ impl Dispatch<ZxdgOutputV1, usize> for OutputCaptureState {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        let output_info = state.outputs.get_mut(*index).unwrap();
+        let output_info = if let Some(output_info) = state.outputs.get_mut(*index) {
+            output_info
+        } else {
+            tracing::error!(
+                "Received event for output index {index} that is not registered: {event:#?}"
+            );
+            return;
+        };
 
         match event {
             zxdg_output_v1::Event::LogicalPosition { x, y } => {
@@ -189,7 +197,6 @@ impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
                     })
                 } else {
                     tracing::debug!("Received Buffer event with unidentified format");
-                    exit(1);
                 }
             }
             zwlr_screencopy_frame_v1::Event::Ready { .. } => {

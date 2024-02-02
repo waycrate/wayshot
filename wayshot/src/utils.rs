@@ -4,7 +4,6 @@ use eyre::{bail, ContextCompat, Error, Result};
 use std::{
     fmt::Display,
     path::PathBuf,
-    process::exit,
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -134,13 +133,10 @@ impl FromStr for EncodingFormat {
 }
 
 pub fn get_default_file_name(extension: EncodingFormat) -> PathBuf {
-    let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(n) => n.as_secs().to_string(),
-        Err(_) => {
-            tracing::error!("SystemTime before UNIX EPOCH!");
-            exit(1);
-        }
-    };
+    let time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|time| time.as_secs().to_string())
+        .unwrap_or("unknown".into());
 
-    (time + "-wayshot." + extension.into()).into()
+    format!("{time}-wayshot.{extension}").into()
 }

@@ -12,6 +12,8 @@ repository.workspace = true
 
 [build-dependencies]
 flate2 = "1.0.27"
+eyre = "0.6.8"
+
 
 [dependencies]
 tracing.workspace = true
