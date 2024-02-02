@@ -2,7 +2,7 @@ use std::cmp;
 
 use wayland_client::protocol::wl_output::Transform;
 
-use crate::error::Error;
+use crate::error::{Error, Result};
 use crate::output::OutputInfo;
 use crate::screencopy::FrameCopy;
 
@@ -12,6 +12,10 @@ pub enum RegionCapturer {
     Outputs(Vec<OutputInfo>),
     /// Capture an already known `LogicalRegion`.
     Region(LogicalRegion),
+    /// The outputs will be "frozen" to the user at which point the given
+    /// callback is called to get the region to capture. This callback is often
+    /// a user interaction to let the user select a region.
+    Freeze(Box<dyn Fn() -> Result<LogicalRegion>>),
 }
 
 /// `Region` where the coordinate system is the logical coordinate system used

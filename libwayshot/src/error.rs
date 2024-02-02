@@ -27,4 +27,6 @@ pub enum Error {
     NoSupportedBufferFormat,
     #[error("Cannot find required wayland protocol")]
     ProtocolNotFound(String),
+    #[error("error occurred in freeze callback")]
+    FreezeCallbackError,
 }

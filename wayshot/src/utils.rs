@@ -1,3 +1,4 @@
+use eyre::{ContextCompat, Result};
 use std::{
     process::exit,
     time::{SystemTime, UNIX_EPOCH},
@@ -5,34 +6,37 @@ use std::{
 
 use libwayshot::region::{LogicalRegion, Region};
 
-pub fn parse_geometry(g: &str) -> Option<LogicalRegion> {
+pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
     let tail = g.trim();
     let x_coordinate: i32;
     let y_coordinate: i32;
     let width: i32;
     let height: i32;
 
+    let validation_error =
+        "Invalid geometry provided.\nValid geometries:\n1) %d,%d %dx%d\n2) %d %d %d %d";
+
     if tail.contains(',') {
         // this accepts: "%d,%d %dx%d"
-        let (head, tail) = tail.split_once(',')?;
-        x_coordinate = head.parse::<i32>().ok()?;
-        let (head, tail) = tail.split_once(' ')?;
-        y_coordinate = head.parse::<i32>().ok()?;
-        let (head, tail) = tail.split_once('x')?;
-        width = head.parse::<i32>().ok()?;
-        height = tail.parse::<i32>().ok()?;
+        let (head, tail) = tail.split_once(',').wrap_err(validation_error)?;
+        x_coordinate = head.parse::<i32>()?;
+        let (head, tail) = tail.split_once(' ').wrap_err(validation_error)?;
+        y_coordinate = head.parse::<i32>()?;
+        let (head, tail) = tail.split_once('x').wrap_err(validation_error)?;
+        width = head.parse::<i32>()?;
+        height = tail.parse::<i32>()?;
     } else {
         // this accepts: "%d %d %d %d"
-        let (head, tail) = tail.split_once(' ')?;
-        x_coordinate = head.parse::<i32>().ok()?;
-        let (head, tail) = tail.split_once(' ')?;
-        y_coordinate = head.parse::<i32>().ok()?;
-        let (head, tail) = tail.split_once(' ')?;
-        width = head.parse::<i32>().ok()?;
-        height = tail.parse::<i32>().ok()?;
+        let (head, tail) = tail.split_once(' ').wrap_err(validation_error)?;
+        x_coordinate = head.parse::<i32>()?;
+        let (head, tail) = tail.split_once(' ').wrap_err(validation_error)?;
+        y_coordinate = head.parse::<i32>()?;
+        let (head, tail) = tail.split_once(' ').wrap_err(validation_error)?;
+        width = head.parse::<i32>()?;
+        height = tail.parse::<i32>()?;
     }
 
-    Some(LogicalRegion {
+    Ok(LogicalRegion {
         inner: Region {
             x: x_coordinate,
             y: y_coordinate,
