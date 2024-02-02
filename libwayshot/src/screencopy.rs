@@ -15,7 +15,10 @@ use wayland_client::protocol::{
     wl_buffer::WlBuffer, wl_output, wl_shm::Format, wl_shm_pool::WlShmPool,
 };
 
-use crate::{Error, Result};
+use crate::{
+    region::{LogicalRegion, Size},
+    Error, Result,
+};
 
 pub struct FrameGuard {
     pub buffer: WlBuffer,
@@ -36,10 +39,18 @@ impl Drop for FrameGuard {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct FrameFormat {
     pub format: Format,
-    pub width: u32,
-    pub height: u32,
+    /// Size of the frame in pixels. This will always be in "landscape" so a
+    /// portrait 1080x1920 frame will be 1920x1080 and will need to be rotated!
+    pub size: Size,
     /// Stride is the number of bytes between the start of a row and the start of the next row.
     pub stride: u32,
+}
+
+impl FrameFormat {
+    /// Returns the size of the frame in bytes, which is the stride * height.
+    pub fn byte_size(&self) -> u64 {
+        self.stride as u64 * self.size.height as u64
+    }
 }
 
 #[tracing::instrument(skip(frame_mmap))]
@@ -51,8 +62,12 @@ where
     P: Pixel<Subpixel = u8>,
 {
     tracing::debug!("Creating image buffer");
-    ImageBuffer::from_vec(frame_format.width, frame_format.height, frame_mmap.to_vec())
-        .ok_or(Error::BufferTooSmall)
+    ImageBuffer::from_vec(
+        frame_format.size.width,
+        frame_format.size.height,
+        frame_mmap.to_vec(),
+    )
+    .ok_or(Error::BufferTooSmall)
 }
 
 /// The copied frame comprising of the FrameFormat, ColorType (Rgba8), and a memory backed shm
@@ -63,7 +78,8 @@ pub struct FrameCopy {
     pub frame_color_type: ColorType,
     pub frame_mmap: MmapMut,
     pub transform: wl_output::Transform,
-    pub position: (i64, i64),
+    /// Logical region with the transform already applied.
+    pub region: LogicalRegion,
 }
 
 impl TryFrom<&FrameCopy> for DynamicImage {

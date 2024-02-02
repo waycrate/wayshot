@@ -1,10 +1,7 @@
 use std::cmp;
 
-use wayland_client::protocol::wl_output::Transform;
-
 use crate::error::{Error, Result};
 use crate::output::OutputInfo;
-use crate::screencopy::FrameCopy;
 
 /// Ways to say how a region for a screenshot should be captured.
 pub enum RegionCapturer {
@@ -58,16 +55,28 @@ pub struct EmbeddedRegion {
 ///
 /// Use `LogicalRegion` or `EmbeddedRegion` instead as they convey the
 /// coordinate system used.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Region {
-    /// X coordinate of the area to capture.
+    /// Position of the region.
+    pub position: Position,
+    /// Size of the region.
+    pub size: Size,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
+pub struct Position {
+    /// X coordinate.
     pub x: i32,
-    /// y coordinate of the area to capture.
+    /// Y coordinate.
     pub y: i32,
-    /// Width of the capture area.
-    pub width: i32,
-    /// Height of the capture area.
-    pub height: i32,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
+pub struct Size {
+    /// Width.
+    pub width: u32,
+    /// Height.
+    pub height: u32,
 }
 
 impl EmbeddedRegion {
@@ -78,30 +87,36 @@ impl EmbeddedRegion {
     /// See `EmbeddedRegion` for an example ASCII visualisation.
     #[tracing::instrument(ret, level = "debug")]
     pub fn new(viewport: LogicalRegion, relative_to: LogicalRegion) -> Option<Self> {
-        let x_relative: i32 = viewport.inner.x - relative_to.inner.x;
-        let y_relative = viewport.inner.y - relative_to.inner.y;
+        let x_relative: i32 = viewport.inner.position.x - relative_to.inner.position.x;
+        let y_relative = viewport.inner.position.y - relative_to.inner.position.y;
 
         let x1 = cmp::max(x_relative, 0);
-        let x2 = cmp::min(x_relative + viewport.inner.width, relative_to.inner.width);
-        let width = x2 - x1;
-        if width <= 0 {
+        let x2 = cmp::min(
+            x_relative + viewport.inner.size.width as i32,
+            relative_to.inner.size.width as i32,
+        );
+        let width = if let Ok(width) = (x2 - x1).try_into() {
+            width
+        } else {
             return None;
-        }
+        };
 
         let y1 = cmp::max(y_relative, 0);
-        let y2 = cmp::min(y_relative + viewport.inner.height, relative_to.inner.height);
-        let height = y2 - y1;
-        if height <= 0 {
+        let y2 = cmp::min(
+            y_relative + viewport.inner.size.height as i32,
+            relative_to.inner.size.height as i32,
+        );
+        let height = if let Ok(height) = (y2 - y1).try_into() {
+            height
+        } else {
             return None;
-        }
+        };
 
         Some(Self {
             relative_to: relative_to,
             inner: Region {
-                x: x1,
-                y: y1,
-                width,
-                height,
+                position: Position { x: x1, y: y1 },
+                size: Size { width, height },
             },
         })
     }
@@ -114,10 +129,11 @@ impl EmbeddedRegion {
     pub fn logical(&self) -> LogicalRegion {
         LogicalRegion {
             inner: Region {
-                x: self.relative_to.inner.x as i32 + self.inner.x,
-                y: self.relative_to.inner.y as i32 + self.inner.y,
-                width: self.inner.width,
-                height: self.inner.height,
+                position: Position {
+                    x: self.relative_to.inner.position.x + self.inner.position.x,
+                    y: self.relative_to.inner.position.y + self.inner.position.y,
+                },
+                size: self.inner.size,
             },
         }
     }
@@ -134,15 +150,30 @@ impl std::fmt::Display for EmbeddedRegion {
     }
 }
 
+impl std::fmt::Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({x}, {y})", x = self.x, y = self.y,)
+    }
+}
+
+impl std::fmt::Display for Size {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "({width}x{height})",
+            width = self.width,
+            height = self.height,
+        )
+    }
+}
+
 impl std::fmt::Display for Region {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "({x}, {y}) ({width}x{height})",
-            x = self.x,
-            y = self.y,
-            width = self.width,
-            height = self.height,
+            "({position}) ({size})",
+            position = self.position,
+            size = self.size,
         )
     }
 }
@@ -156,12 +187,7 @@ impl std::fmt::Display for LogicalRegion {
 impl From<&OutputInfo> for LogicalRegion {
     fn from(output_info: &OutputInfo) -> Self {
         LogicalRegion {
-            inner: Region {
-                x: output_info.dimensions.x,
-                y: output_info.dimensions.y,
-                width: output_info.dimensions.width,
-                height: output_info.dimensions.height,
-            },
+            inner: output_info.region,
         }
     }
 }
@@ -172,52 +198,32 @@ impl TryFrom<&Vec<OutputInfo>> for LogicalRegion {
     fn try_from(output_info: &Vec<OutputInfo>) -> std::result::Result<Self, Self::Error> {
         let x1 = output_info
             .iter()
-            .map(|output| output.dimensions.x)
+            .map(|output| output.region.position.x)
             .min()
             .ok_or(Error::NoOutputs)?;
         let y1 = output_info
             .iter()
-            .map(|output| output.dimensions.y)
+            .map(|output| output.region.position.y)
             .min()
             .ok_or(Error::NoOutputs)?;
         let x2 = output_info
             .iter()
-            .map(|output| output.dimensions.x + output.dimensions.width)
+            .map(|output| output.region.position.x + output.region.size.width as i32)
             .max()
             .ok_or(Error::NoOutputs)?;
         let y2 = output_info
             .iter()
-            .map(|output| output.dimensions.y + output.dimensions.height)
+            .map(|output| output.region.position.y + output.region.size.height as i32)
             .max()
             .ok_or(Error::NoOutputs)?;
         Ok(LogicalRegion {
             inner: Region {
-                x: x1,
-                y: y1,
-                width: x2 - x1,
-                height: y2 - y1,
+                position: Position { x: x1, y: y1 },
+                size: Size {
+                    width: (x2 - x1) as u32,
+                    height: (y2 - y1) as u32,
+                },
             },
         })
-    }
-}
-
-impl From<&FrameCopy> for LogicalRegion {
-    fn from(frame_copy: &FrameCopy) -> Self {
-        let (width, height) = (
-            frame_copy.frame_format.width as i32,
-            frame_copy.frame_format.height as i32,
-        );
-        let is_portait = match frame_copy.transform {
-            Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270 => true,
-            _ => false,
-        };
-        LogicalRegion {
-            inner: Region {
-                x: frame_copy.position.0 as i32,
-                y: frame_copy.position.1 as i32,
-                width: if is_portait { height } else { width },
-                height: if is_portait { width } else { height },
-            },
-        }
     }
 }

@@ -26,7 +26,8 @@ use wayland_protocols_wlr::screencopy::v1::client::{
 };
 
 use crate::{
-    output::{OutputInfo, OutputPositioning, WlOutputMode},
+    output::OutputInfo,
+    region::{Position, Region, Size},
     screencopy::FrameFormat,
 };
 
@@ -64,8 +65,7 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
                         description: String::new(),
                         transform: wl_output::Transform::Normal,
                         scale: 1,
-                        dimensions: OutputPositioning::default(),
-                        mode: WlOutputMode::default(),
+                        region: Region::default(),
                     });
                 } else {
                     tracing::error!("Ignoring a wl_output with version < 4.");
@@ -100,9 +100,7 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
             wl_output::Event::Description { description } => {
                 output.description = description;
             }
-            wl_output::Event::Mode { width, height, .. } => {
-                output.mode = WlOutputMode { width, height };
-            }
+            wl_output::Event::Mode { .. } => {}
             wl_output::Event::Geometry {
                 transform: WEnum::Value(transform),
                 ..
@@ -141,12 +139,13 @@ impl Dispatch<ZxdgOutputV1, usize> for OutputCaptureState {
 
         match event {
             zxdg_output_v1::Event::LogicalPosition { x, y } => {
-                output_info.dimensions.x = x;
-                output_info.dimensions.y = y;
+                output_info.region.position = Position { x, y };
             }
             zxdg_output_v1::Event::LogicalSize { width, height } => {
-                output_info.dimensions.width = width;
-                output_info.dimensions.height = height;
+                output_info.region.size = Size {
+                    width: width as u32,
+                    height: height as u32,
+                };
             }
             zxdg_output_v1::Event::Done => {}
             zxdg_output_v1::Event::Name { .. } => {}
@@ -191,8 +190,7 @@ impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
                 if let Value(f) = format {
                     frame.formats.push(FrameFormat {
                         format: f,
-                        width,
-                        height,
+                        size: Size { width, height },
                         stride,
                     })
                 } else {

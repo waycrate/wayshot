@@ -29,7 +29,7 @@ use wayland_client::{
     globals::{registry_queue_init, GlobalList},
     protocol::{
         wl_compositor::WlCompositor,
-        wl_output::WlOutput,
+        wl_output::{Transform, WlOutput},
         wl_shm::{self, WlShm},
     },
     Connection, EventQueue,
@@ -52,7 +52,7 @@ use crate::{
     convert::create_converter,
     dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState},
     output::OutputInfo,
-    region::LogicalRegion,
+    region::{LogicalRegion, Region, Size},
     screencopy::{create_shm_fd, FrameCopy, FrameFormat},
 };
 
@@ -214,10 +214,10 @@ impl WayshotConnection {
             screencopy_manager.capture_output_region(
                 cursor_overlay,
                 output,
-                embedded_region.inner.x,
-                embedded_region.inner.y,
-                embedded_region.inner.width,
-                embedded_region.inner.height,
+                embedded_region.inner.position.x,
+                embedded_region.inner.position.y,
+                embedded_region.inner.size.width as i32,
+                embedded_region.inner.size.height as i32,
                 &qh,
                 (),
             )
@@ -275,16 +275,21 @@ impl WayshotConnection {
         // Connecting to wayland environment.
         let qh = event_queue.handle();
 
-        // Bytes of data in the frame = stride * height.
-        let frame_bytes = frame_format.stride * frame_format.height;
-
         // Instantiate shm global.
         let shm = self.globals.bind::<WlShm, _, _>(&qh, 1..=1, ())?;
-        let shm_pool = shm.create_pool(fd.as_fd(), frame_bytes as i32, &qh, ());
+        let shm_pool = shm.create_pool(
+            fd.as_fd(),
+            frame_format
+                .byte_size()
+                .try_into()
+                .map_err(|_| Error::BufferTooSmall)?,
+            &qh,
+            (),
+        );
         let buffer = shm_pool.create_buffer(
             0,
-            frame_format.width as i32,
-            frame_format.height as i32,
+            frame_format.size.width as i32,
+            frame_format.size.height as i32,
             frame_format.stride as i32,
             frame_format.format,
             &qh,
@@ -322,9 +327,7 @@ impl WayshotConnection {
         let (state, event_queue, frame, frame_format) =
             self.capture_output_frame_get_state(cursor_overlay as i32, output, capture_region)?;
 
-        // Bytes of data in the frame = stride * height.
-        let frame_bytes = frame_format.stride * frame_format.height;
-        file.set_len(frame_bytes as u64)?;
+        file.set_len(frame_format.byte_size())?;
 
         let frame_guard =
             self.capture_output_frame_inner(state, event_queue, frame, frame_format, file)?;
@@ -333,7 +336,7 @@ impl WayshotConnection {
     }
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
-    #[tracing::instrument(skip_all, fields(output = output_info.name, region = capture_region.map(|r| format!("{:}", r))))]
+    #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{:}", r))))]
     fn capture_frame_copy(
         &self,
         cursor_overlay: bool,
@@ -361,22 +364,30 @@ impl WayshotConnection {
             tracing::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
             return Err(Error::NoSupportedBufferFormat);
         };
+        let rotated_size = match output_info.transform {
+            Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270 => {
+                Size {
+                    width: frame_format.size.height,
+                    height: frame_format.size.width,
+                }
+            }
+            _ => frame_format.size,
+        };
         let frame_copy = FrameCopy {
             frame_format,
             frame_color_type,
             frame_mmap,
             transform: output_info.transform,
-            position: capture_region
-                .map(|capture_region| {
-                    let logical_region = capture_region.logical();
-                    (logical_region.inner.x as i64, logical_region.inner.y as i64)
-                })
-                .unwrap_or_else(|| {
-                    (
-                        output_info.dimensions.x as i64,
-                        output_info.dimensions.y as i64,
-                    )
-                }),
+            region: LogicalRegion {
+                inner: Region {
+                    position: capture_region
+                        .map(|capture_region: EmbeddedRegion| {
+                            capture_region.logical().inner.position
+                        })
+                        .unwrap_or_else(|| output_info.region.position),
+                    size: rotated_size,
+                },
+            },
         };
         tracing::debug!("Created frame copy: {:#?}", frame_copy);
         Ok((frame_copy, frame_guard))
@@ -451,7 +462,7 @@ impl WayshotConnection {
             tracing::span!(
                 tracing::Level::DEBUG,
                 "overlay_frames::surface",
-                output = output_info.name.as_str()
+                output = format!("{output_info}")
             )
             .in_scope(|| -> Result<()> {
                 let surface = compositor.create_surface(&qh, ());
@@ -468,8 +479,8 @@ impl WayshotConnection {
                 layer_surface.set_exclusive_zone(-1);
                 layer_surface.set_anchor(Anchor::Top | Anchor::Left);
                 layer_surface.set_size(
-                    frame_copy.frame_format.width,
-                    frame_copy.frame_format.height,
+                    frame_copy.frame_format.size.width,
+                    frame_copy.frame_format.size.height,
                 );
 
                 debug!("Committing surface creation changes.");
@@ -515,8 +526,8 @@ impl WayshotConnection {
                             tracing::Level::DEBUG,
                             "filter_map",
                             output = format!(
-                                "{name} at {region}",
-                                name = output_info.name,
+                                "{output_info} at {region}",
+                                output_info = format!("{output_info}"),
                                 region = LogicalRegion::from(output_info),
                             ),
                             capture_region = format!("{}", capture_region),
@@ -561,8 +572,8 @@ impl WayshotConnection {
                             image_util::rotate_image_buffer(
                                 image,
                                 frame_copy.transform,
-                                frame_copy.frame_format.width,
-                                frame_copy.frame_format.height,
+                                frame_copy.frame_format.size.width,
+                                frame_copy.frame_format.size.height,
                             ),
                             frame_copy,
                         ))
@@ -580,23 +591,24 @@ impl WayshotConnection {
                         // Default to a transparent image.
                         let composite_image = composite_image.unwrap_or_else(|| {
                             Ok(DynamicImage::new_rgba8(
-                                capture_region.inner.width as u32,
-                                capture_region.inner.height as u32,
+                                capture_region.inner.size.width,
+                                capture_region.inner.size.height,
                             ))
                         });
 
                         Some(|| -> Result<_> {
                             let mut composite_image = composite_image?;
                             let (image, frame_copy) = image?;
-                            let frame_copy_region = LogicalRegion::from(&frame_copy);
                             let (x, y) = (
-                                frame_copy_region.inner.x as i64 - capture_region.inner.x as i64,
-                                frame_copy_region.inner.y as i64 - capture_region.inner.y as i64,
+                                frame_copy.region.inner.position.x as i64
+                                    - capture_region.inner.position.x as i64,
+                                frame_copy.region.inner.position.y as i64
+                                    - capture_region.inner.position.y as i64,
                             );
                             tracing::span!(
                                 tracing::Level::DEBUG,
                                 "replace",
-                                frame_copy_region = format!("{}", frame_copy_region),
+                                frame_copy_region = format!("{}", frame_copy.region),
                                 capture_region = format!("{}", capture_region),
                                 x = x,
                                 y = y,

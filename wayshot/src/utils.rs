@@ -8,14 +8,14 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use libwayshot::region::{LogicalRegion, Region};
+use libwayshot::region::{LogicalRegion, Position, Region, Size};
 
 pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
     let tail = g.trim();
     let x_coordinate: i32;
     let y_coordinate: i32;
-    let width: i32;
-    let height: i32;
+    let width: u32;
+    let height: u32;
 
     let validation_error =
         "Invalid geometry provided.\nValid geometries:\n1) %d,%d %dx%d\n2) %d %d %d %d";
@@ -27,8 +27,8 @@ pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
         let (head, tail) = tail.split_once(' ').wrap_err(validation_error)?;
         y_coordinate = head.parse::<i32>()?;
         let (head, tail) = tail.split_once('x').wrap_err(validation_error)?;
-        width = head.parse::<i32>()?;
-        height = tail.parse::<i32>()?;
+        width = head.parse::<u32>()?;
+        height = tail.parse::<u32>()?;
     } else {
         // this accepts: "%d %d %d %d"
         let (head, tail) = tail.split_once(' ').wrap_err(validation_error)?;
@@ -36,16 +36,17 @@ pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
         let (head, tail) = tail.split_once(' ').wrap_err(validation_error)?;
         y_coordinate = head.parse::<i32>()?;
         let (head, tail) = tail.split_once(' ').wrap_err(validation_error)?;
-        width = head.parse::<i32>()?;
-        height = tail.parse::<i32>()?;
+        width = head.parse::<u32>()?;
+        height = tail.parse::<u32>()?;
     }
 
     Ok(LogicalRegion {
         inner: Region {
-            x: x_coordinate,
-            y: y_coordinate,
-            width,
-            height,
+            position: Position {
+                x: x_coordinate,
+                y: y_coordinate,
+            },
+            size: Size { width, height },
         },
     })
 }
