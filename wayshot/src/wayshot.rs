@@ -11,9 +11,7 @@ mod cli;
 mod utils;
 
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
-use tracing::Level;
-
-use crate::utils::EncodingFormat;
+use utils::EncodingFormat;
 
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where
@@ -32,40 +30,38 @@ where
 
 fn main() -> Result<()> {
     let cli = cli::Cli::parse();
-    let level = if cli.debug { Level::TRACE } else { Level::INFO };
     tracing_subscriber::fmt()
-        .with_max_level(level)
+        .with_max_level(cli.log_level)
         .with_writer(std::io::stderr)
         .init();
 
-    let extension = if let Some(extension) = cli.extension {
-        let ext = extension.trim().to_lowercase();
-        tracing::debug!("Using custom extension: {:#?}", ext);
+    let input_encoding = cli
+        .file
+        .as_ref()
+        .and_then(|pathbuf| pathbuf.try_into().ok());
+    let requested_encoding = cli
+        .encoding
+        .or(input_encoding)
+        .unwrap_or(EncodingFormat::default());
 
-        match ext.as_str() {
-            "jpeg" | "jpg" => EncodingFormat::Jpg,
-            "png" => EncodingFormat::Png,
-            "ppm" => EncodingFormat::Ppm,
-            "qoi" => EncodingFormat::Qoi,
-            _ => {
-                tracing::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm\n5) qoi");
-                exit(1);
+    if let Some(input_encoding) = input_encoding {
+        if input_encoding != requested_encoding {
+            tracing::warn!(
+                "The encoding requested '{requested_encoding}' does not match the output file's encoding '{input_encoding}'. Still using the requested encoding however.",
+            );
+        }
+    }
+
+    let file = match cli.file {
+        Some(pathbuf) => {
+            if pathbuf.to_string_lossy() == "-" {
+                None
+            } else {
+                Some(pathbuf)
             }
         }
-    } else {
-        EncodingFormat::Png
+        None => Some(utils::get_default_file_name(requested_encoding)),
     };
-
-    let mut file_is_stdout: bool = false;
-    let mut file_path: Option<String> = None;
-
-    if cli.stdout {
-        file_is_stdout = true;
-    } else if let Some(filepath) = cli.file {
-        file_path = Some(filepath.trim().to_string());
-    } else {
-        file_path = Some(utils::get_default_file_name(extension));
-    }
 
     let wayshot_conn = WayshotConnection::new()?;
 
@@ -117,16 +113,16 @@ fn main() -> Result<()> {
         wayshot_conn.screenshot_all(cli.cursor)?
     };
 
-    if file_is_stdout {
+    if let Some(file) = file {
+        image_buffer.save(file)?;
+    } else {
         let stdout = stdout();
         let mut buffer = Cursor::new(Vec::new());
 
         let mut writer = BufWriter::new(stdout.lock());
-        image_buffer.write_to(&mut buffer, extension)?;
+        image_buffer.write_to(&mut buffer, requested_encoding)?;
 
         writer.write_all(buffer.get_ref())?;
-    } else {
-        image_buffer.save(file_path.unwrap())?;
     }
 
     Ok(())
