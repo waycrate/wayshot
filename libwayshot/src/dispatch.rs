@@ -25,11 +25,13 @@ use crate::{
     screencopy::FrameFormat,
 };
 
+#[derive(Debug)]
 pub struct OutputCaptureState {
     pub outputs: Vec<OutputInfo>,
 }
 
 impl Dispatch<WlRegistry, ()> for OutputCaptureState {
+    #[tracing::instrument(skip(wl_registry, qh), ret, level = "trace")]
     fn event(
         state: &mut Self,
         wl_registry: &WlRegistry,
@@ -76,6 +78,7 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
 }
 
 impl Dispatch<WlOutput, ()> for OutputCaptureState {
+    #[tracing::instrument(skip(wl_output), ret, level = "trace")]
     fn event(
         state: &mut Self,
         wl_output: &WlOutput,
@@ -114,6 +117,7 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
 delegate_noop!(OutputCaptureState: ignore ZxdgOutputManagerV1);
 
 impl Dispatch<ZxdgOutputV1, usize> for OutputCaptureState {
+    #[tracing::instrument(ret, level = "trace")]
     fn event(
         state: &mut Self,
         _: &ZxdgOutputV1,
@@ -128,19 +132,20 @@ impl Dispatch<ZxdgOutputV1, usize> for OutputCaptureState {
             zxdg_output_v1::Event::LogicalPosition { x, y } => {
                 output_info.dimensions.x = x;
                 output_info.dimensions.y = y;
-                tracing::debug!("Logical position event fired!");
             }
             zxdg_output_v1::Event::LogicalSize { width, height } => {
                 output_info.dimensions.width = width;
                 output_info.dimensions.height = height;
-                tracing::debug!("Logical size event fired!");
             }
+            zxdg_output_v1::Event::Done => {}
+            zxdg_output_v1::Event::Name { .. } => {}
+            zxdg_output_v1::Event::Description { .. } => {}
             _ => {}
         };
     }
 }
 
-/// State of the frame after attemting to copy it's data to a wl_buffer.
+/// State of the frame after attempting to copy it's data to a wl_buffer.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum FrameState {
     /// Compositor returned a failed event on calling `frame.copy`.
@@ -156,6 +161,7 @@ pub struct CaptureFrameState {
 }
 
 impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
+    #[tracing::instrument(skip(frame), ret, level = "trace")]
     fn event(
         frame: &mut Self,
         _: &ZwlrScreencopyFrameV1,
@@ -171,7 +177,6 @@ impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
                 height,
                 stride,
             } => {
-                tracing::debug!("Received Buffer event");
                 if let Value(f) = format {
                     frame.formats.push(FrameFormat {
                         format: f,
@@ -184,30 +189,20 @@ impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
                     exit(1);
                 }
             }
-            zwlr_screencopy_frame_v1::Event::Flags { .. } => {
-                tracing::debug!("Received Flags event");
-            }
             zwlr_screencopy_frame_v1::Event::Ready { .. } => {
                 // If the frame is successfully copied, a “flags” and a “ready” events are sent. Otherwise, a “failed” event is sent.
                 // This is useful when we call .copy on the frame object.
-                tracing::debug!("Received Ready event");
                 frame.state.replace(FrameState::Finished);
             }
             zwlr_screencopy_frame_v1::Event::Failed => {
-                tracing::debug!("Received Failed event");
                 frame.state.replace(FrameState::Failed);
             }
-            zwlr_screencopy_frame_v1::Event::Damage { .. } => {
-                tracing::debug!("Received Damage event");
-            }
-            zwlr_screencopy_frame_v1::Event::LinuxDmabuf { .. } => {
-                tracing::debug!("Received LinuxDmaBuf event");
-            }
+            zwlr_screencopy_frame_v1::Event::Damage { .. } => {}
+            zwlr_screencopy_frame_v1::Event::LinuxDmabuf { .. } => {}
             zwlr_screencopy_frame_v1::Event::BufferDone => {
-                tracing::debug!("Received bufferdone event");
                 frame.buffer_done.store(true, Ordering::SeqCst);
             }
-            _ => unreachable!(),
+            _ => {}
         };
     }
 }
