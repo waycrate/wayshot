@@ -3,10 +3,11 @@ use std::{
     process::{exit, Command},
 };
 
+use clap::Parser;
 use eyre::Result;
 use libwayshot::{region::LogicalRegion, WayshotConnection};
 
-mod clap;
+mod cli;
 mod utils;
 
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
@@ -30,18 +31,14 @@ where
 }
 
 fn main() -> Result<()> {
-    let args = clap::set_flags().get_matches();
-    let level = if args.get_flag("debug") {
-        Level::TRACE
-    } else {
-        Level::INFO
-    };
+    let cli = cli::Cli::parse();
+    let level = if cli.debug { Level::TRACE } else { Level::INFO };
     tracing_subscriber::fmt()
         .with_max_level(level)
         .with_writer(std::io::stderr)
         .init();
 
-    let extension = if let Some(extension) = args.get_one::<String>("extension") {
+    let extension = if let Some(extension) = cli.extension {
         let ext = extension.trim().to_lowercase();
         tracing::debug!("Using custom extension: {:#?}", ext);
 
@@ -62,9 +59,9 @@ fn main() -> Result<()> {
     let mut file_is_stdout: bool = false;
     let mut file_path: Option<String> = None;
 
-    if args.get_flag("stdout") {
+    if cli.stdout {
         file_is_stdout = true;
-    } else if let Some(filepath) = args.get_one::<String>("file") {
+    } else if let Some(filepath) = cli.file {
         file_path = Some(filepath.trim().to_string());
     } else {
         file_path = Some(utils::get_default_file_name(extension));
@@ -72,7 +69,7 @@ fn main() -> Result<()> {
 
     let wayshot_conn = WayshotConnection::new()?;
 
-    if args.get_flag("listoutputs") {
+    if cli.list_outputs {
         let valid_outputs = wayshot_conn.get_all_outputs();
         for output in valid_outputs {
             tracing::info!("{:#?}", output.name);
@@ -80,12 +77,7 @@ fn main() -> Result<()> {
         exit(1);
     }
 
-    let mut cursor_overlay = false;
-    if args.get_flag("cursor") {
-        cursor_overlay = true;
-    }
-
-    let image_buffer = if let Some(slurp_region) = args.get_one::<String>("slurp") {
+    let image_buffer = if let Some(slurp_region) = cli.slurp {
         let slurp_region = slurp_region.clone();
         wayshot_conn.screenshot_freeze(
             Box::new(move || {
@@ -99,30 +91,30 @@ fn main() -> Result<()> {
                 }()
                 .map_err(|_| libwayshot::Error::FreezeCallbackError)
             }),
-            cursor_overlay,
+            cli.cursor,
         )?
-    } else if let Some(output_name) = args.get_one::<String>("output") {
+    } else if let Some(output_name) = cli.output {
         let outputs = wayshot_conn.get_all_outputs();
-        if let Some(output) = outputs.iter().find(|output| &output.name == output_name) {
-            wayshot_conn.screenshot_single_output(output, cursor_overlay)?
+        if let Some(output) = outputs.iter().find(|output| output.name == output_name) {
+            wayshot_conn.screenshot_single_output(output, cli.cursor)?
         } else {
             tracing::error!("No output found!\n");
             exit(1);
         }
-    } else if args.get_flag("chooseoutput") {
+    } else if cli.choose_output {
         let outputs = wayshot_conn.get_all_outputs();
         let output_names: Vec<String> = outputs
             .iter()
             .map(|display| display.name.to_string())
             .collect();
         if let Some(index) = select_ouput(&output_names) {
-            wayshot_conn.screenshot_single_output(&outputs[index], cursor_overlay)?
+            wayshot_conn.screenshot_single_output(&outputs[index], cli.cursor)?
         } else {
             tracing::error!("No output found!\n");
             exit(1);
         }
     } else {
-        wayshot_conn.screenshot_all(cursor_overlay)?
+        wayshot_conn.screenshot_all(cli.cursor)?
     };
 
     if file_is_stdout {
