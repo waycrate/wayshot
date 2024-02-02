@@ -462,7 +462,9 @@ impl WayshotConnection {
             tracing::span!(
                 tracing::Level::DEBUG,
                 "overlay_frames::surface",
-                output = format!("{output_info}")
+                output = format!("{output_info}"),
+                scale = output_info.scale,
+                transform = format!("{:?}", output_info.transform),
             )
             .in_scope(|| -> Result<()> {
                 let surface = compositor.create_surface(&qh, ());
