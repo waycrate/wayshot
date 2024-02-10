@@ -17,8 +17,9 @@ pub enum RegionCapturer {
 
 /// `Region` where the coordinate system is the logical coordinate system used
 /// in Wayland to position outputs. Top left is (0, 0) and any transforms and
-/// scaling have been applied.
-#[derive(Debug, Copy, Clone)]
+/// scaling have been applied. A unit is a logical pixel, meaning that this is
+/// after scaling has been applied.
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct LogicalRegion {
     pub inner: Region,
 }
@@ -27,8 +28,9 @@ pub struct LogicalRegion {
 ///
 /// It can only be contained inside of another and cannot exceed its bounds.
 ///
-/// Example of what
+/// Example:
 ///
+/// ````
 /// ┌─────────────┐
 /// │             │
 /// │  ┌──────────┼──────┐
@@ -44,6 +46,7 @@ pub struct LogicalRegion {
 /// │             │
 /// │    Screen 1 │
 /// └─────────────┘
+/// ````
 #[derive(Debug, Copy, Clone)]
 pub struct EmbeddedRegion {
     /// The coordinate sysd
@@ -171,7 +174,7 @@ impl std::fmt::Display for Region {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "({position}) ({size})",
+            "{position} {size}",
             position = self.position,
             size = self.size,
         )
@@ -187,7 +190,7 @@ impl std::fmt::Display for LogicalRegion {
 impl From<&OutputInfo> for LogicalRegion {
     fn from(output_info: &OutputInfo) -> Self {
         LogicalRegion {
-            inner: output_info.region,
+            inner: output_info.logical_region.inner,
         }
     }
 }
@@ -198,22 +201,28 @@ impl TryFrom<&Vec<OutputInfo>> for LogicalRegion {
     fn try_from(output_info: &Vec<OutputInfo>) -> std::result::Result<Self, Self::Error> {
         let x1 = output_info
             .iter()
-            .map(|output| output.region.position.x)
+            .map(|output| output.logical_region.inner.position.x)
             .min()
             .ok_or(Error::NoOutputs)?;
         let y1 = output_info
             .iter()
-            .map(|output| output.region.position.y)
+            .map(|output| output.logical_region.inner.position.y)
             .min()
             .ok_or(Error::NoOutputs)?;
         let x2 = output_info
             .iter()
-            .map(|output| output.region.position.x + output.region.size.width as i32)
+            .map(|output| {
+                output.logical_region.inner.position.x
+                    + output.logical_region.inner.size.width as i32
+            })
             .max()
             .ok_or(Error::NoOutputs)?;
         let y2 = output_info
             .iter()
-            .map(|output| output.region.position.y + output.region.size.height as i32)
+            .map(|output| {
+                output.logical_region.inner.position.y
+                    + output.logical_region.inner.size.height as i32
+            })
             .max()
             .ok_or(Error::NoOutputs)?;
         Ok(LogicalRegion {

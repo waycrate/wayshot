@@ -27,7 +27,7 @@ use wayland_protocols_wlr::screencopy::v1::client::{
 
 use crate::{
     output::OutputInfo,
-    region::{Position, Region, Size},
+    region::{LogicalRegion, Position, Size},
     screencopy::FrameFormat,
 };
 
@@ -64,8 +64,8 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
                         name: "".to_string(),
                         description: String::new(),
                         transform: wl_output::Transform::Normal,
-                        scale: 1,
-                        region: Region::default(),
+                        physical_size: Size::default(),
+                        logical_region: LogicalRegion::default(),
                     });
                 } else {
                     tracing::error!("Ignoring a wl_output with version < 4.");
@@ -100,16 +100,19 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
             wl_output::Event::Description { description } => {
                 output.description = description;
             }
-            wl_output::Event::Mode { .. } => {}
+            wl_output::Event::Mode { width, height, .. } => {
+                output.physical_size = Size {
+                    width: width as u32,
+                    height: height as u32,
+                };
+            }
             wl_output::Event::Geometry {
                 transform: WEnum::Value(transform),
                 ..
             } => {
                 output.transform = transform;
             }
-            wl_output::Event::Scale { factor } => {
-                output.scale = factor;
-            }
+            wl_output::Event::Scale { .. } => {}
             wl_output::Event::Done => {}
             _ => {}
         }
@@ -139,10 +142,10 @@ impl Dispatch<ZxdgOutputV1, usize> for OutputCaptureState {
 
         match event {
             zxdg_output_v1::Event::LogicalPosition { x, y } => {
-                output_info.region.position = Position { x, y };
+                output_info.logical_region.inner.position = Position { x, y };
             }
             zxdg_output_v1::Event::LogicalSize { width, height } => {
-                output_info.region.size = Size {
+                output_info.logical_region.inner.size = Size {
                     width: width as u32,
                     height: height as u32,
                 };
