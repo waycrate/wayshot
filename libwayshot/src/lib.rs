@@ -8,22 +8,27 @@ mod dispatch;
 mod error;
 mod image_util;
 pub mod output;
+pub mod region;
 mod screencopy;
 
 use std::{
-    cmp,
+    collections::HashSet,
     fs::File,
     os::fd::AsFd,
-    process::exit,
     sync::atomic::{AtomicBool, Ordering},
     thread,
 };
 
-use image::{imageops::overlay, DynamicImage};
+use dispatch::LayerShellState;
+use image::{imageops::replace, DynamicImage};
 use memmap2::MmapMut;
+use region::{EmbeddedRegion, RegionCapturer};
+use screencopy::FrameGuard;
+use tracing::debug;
 use wayland_client::{
     globals::{registry_queue_init, GlobalList},
     protocol::{
+        wl_compositor::WlCompositor,
         wl_output::{Transform, WlOutput},
         wl_shm::{self, WlShm},
     },
@@ -32,15 +37,22 @@ use wayland_client::{
 use wayland_protocols::xdg::xdg_output::zv1::client::{
     zxdg_output_manager_v1::ZxdgOutputManagerV1, zxdg_output_v1::ZxdgOutputV1,
 };
-use wayland_protocols_wlr::screencopy::v1::client::{
-    zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
-    zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
+use wayland_protocols_wlr::{
+    layer_shell::v1::client::{
+        zwlr_layer_shell_v1::{Layer, ZwlrLayerShellV1},
+        zwlr_layer_surface_v1::Anchor,
+    },
+    screencopy::v1::client::{
+        zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
+        zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
+    },
 };
 
 use crate::{
     convert::create_converter,
     dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState},
     output::OutputInfo,
+    region::{LogicalRegion, Region, Size},
     screencopy::{create_shm_fd, FrameCopy, FrameFormat},
 };
 
@@ -51,34 +63,12 @@ pub mod reexport {
     pub use wl_output::{Transform, WlOutput};
 }
 
-type Frame = (Vec<FrameCopy>, (i32, i32));
-
-/// Struct to store region capture details.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct CaptureRegion {
-    /// X coordinate of the area to capture.
-    pub x_coordinate: i32,
-    /// y coordinate of the area to capture.
-    pub y_coordinate: i32,
-    /// Width of the capture area.
-    pub width: i32,
-    /// Height of the capture area.
-    pub height: i32,
-}
-
-#[derive(Debug)]
-struct IntersectingOutput {
-    output: WlOutput,
-    region: CaptureRegion,
-    transform: Transform,
-}
-
 /// Struct to store wayland connection and globals list.
 /// # Example usage
 ///
 /// ```
-/// let wayshot_connection = WayshotConnection::new().unwrap();
-/// let image_buffer = wayshot_connection.screenshot_all().unwrap();
+/// let wayshot_connection = WayshotConnection::new()?;
+/// let image_buffer = wayshot_connection.screenshot_all()?;
 /// ```
 #[derive(Debug)]
 pub struct WayshotConnection {
@@ -159,9 +149,9 @@ impl WayshotConnection {
 
         if state.outputs.is_empty() {
             tracing::error!("Compositor did not advertise any wl_output devices!");
-            exit(1);
+            return Err(Error::NoOutputs);
         }
-        tracing::debug!("Outputs detected: {:#?}", state.outputs);
+        tracing::trace!("Outputs detected: {:#?}", state.outputs);
         self.output_infos = state.outputs;
 
         Ok(())
@@ -174,18 +164,21 @@ impl WayshotConnection {
         cursor_overlay: i32,
         output: &WlOutput,
         fd: T,
-        capture_region: Option<CaptureRegion>,
-    ) -> Result<FrameFormat> {
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<(FrameFormat, FrameGuard)> {
         let (state, event_queue, frame, frame_format) =
             self.capture_output_frame_get_state(cursor_overlay, output, capture_region)?;
-        self.capture_output_frame_inner(state, event_queue, frame, frame_format, fd)
+        let frame_guard =
+            self.capture_output_frame_inner(state, event_queue, frame, frame_format, fd)?;
+
+        Ok((frame_format, frame_guard))
     }
 
     fn capture_output_frame_get_state(
         &self,
         cursor_overlay: i32,
         output: &WlOutput,
-        capture_region: Option<CaptureRegion>,
+        capture_region: Option<EmbeddedRegion>,
     ) -> Result<(
         CaptureFrameState,
         EventQueue<CaptureFrameState>,
@@ -216,15 +209,15 @@ impl WayshotConnection {
             }
         };
 
-        // Capture output.
-        let frame: ZwlrScreencopyFrameV1 = if let Some(region) = capture_region {
+        debug!("Capturing output...");
+        let frame = if let Some(embedded_region) = capture_region {
             screencopy_manager.capture_output_region(
                 cursor_overlay,
                 output,
-                region.x_coordinate,
-                region.y_coordinate,
-                region.width,
-                region.height,
+                embedded_region.inner.position.x,
+                embedded_region.inner.position.y,
+                embedded_region.inner.size.width as i32,
+                embedded_region.inner.size.height as i32,
                 &qh,
                 (),
             )
@@ -238,7 +231,7 @@ impl WayshotConnection {
             event_queue.blocking_dispatch(&mut state)?;
         }
 
-        tracing::debug!(
+        tracing::trace!(
             "Received compositor frame buffer formats: {:#?}",
             state.formats
         );
@@ -258,7 +251,7 @@ impl WayshotConnection {
                 )
             })
             .copied();
-        tracing::debug!("Selected frame buffer format: {:#?}", frame_format);
+        tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
 
         // Check if frame format exists.
         let frame_format = match frame_format {
@@ -278,20 +271,25 @@ impl WayshotConnection {
         frame: ZwlrScreencopyFrameV1,
         frame_format: FrameFormat,
         fd: T,
-    ) -> Result<FrameFormat> {
+    ) -> Result<FrameGuard> {
         // Connecting to wayland environment.
         let qh = event_queue.handle();
 
-        // Bytes of data in the frame = stride * height.
-        let frame_bytes = frame_format.stride * frame_format.height;
-
         // Instantiate shm global.
-        let shm = self.globals.bind::<WlShm, _, _>(&qh, 1..=1, ()).unwrap();
-        let shm_pool = shm.create_pool(fd.as_fd(), frame_bytes as i32, &qh, ());
+        let shm = self.globals.bind::<WlShm, _, _>(&qh, 1..=1, ())?;
+        let shm_pool = shm.create_pool(
+            fd.as_fd(),
+            frame_format
+                .byte_size()
+                .try_into()
+                .map_err(|_| Error::BufferTooSmall)?,
+            &qh,
+            (),
+        );
         let buffer = shm_pool.create_buffer(
             0,
-            frame_format.width as i32,
-            frame_format.height as i32,
+            frame_format.size.width as i32,
+            frame_format.size.height as i32,
             frame_format.stride as i32,
             frame_format.format,
             &qh,
@@ -310,9 +308,7 @@ impl WayshotConnection {
                         return Err(Error::FramecopyFailed);
                     }
                     FrameState::Finished => {
-                        buffer.destroy();
-                        shm_pool.destroy();
-                        return Ok(frame_format);
+                        return Ok(FrameGuard { buffer, shm_pool });
                     }
                 }
             }
@@ -326,34 +322,35 @@ impl WayshotConnection {
         cursor_overlay: bool,
         output: &WlOutput,
         file: &File,
-        capture_region: Option<CaptureRegion>,
-    ) -> Result<FrameFormat> {
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<(FrameFormat, FrameGuard)> {
         let (state, event_queue, frame, frame_format) =
             self.capture_output_frame_get_state(cursor_overlay as i32, output, capture_region)?;
 
-        // Bytes of data in the frame = stride * height.
-        let frame_bytes = frame_format.stride * frame_format.height;
-        file.set_len(frame_bytes as u64)?;
+        file.set_len(frame_format.byte_size())?;
 
-        self.capture_output_frame_inner(state, event_queue, frame, frame_format, file)
+        let frame_guard =
+            self.capture_output_frame_inner(state, event_queue, frame, frame_format, file)?;
+
+        Ok((frame_format, frame_guard))
     }
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
-    fn capture_output_frame(
+    #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{:}", r))))]
+    fn capture_frame_copy(
         &self,
         cursor_overlay: bool,
-        output: &WlOutput,
-        transform: Transform,
-        capture_region: Option<CaptureRegion>,
-    ) -> Result<FrameCopy> {
+        output_info: &OutputInfo,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<(FrameCopy, FrameGuard)> {
         // Create an in memory file and return it's file descriptor.
         let fd = create_shm_fd()?;
         // Create a writeable memory map backed by a mem_file.
         let mem_file = File::from(fd);
 
-        let frame_format = self.capture_output_frame_shm_from_file(
+        let (frame_format, frame_guard) = self.capture_output_frame_shm_from_file(
             cursor_overlay,
-            output,
+            &output_info.wl_output,
             &mem_file,
             capture_region,
         )?;
@@ -367,64 +364,53 @@ impl WayshotConnection {
             tracing::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
             return Err(Error::NoSupportedBufferFormat);
         };
-        Ok(FrameCopy {
+        let rotated_size = match output_info.transform {
+            Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270 => {
+                Size {
+                    width: frame_format.size.height,
+                    height: frame_format.size.width,
+                }
+            }
+            _ => frame_format.size,
+        };
+        let frame_copy = FrameCopy {
             frame_format,
             frame_color_type,
             frame_mmap,
-            transform,
-        })
+            transform: output_info.transform,
+            region: LogicalRegion {
+                inner: Region {
+                    position: capture_region
+                        .map(|capture_region: EmbeddedRegion| {
+                            capture_region.logical().inner.position
+                        })
+                        .unwrap_or_else(|| output_info.region.position),
+                    size: rotated_size,
+                },
+            },
+        };
+        tracing::debug!("Created frame copy: {:#?}", frame_copy);
+        Ok((frame_copy, frame_guard))
     }
 
-    fn create_frame_copy(
+    pub fn capture_frame_copies(
         &self,
-        capture_region: CaptureRegion,
+        output_capture_regions: &Vec<(OutputInfo, Option<EmbeddedRegion>)>,
         cursor_overlay: bool,
-    ) -> Result<Frame> {
+    ) -> Result<Vec<(FrameCopy, FrameGuard, OutputInfo)>> {
         let frame_copies = thread::scope(|scope| -> Result<_> {
-            let join_handles = self
-                .get_all_outputs()
+            let join_handles = output_capture_regions
                 .into_iter()
-                .filter_map(|output| {
-                    let x1: i32 = cmp::max(output.dimensions.x, capture_region.x_coordinate);
-                    let y1: i32 = cmp::max(output.dimensions.y, capture_region.y_coordinate);
-                    let x2: i32 = cmp::min(
-                        output.dimensions.x + output.dimensions.width,
-                        capture_region.x_coordinate + capture_region.width,
-                    );
-                    let y2: i32 = cmp::min(
-                        output.dimensions.y + output.dimensions.height,
-                        capture_region.y_coordinate + capture_region.height,
-                    );
-
-                    let width = x2 - x1;
-                    let height = y2 - y1;
-
-                    if width <= 0 || height <= 0 {
-                        return None;
-                    }
-
-                    let true_x = capture_region.x_coordinate - output.dimensions.x;
-                    let true_y = capture_region.y_coordinate - output.dimensions.y;
-                    let true_region = CaptureRegion {
-                        x_coordinate: true_x,
-                        y_coordinate: true_y,
-                        width: capture_region.width,
-                        height: capture_region.height,
-                    };
-                    Some(IntersectingOutput {
-                        output: output.wl_output.clone(),
-                        region: true_region,
-                        transform: output.transform,
-                    })
-                })
-                .map(|intersecting_output| {
+                .map(|(output_info, capture_region)| {
                     scope.spawn(move || {
-                        self.capture_output_frame(
+                        self.capture_frame_copy(
                             cursor_overlay,
-                            &intersecting_output.output,
-                            intersecting_output.transform,
-                            Some(intersecting_output.region),
+                            &output_info,
+                            capture_region.clone(),
                         )
+                        .map(|(frame_copy, frame_guard)| {
+                            (frame_copy, frame_guard, output_info.clone())
+                        })
                     })
                 })
                 .collect::<Vec<_>>();
@@ -436,30 +422,160 @@ impl WayshotConnection {
                 .collect::<Result<_>>()
         })?;
 
-        Ok((frame_copies, (capture_region.width, capture_region.height)))
+        Ok(frame_copies)
+    }
+
+    fn overlay_frames(&self, frames: &Vec<(FrameCopy, FrameGuard, OutputInfo)>) -> Result<()> {
+        let mut state = LayerShellState {
+            configured_outputs: HashSet::new(),
+        };
+        let mut event_queue: EventQueue<LayerShellState> =
+            self.conn.new_event_queue::<LayerShellState>();
+        let qh = event_queue.handle();
+
+        let compositor = match self.globals.bind::<WlCompositor, _, _>(&qh, 3..=3, ()) {
+            Ok(x) => x,
+            Err(e) => {
+                tracing::error!(
+                    "Failed to create compositor Does your compositor implement WlCompositor?"
+                );
+                tracing::error!("err: {e}");
+                return Err(Error::ProtocolNotFound(
+                    "WlCompositor not found".to_string(),
+                ));
+            }
+        };
+        let layer_shell = match self.globals.bind::<ZwlrLayerShellV1, _, _>(&qh, 1..=1, ()) {
+            Ok(x) => x,
+            Err(e) => {
+                tracing::error!(
+                    "Failed to create layer shell. Does your compositor implement WlrLayerShellV1?"
+                );
+                tracing::error!("err: {e}");
+                return Err(Error::ProtocolNotFound(
+                    "WlrLayerShellV1 not found".to_string(),
+                ));
+            }
+        };
+
+        for (frame_copy, frame_guard, output_info) in frames {
+            tracing::span!(
+                tracing::Level::DEBUG,
+                "overlay_frames::surface",
+                output = format!("{output_info}")
+            )
+            .in_scope(|| -> Result<()> {
+                let surface = compositor.create_surface(&qh, ());
+
+                let layer_surface = layer_shell.get_layer_surface(
+                    &surface,
+                    Some(&output_info.wl_output),
+                    Layer::Top,
+                    "wayshot".to_string(),
+                    &qh,
+                    output_info.wl_output.clone(),
+                );
+
+                layer_surface.set_exclusive_zone(-1);
+                layer_surface.set_anchor(Anchor::Top | Anchor::Left);
+                layer_surface.set_size(
+                    frame_copy.frame_format.size.width,
+                    frame_copy.frame_format.size.height,
+                );
+
+                debug!("Committing surface creation changes.");
+                surface.commit();
+
+                debug!("Waiting for layer surface to be configured.");
+                while !state.configured_outputs.contains(&output_info.wl_output) {
+                    event_queue.blocking_dispatch(&mut state)?;
+                }
+
+                surface.set_buffer_transform(output_info.transform);
+                surface.set_buffer_scale(output_info.scale);
+                surface.attach(Some(&frame_guard.buffer), 0, 0);
+
+                debug!("Committing surface with attached buffer.");
+                surface.commit();
+
+                event_queue.blocking_dispatch(&mut state)?;
+
+                Ok(())
+            })?;
+        }
+        Ok(())
     }
 
     /// Take a screenshot from the specified region.
-    pub fn screenshot(
+    fn screenshot_region_capturer(
         &self,
-        capture_region: CaptureRegion,
+        region_capturer: RegionCapturer,
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
-        let (frame_copies, (width, height)) =
-            self.create_frame_copy(capture_region, cursor_overlay)?;
+        let outputs_capture_regions: &Vec<(OutputInfo, Option<EmbeddedRegion>)> =
+            &match region_capturer {
+                RegionCapturer::Outputs(ref outputs) => outputs
+                    .into_iter()
+                    .map(|output_info| (output_info.clone(), None))
+                    .collect(),
+                RegionCapturer::Region(capture_region) => self
+                    .get_all_outputs()
+                    .into_iter()
+                    .filter_map(|output_info| {
+                        tracing::span!(
+                            tracing::Level::DEBUG,
+                            "filter_map",
+                            output = format!(
+                                "{output_info} at {region}",
+                                output_info = format!("{output_info}"),
+                                region = LogicalRegion::from(output_info),
+                            ),
+                            capture_region = format!("{}", capture_region),
+                        )
+                        .in_scope(|| {
+                            if let Some(relative_region) =
+                                EmbeddedRegion::new(capture_region, output_info.into())
+                            {
+                                tracing::debug!("Intersection found: {}", relative_region);
+                                Some((output_info.clone(), Some(relative_region)))
+                            } else {
+                                tracing::debug!("No intersection found");
+                                None
+                            }
+                        })
+                    })
+                    .collect(),
+                RegionCapturer::Freeze(_) => self
+                    .get_all_outputs()
+                    .into_iter()
+                    .map(|output_info| (output_info.clone(), None))
+                    .collect(),
+            };
+
+        let frames = self.capture_frame_copies(outputs_capture_regions, cursor_overlay)?;
+
+        let capture_region: LogicalRegion = match region_capturer {
+            RegionCapturer::Outputs(ref outputs) => outputs.try_into()?,
+            RegionCapturer::Region(region) => region,
+            RegionCapturer::Freeze(callback) => {
+                self.overlay_frames(&frames).and_then(|_| callback())?
+            }
+        };
 
         thread::scope(|scope| {
-            let rotate_join_handles = frame_copies
+            let rotate_join_handles = frames
                 .into_iter()
-                .map(|frame_copy| {
+                .map(|(frame_copy, _, _)| {
                     scope.spawn(move || {
-                        let transform = frame_copy.transform;
-                        let image = frame_copy.try_into()?;
-                        Ok(image_util::rotate_image_buffer(
-                            image,
-                            transform,
-                            width as u32,
-                            height as u32,
+                        let image = (&frame_copy).try_into()?;
+                        Ok((
+                            image_util::rotate_image_buffer(
+                                image,
+                                frame_copy.transform,
+                                frame_copy.frame_format.size.width,
+                                frame_copy.frame_format.size.height,
+                            ),
+                            frame_copy,
                         ))
                     })
                 })
@@ -471,21 +587,39 @@ impl WayshotConnection {
                 .flatten()
                 .fold(
                     None,
-                    |possible_overlayed_image_or_error: Option<Result<_>>, image: Result<_>| {
-                        if let Some(overlayed_image_or_error) = possible_overlayed_image_or_error {
-                            if let Ok(mut overlayed_image) = overlayed_image_or_error {
-                                if let Ok(image) = image {
-                                    overlay(&mut overlayed_image, &image, 0, 0);
-                                    Some(Ok(overlayed_image))
-                                } else {
-                                    Some(image)
-                                }
-                            } else {
-                                Some(image)
-                            }
-                        } else {
-                            Some(image)
-                        }
+                    |composite_image: Option<Result<_>>, image: Result<_>| {
+                        // Default to a transparent image.
+                        let composite_image = composite_image.unwrap_or_else(|| {
+                            Ok(DynamicImage::new_rgba8(
+                                capture_region.inner.size.width,
+                                capture_region.inner.size.height,
+                            ))
+                        });
+
+                        Some(|| -> Result<_> {
+                            let mut composite_image = composite_image?;
+                            let (image, frame_copy) = image?;
+                            let (x, y) = (
+                                frame_copy.region.inner.position.x as i64
+                                    - capture_region.inner.position.x as i64,
+                                frame_copy.region.inner.position.y as i64
+                                    - capture_region.inner.position.y as i64,
+                            );
+                            tracing::span!(
+                                tracing::Level::DEBUG,
+                                "replace",
+                                frame_copy_region = format!("{}", frame_copy.region),
+                                capture_region = format!("{}", capture_region),
+                                x = x,
+                                y = y,
+                            )
+                            .in_scope(|| {
+                                tracing::debug!("Replacing parts of the final image");
+                                replace(&mut composite_image, &image, x, y);
+                            });
+
+                            Ok(composite_image)
+                        }())
                     },
                 )
                 .ok_or_else(|| {
@@ -495,19 +629,32 @@ impl WayshotConnection {
         })
     }
 
+    /// Take a screenshot from the specified region.
+    pub fn screenshot(
+        &self,
+        capture_region: LogicalRegion,
+        cursor_overlay: bool,
+    ) -> Result<DynamicImage> {
+        self.screenshot_region_capturer(RegionCapturer::Region(capture_region), cursor_overlay)
+    }
+
+    /// Take a screenshot, overlay the screenshot, run the callback, and then
+    /// unfreeze the screenshot and return the selected region.
+    pub fn screenshot_freeze(
+        &self,
+        callback: Box<dyn Fn() -> Result<LogicalRegion>>,
+        cursor_overlay: bool,
+    ) -> Result<DynamicImage> {
+        self.screenshot_region_capturer(RegionCapturer::Freeze(callback), cursor_overlay)
+    }
     /// shot one ouput
     pub fn screenshot_single_output(
         &self,
         output_info: &OutputInfo,
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
-        let frame_copy = self.capture_output_frame(
-            cursor_overlay,
-            &output_info.wl_output,
-            output_info.transform,
-            None,
-        )?;
-        frame_copy.try_into()
+        let (frame_copy, _) = self.capture_frame_copy(cursor_overlay, output_info, None)?;
+        (&frame_copy).try_into()
     }
 
     /// Take a screenshot from all of the specified outputs.
@@ -520,33 +667,7 @@ impl WayshotConnection {
             return Err(Error::NoOutputs);
         }
 
-        let x1 = outputs
-            .iter()
-            .map(|output| output.dimensions.x)
-            .min()
-            .unwrap();
-        let y1 = outputs
-            .iter()
-            .map(|output| output.dimensions.y)
-            .min()
-            .unwrap();
-        let x2 = outputs
-            .iter()
-            .map(|output| output.dimensions.x + output.dimensions.width)
-            .max()
-            .unwrap();
-        let y2 = outputs
-            .iter()
-            .map(|output| output.dimensions.y + output.dimensions.height)
-            .max()
-            .unwrap();
-        let capture_region = CaptureRegion {
-            x_coordinate: x1,
-            y_coordinate: y1,
-            width: x2 - x1,
-            height: y2 - y1,
-        };
-        self.screenshot(capture_region, cursor_overlay)
+        self.screenshot_region_capturer(RegionCapturer::Outputs(outputs.clone()), cursor_overlay)
     }
 
     /// Take a screenshot from all accessible outputs.

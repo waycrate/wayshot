@@ -1,5 +1,5 @@
 use std::{
-    ffi::CStr,
+    ffi::CString,
     os::fd::{AsRawFd, IntoRawFd, OwnedFd},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -11,20 +11,49 @@ use nix::{
     sys::{memfd, mman, stat},
     unistd,
 };
-use wayland_client::protocol::{wl_output, wl_shm::Format};
+use wayland_client::protocol::{
+    wl_buffer::WlBuffer, wl_output, wl_shm::Format, wl_shm_pool::WlShmPool,
+};
 
-use crate::{Error, Result};
+use crate::{
+    region::{LogicalRegion, Size},
+    Error, Result,
+};
+
+pub struct FrameGuard {
+    pub buffer: WlBuffer,
+    pub shm_pool: WlShmPool,
+}
+
+impl Drop for FrameGuard {
+    fn drop(&mut self) {
+        self.buffer.destroy();
+        self.shm_pool.destroy();
+    }
+}
 
 /// Type of frame supported by the compositor. For now we only support Argb8888, Xrgb8888, and
 /// Xbgr8888.
+///
+/// See `zwlr_screencopy_frame_v1::Event::Buffer` as it's retrieved from there.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct FrameFormat {
     pub format: Format,
-    pub width: u32,
-    pub height: u32,
+    /// Size of the frame in pixels. This will always be in "landscape" so a
+    /// portrait 1080x1920 frame will be 1920x1080 and will need to be rotated!
+    pub size: Size,
+    /// Stride is the number of bytes between the start of a row and the start of the next row.
     pub stride: u32,
 }
 
+impl FrameFormat {
+    /// Returns the size of the frame in bytes, which is the stride * height.
+    pub fn byte_size(&self) -> u64 {
+        self.stride as u64 * self.size.height as u64
+    }
+}
+
+#[tracing::instrument(skip(frame_mmap))]
 fn create_image_buffer<P>(
     frame_format: &FrameFormat,
     frame_mmap: &MmapMut,
@@ -32,8 +61,13 @@ fn create_image_buffer<P>(
 where
     P: Pixel<Subpixel = u8>,
 {
-    ImageBuffer::from_vec(frame_format.width, frame_format.height, frame_mmap.to_vec())
-        .ok_or(Error::BufferTooSmall)
+    tracing::debug!("Creating image buffer");
+    ImageBuffer::from_vec(
+        frame_format.size.width,
+        frame_format.size.height,
+        frame_mmap.to_vec(),
+    )
+    .ok_or(Error::BufferTooSmall)
 }
 
 /// The copied frame comprising of the FrameFormat, ColorType (Rgba8), and a memory backed shm
@@ -44,12 +78,14 @@ pub struct FrameCopy {
     pub frame_color_type: ColorType,
     pub frame_mmap: MmapMut,
     pub transform: wl_output::Transform,
+    /// Logical region with the transform already applied.
+    pub region: LogicalRegion,
 }
 
-impl TryFrom<FrameCopy> for DynamicImage {
+impl TryFrom<&FrameCopy> for DynamicImage {
     type Error = Error;
 
-    fn try_from(value: FrameCopy) -> Result<Self> {
+    fn try_from(value: &FrameCopy) -> Result<Self> {
         Ok(match value.frame_color_type {
             ColorType::Rgb8 => {
                 Self::ImageRgb8(create_image_buffer(&value.frame_format, &value.frame_mmap)?)
@@ -62,6 +98,16 @@ impl TryFrom<FrameCopy> for DynamicImage {
     }
 }
 
+fn get_mem_file_handle() -> String {
+    format!(
+        "/libwayshot-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|time| time.subsec_nanos().to_string())
+            .unwrap_or("unknown".into())
+    )
+}
+
 /// Return a RawFd to a shm file. We use memfd create on linux and shm_open for BSD support.
 /// You don't need to mess around with this function, it is only used by
 /// capture_output_frame.
@@ -71,7 +117,7 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
     loop {
         // Create a file that closes on succesful execution and seal it's operations.
         match memfd::memfd_create(
-            CStr::from_bytes_with_nul(b"libwayshot\0").unwrap(),
+            CString::new("libwayshot")?.as_c_str(),
             memfd::MemFdCreateFlag::MFD_CLOEXEC | memfd::MemFdCreateFlag::MFD_ALLOW_SEALING,
         ) {
             Ok(fd) => {
@@ -93,11 +139,7 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
     }
 
     // Fallback to using shm_open.
-    let sys_time = SystemTime::now();
-    let mut mem_file_handle = format!(
-        "/libwayshot-{}",
-        sys_time.duration_since(UNIX_EPOCH).unwrap().subsec_nanos()
-    );
+    let mut mem_file_handle = get_mem_file_handle();
     loop {
         match mman::shm_open(
             // O_CREAT = Create file if does not exist.
@@ -122,10 +164,7 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
             },
             Err(nix::errno::Errno::EEXIST) => {
                 // If a file with that handle exists then change the handle
-                mem_file_handle = format!(
-                    "/libwayshot-{}",
-                    sys_time.duration_since(UNIX_EPOCH).unwrap().subsec_nanos()
-                );
+                mem_file_handle = get_mem_file_handle();
                 continue;
             }
             Err(nix::errno::Errno::EINTR) => continue,

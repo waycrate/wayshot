@@ -1,18 +1,17 @@
 use std::{
-    error::Error,
     io::{stdout, BufWriter, Cursor, Write},
-    process::exit,
+    process::Command,
 };
 
-use libwayshot::WayshotConnection;
+use clap::Parser;
+use eyre::{bail, Result};
+use libwayshot::{region::LogicalRegion, WayshotConnection};
 
-mod clap;
+mod cli;
 mod utils;
 
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
-use tracing::Level;
-
-use crate::utils::EncodingFormat;
+use utils::EncodingFormat;
 
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where
@@ -29,103 +28,99 @@ where
     Some(selection)
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let args = clap::set_flags().get_matches();
-    let level = if args.get_flag("debug") {
-        Level::TRACE
-    } else {
-        Level::INFO
-    };
+fn main() -> Result<()> {
+    let cli = cli::Cli::parse();
     tracing_subscriber::fmt()
-        .with_max_level(level)
+        .with_max_level(cli.log_level)
         .with_writer(std::io::stderr)
         .init();
 
-    let extension = if let Some(extension) = args.get_one::<String>("extension") {
-        let ext = extension.trim().to_lowercase();
-        tracing::debug!("Using custom extension: {:#?}", ext);
+    let input_encoding = cli
+        .file
+        .as_ref()
+        .and_then(|pathbuf| pathbuf.try_into().ok());
+    let requested_encoding = cli
+        .encoding
+        .or(input_encoding)
+        .unwrap_or(EncodingFormat::default());
 
-        match ext.as_str() {
-            "jpeg" | "jpg" => EncodingFormat::Jpg,
-            "png" => EncodingFormat::Png,
-            "ppm" => EncodingFormat::Ppm,
-            "qoi" => EncodingFormat::Qoi,
-            _ => {
-                tracing::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm\n5) qoi");
-                exit(1);
+    if let Some(input_encoding) = input_encoding {
+        if input_encoding != requested_encoding {
+            tracing::warn!(
+                "The encoding requested '{requested_encoding}' does not match the output file's encoding '{input_encoding}'. Still using the requested encoding however.",
+            );
+        }
+    }
+
+    let file = match cli.file {
+        Some(pathbuf) => {
+            if pathbuf.to_string_lossy() == "-" {
+                None
+            } else {
+                Some(pathbuf)
             }
         }
-    } else {
-        EncodingFormat::Png
+        None => Some(utils::get_default_file_name(requested_encoding)),
     };
-
-    let mut file_is_stdout: bool = false;
-    let mut file_path: Option<String> = None;
-
-    if args.get_flag("stdout") {
-        file_is_stdout = true;
-    } else if let Some(filepath) = args.get_one::<String>("file") {
-        file_path = Some(filepath.trim().to_string());
-    } else {
-        file_path = Some(utils::get_default_file_name(extension));
-    }
 
     let wayshot_conn = WayshotConnection::new()?;
 
-    if args.get_flag("listoutputs") {
+    if cli.list_outputs {
         let valid_outputs = wayshot_conn.get_all_outputs();
         for output in valid_outputs {
             tracing::info!("{:#?}", output.name);
         }
-        exit(1);
+        return Ok(());
     }
 
-    let mut cursor_overlay = false;
-    if args.get_flag("cursor") {
-        cursor_overlay = true;
-    }
+    let image_buffer = if let Some(slurp_region) = cli.slurp {
+        let slurp_region = slurp_region.clone();
+        wayshot_conn.screenshot_freeze(
+            Box::new(move || {
+                || -> Result<LogicalRegion> {
+                    let slurp_output = Command::new("slurp")
+                        .args(slurp_region.split(" "))
+                        .output()?
+                        .stdout;
 
-    let image_buffer = if let Some(slurp_region) = args.get_one::<String>("slurp") {
-        if let Some(region) = utils::parse_geometry(slurp_region) {
-            wayshot_conn.screenshot(region, cursor_overlay)?
-        } else {
-            tracing::error!("Invalid geometry specification");
-            exit(1);
-        }
-    } else if let Some(output_name) = args.get_one::<String>("output") {
+                    utils::parse_geometry(&String::from_utf8(slurp_output)?)
+                }()
+                .map_err(|_| libwayshot::Error::FreezeCallbackError)
+            }),
+            cli.cursor,
+        )?
+    } else if let Some(output_name) = cli.output {
         let outputs = wayshot_conn.get_all_outputs();
-        if let Some(output) = outputs.iter().find(|output| &output.name == output_name) {
-            wayshot_conn.screenshot_single_output(output, cursor_overlay)?
+        if let Some(output) = outputs.iter().find(|output| output.name == output_name) {
+            wayshot_conn.screenshot_single_output(output, cli.cursor)?
         } else {
-            tracing::error!("No output found!\n");
-            exit(1);
+            bail!("No output found!");
         }
-    } else if args.get_flag("chooseoutput") {
+    } else if cli.choose_output {
         let outputs = wayshot_conn.get_all_outputs();
         let output_names: Vec<String> = outputs
             .iter()
             .map(|display| display.name.to_string())
             .collect();
         if let Some(index) = select_ouput(&output_names) {
-            wayshot_conn.screenshot_single_output(&outputs[index], cursor_overlay)?
+            wayshot_conn.screenshot_single_output(&outputs[index], cli.cursor)?
         } else {
-            tracing::error!("No output found!\n");
-            exit(1);
+            bail!("No output found!");
         }
     } else {
-        wayshot_conn.screenshot_all(cursor_overlay)?
+        wayshot_conn.screenshot_all(cli.cursor)?
     };
 
-    if file_is_stdout {
+    if let Some(file) = file {
+        image_buffer.save(file)?;
+    } else {
         let stdout = stdout();
         let mut buffer = Cursor::new(Vec::new());
 
         let mut writer = BufWriter::new(stdout.lock());
-        image_buffer.write_to(&mut buffer, extension)?;
+        image_buffer.write_to(&mut buffer, requested_encoding)?;
 
         writer.write_all(buffer.get_ref())?;
-    } else {
-        image_buffer.save(file_path.unwrap())?;
     }
 
     Ok(())
