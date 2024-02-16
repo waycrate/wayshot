@@ -18,3 +18,4 @@ thiserror = "1"
 wayland-client = "0.31.1"
 wayland-protocols = { version = "0.31.0", features = ["client", "unstable"] }
 wayland-protocols-wlr = { version = "0.2.0", features = ["client"] }
+tempfile = "3.10.0"

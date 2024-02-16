@@ -13,7 +13,9 @@ mod screencopy;
 
 use std::{
     collections::HashSet,
+    f64,
     fs::File,
+    io::Write,
     os::fd::AsFd,
     sync::atomic::{AtomicBool, Ordering},
     thread,
@@ -395,30 +397,25 @@ impl WayshotConnection {
 
     pub fn capture_frame_copies(
         &self,
-        output_capture_regions: &Vec<(OutputInfo, Option<EmbeddedRegion>)>,
+        output_capture_regions: &[(OutputInfo, Option<EmbeddedRegion>)],
         cursor_overlay: bool,
     ) -> Result<Vec<(FrameCopy, FrameGuard, OutputInfo)>> {
         let frame_copies = thread::scope(|scope| -> Result<_> {
             let join_handles = output_capture_regions
-                .into_iter()
+                .iter()
                 .map(|(output_info, capture_region)| {
                     scope.spawn(move || {
-                        self.capture_frame_copy(
-                            cursor_overlay,
-                            &output_info,
-                            capture_region.clone(),
-                        )
-                        .map(|(frame_copy, frame_guard)| {
-                            (frame_copy, frame_guard, output_info.clone())
-                        })
+                        self.capture_frame_copy(cursor_overlay, output_info, *capture_region)
+                            .map(|(frame_copy, frame_guard)| {
+                                (frame_copy, frame_guard, output_info.clone())
+                            })
                     })
                 })
                 .collect::<Vec<_>>();
 
             join_handles
                 .into_iter()
-                .map(|join_handle| join_handle.join())
-                .flatten()
+                .flat_map(|join_handle| join_handle.join())
                 .collect::<Result<_>>()
         })?;
 
@@ -457,6 +454,7 @@ impl WayshotConnection {
                 ));
             }
         };
+        let shm = self.globals.bind::<WlShm, _, _>(&qh, 1..=1, ())?;
 
         for (frame_copy, frame_guard, output_info) in frames {
             tracing::span!(
@@ -476,11 +474,44 @@ impl WayshotConnection {
                     output_info.wl_output.clone(),
                 );
 
+                let buffer = {
+                    if output_info.region.size != frame_copy.frame_format.size {
+                        let file = tempfile::tempfile().unwrap();
+                        let image: DynamicImage = frame_copy.try_into()?;
+                        let image = image::imageops::resize(
+                            &image,
+                            output_info.region.size.width,
+                            output_info.region.size.height,
+                            image::imageops::FilterType::Triangle,
+                        );
+                        init_overlay(&image, &file);
+                        let pool = shm.create_pool(
+                            file.as_fd(),
+                            (output_info.region.size.width * output_info.region.size.height * 4)
+                                as i32,
+                            &qh,
+                            (),
+                        );
+
+                        pool.create_buffer(
+                            0,
+                            output_info.region.size.width as i32,
+                            output_info.region.size.height as i32,
+                            (output_info.region.size.width * 4) as i32,
+                            frame_copy.frame_format.format,
+                            &qh,
+                            (),
+                        )
+                    } else {
+                        frame_guard.buffer.clone()
+                    }
+                };
+
                 layer_surface.set_exclusive_zone(-1);
                 layer_surface.set_anchor(Anchor::Top | Anchor::Left);
                 layer_surface.set_size(
-                    frame_copy.frame_format.size.width,
-                    frame_copy.frame_format.size.height,
+                    output_info.region.size.width,
+                    output_info.region.size.height,
                 );
 
                 debug!("Committing surface creation changes.");
@@ -492,8 +523,8 @@ impl WayshotConnection {
                 }
 
                 surface.set_buffer_transform(output_info.transform);
-                surface.set_buffer_scale(output_info.scale);
-                surface.attach(Some(&frame_guard.buffer), 0, 0);
+                surface.set_buffer_scale(1);
+                surface.attach(Some(&buffer), 0, 0);
 
                 debug!("Committing surface with attached buffer.");
                 surface.commit();
@@ -515,12 +546,12 @@ impl WayshotConnection {
         let outputs_capture_regions: &Vec<(OutputInfo, Option<EmbeddedRegion>)> =
             &match region_capturer {
                 RegionCapturer::Outputs(ref outputs) => outputs
-                    .into_iter()
+                    .iter()
                     .map(|output_info| (output_info.clone(), None))
                     .collect(),
                 RegionCapturer::Region(capture_region) => self
                     .get_all_outputs()
-                    .into_iter()
+                    .iter()
                     .filter_map(|output_info| {
                         tracing::span!(
                             tracing::Level::DEBUG,
@@ -547,7 +578,7 @@ impl WayshotConnection {
                     .collect(),
                 RegionCapturer::Freeze(_) => self
                     .get_all_outputs()
-                    .into_iter()
+                    .iter()
                     .map(|output_info| (output_info.clone(), None))
                     .collect(),
             };
@@ -565,7 +596,7 @@ impl WayshotConnection {
         thread::scope(|scope| {
             let rotate_join_handles = frames
                 .into_iter()
-                .map(|(frame_copy, _, _)| {
+                .map(|(frame_copy, _, output_info)| {
                     scope.spawn(move || {
                         let image = (&frame_copy).try_into()?;
                         Ok((
@@ -576,6 +607,7 @@ impl WayshotConnection {
                                 frame_copy.frame_format.size.height,
                             ),
                             frame_copy,
+                            output_info,
                         ))
                     })
                 })
@@ -583,8 +615,7 @@ impl WayshotConnection {
 
             rotate_join_handles
                 .into_iter()
-                .map(|join_handle| join_handle.join())
-                .flatten()
+                .flat_map(|join_handle| join_handle.join())
                 .fold(
                     None,
                     |composite_image: Option<Result<_>>, image: Result<_>| {
@@ -598,12 +629,15 @@ impl WayshotConnection {
 
                         Some(|| -> Result<_> {
                             let mut composite_image = composite_image?;
-                            let (image, frame_copy) = image?;
+                            let (image, frame_copy, output_info) = image?;
+                            let change = frame_copy.frame_format.size.width as f64
+                                / output_info.region.size.width as f64;
+                            let real_select_region = capture_region.region_change(change);
                             let (x, y) = (
                                 frame_copy.region.inner.position.x as i64
-                                    - capture_region.inner.position.x as i64,
+                                    - real_select_region.inner.position.x as i64,
                                 frame_copy.region.inner.position.y as i64
-                                    - capture_region.inner.position.y as i64,
+                                    - real_select_region.inner.position.y as i64,
                             );
                             tracing::span!(
                                 tracing::Level::DEBUG,
@@ -660,18 +694,27 @@ impl WayshotConnection {
     /// Take a screenshot from all of the specified outputs.
     pub fn screenshot_outputs(
         &self,
-        outputs: &Vec<OutputInfo>,
+        outputs: &[OutputInfo],
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
         if outputs.is_empty() {
             return Err(Error::NoOutputs);
         }
 
-        self.screenshot_region_capturer(RegionCapturer::Outputs(outputs.clone()), cursor_overlay)
+        self.screenshot_region_capturer(RegionCapturer::Outputs(outputs.to_vec()), cursor_overlay)
     }
 
     /// Take a screenshot from all accessible outputs.
     pub fn screenshot_all(&self, cursor_overlay: bool) -> Result<DynamicImage> {
         self.screenshot_outputs(self.get_all_outputs(), cursor_overlay)
     }
+}
+
+fn init_overlay(origin_image: &image::ImageBuffer<image::Rgba<u8>, Vec<u8>>, tmp: &File) {
+    let mut buf = std::io::BufWriter::new(tmp);
+
+    for index in origin_image.pixels() {
+        buf.write_all(&index.0).unwrap();
+    }
+    buf.flush().unwrap();
 }
