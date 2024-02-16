@@ -23,6 +23,14 @@ pub struct LogicalRegion {
     pub inner: Region,
 }
 
+impl LogicalRegion {
+    pub(crate) fn region_change(&self, change: f64) -> Self {
+        Self {
+            inner: self.inner.region_change(change),
+        }
+    }
+}
+
 /// An embedded region is a region entirely inside of another (often an output).
 ///
 /// It can only be contained inside of another and cannot exceed its bounds.
@@ -61,6 +69,21 @@ pub struct Region {
     pub position: Position,
     /// Size of the region.
     pub size: Size,
+}
+
+impl Region {
+    fn region_change(&self, change: f64) -> Self {
+        Self {
+            position: Position {
+                x: (self.position.x as f64 * change) as i32,
+                y: (self.position.y as f64 * change) as i32,
+            },
+            size: Size {
+                width: (self.size.width as f64 * change) as u32,
+                height: (self.size.height as f64 * change) as u32,
+            },
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]

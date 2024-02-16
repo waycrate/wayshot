@@ -13,6 +13,7 @@ mod screencopy;
 
 use std::{
     collections::HashSet,
+    f64,
     fs::File,
     io::Write,
     os::fd::AsFd,
@@ -602,10 +603,11 @@ impl WayshotConnection {
                             image_util::rotate_image_buffer(
                                 image,
                                 frame_copy.transform,
-                                output_info.region.size.width,
-                                output_info.region.size.height,
+                                frame_copy.frame_format.size.width,
+                                frame_copy.frame_format.size.height,
                             ),
                             frame_copy,
+                            output_info,
                         ))
                     })
                 })
@@ -627,12 +629,15 @@ impl WayshotConnection {
 
                         Some(|| -> Result<_> {
                             let mut composite_image = composite_image?;
-                            let (image, frame_copy) = image?;
+                            let (image, frame_copy, output_info) = image?;
+                            let change = frame_copy.frame_format.size.width as f64
+                                / output_info.region.size.width as f64;
+                            let real_select_region = capture_region.region_change(change);
                             let (x, y) = (
                                 frame_copy.region.inner.position.x as i64
-                                    - capture_region.inner.position.x as i64,
+                                    - real_select_region.inner.position.x as i64,
                                 frame_copy.region.inner.position.y as i64
-                                    - capture_region.inner.position.y as i64,
+                                    - real_select_region.inner.position.y as i64,
                             );
                             tracing::span!(
                                 tracing::Level::DEBUG,
