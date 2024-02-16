@@ -475,12 +475,19 @@ impl WayshotConnection {
 
                 let file = tempfile::tempfile().unwrap();
                 let image: DynamicImage = frame_copy.try_into()?;
-                let image = image::imageops::resize(
-                    &image,
-                    output_info.region.size.width,
-                    output_info.region.size.height,
-                    image::imageops::FilterType::Nearest,
-                );
+                let image = {
+                    if output_info.region.size != frame_copy.frame_format.size {
+                        image::imageops::resize(
+                            &image,
+                            output_info.region.size.width,
+                            output_info.region.size.height,
+                            image::imageops::FilterType::Triangle,
+                        )
+                    } else {
+                        image.into_rgba8()
+                    }
+                };
+
                 init_overlay(&image, &file);
                 let pool = shm.create_pool(
                     file.as_fd(),
