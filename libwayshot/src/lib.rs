@@ -456,7 +456,7 @@ impl WayshotConnection {
         };
         let shm = self.globals.bind::<WlShm, _, _>(&qh, 1..=1, ())?;
 
-        for (frame_copy, _frame_guard, output_info) in frames {
+        for (frame_copy, frame_guard, output_info) in frames {
             tracing::span!(
                 tracing::Level::DEBUG,
                 "overlay_frames::surface",
@@ -474,38 +474,38 @@ impl WayshotConnection {
                     output_info.wl_output.clone(),
                 );
 
-                let file = tempfile::tempfile().unwrap();
-                let image: DynamicImage = frame_copy.try_into()?;
-                let image = {
+                let buffer = {
                     if output_info.region.size != frame_copy.frame_format.size {
-                        image::imageops::resize(
+                        let file = tempfile::tempfile().unwrap();
+                        let image: DynamicImage = frame_copy.try_into()?;
+                        let image = image::imageops::resize(
                             &image,
                             output_info.region.size.width,
                             output_info.region.size.height,
                             image::imageops::FilterType::Triangle,
+                        );
+                        init_overlay(&image, &file);
+                        let pool = shm.create_pool(
+                            file.as_fd(),
+                            (output_info.region.size.width * output_info.region.size.height * 4)
+                                as i32,
+                            &qh,
+                            (),
+                        );
+
+                        pool.create_buffer(
+                            0,
+                            output_info.region.size.width as i32,
+                            output_info.region.size.height as i32,
+                            (output_info.region.size.width * 4) as i32,
+                            frame_copy.frame_format.format,
+                            &qh,
+                            (),
                         )
                     } else {
-                        image.into_rgba8()
+                        frame_guard.buffer.clone()
                     }
                 };
-
-                init_overlay(&image, &file);
-                let pool = shm.create_pool(
-                    file.as_fd(),
-                    (output_info.region.size.width * output_info.region.size.height * 4) as i32,
-                    &qh,
-                    (),
-                );
-
-                let buffer = pool.create_buffer(
-                    0,
-                    output_info.region.size.width as i32,
-                    output_info.region.size.height as i32,
-                    (output_info.region.size.width * 4) as i32,
-                    frame_copy.frame_format.format,
-                    &qh,
-                    (),
-                );
 
                 layer_surface.set_exclusive_zone(-1);
                 layer_surface.set_anchor(Anchor::Top | Anchor::Left);
