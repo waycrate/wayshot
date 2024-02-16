@@ -474,7 +474,7 @@ impl WayshotConnection {
                 );
 
                 let file = tempfile::tempfile().unwrap();
-                let image: DynamicImage = frame_copy.try_into().unwrap();
+                let image: DynamicImage = frame_copy.try_into()?;
                 let image = image::imageops::resize(
                     &image,
                     output_info.region.size.width,
@@ -493,7 +493,7 @@ impl WayshotConnection {
                     0,
                     output_info.region.size.width as i32,
                     output_info.region.size.height as i32,
-                    (output_info.region.size.height * 4) as i32,
+                    (output_info.region.size.width * 4) as i32,
                     frame_copy.frame_format.format,
                     &qh,
                     (),
@@ -515,7 +515,7 @@ impl WayshotConnection {
                 }
 
                 surface.set_buffer_transform(output_info.transform);
-                surface.set_buffer_scale(output_info.scale);
+                surface.set_buffer_scale(1);
                 surface.attach(Some(&buffer), 0, 0);
 
                 debug!("Committing surface with attached buffer.");
