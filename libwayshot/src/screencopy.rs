@@ -79,7 +79,8 @@ pub struct FrameCopy {
     pub frame_mmap: MmapMut,
     pub transform: wl_output::Transform,
     /// Logical region with the transform already applied.
-    pub region: LogicalRegion,
+    pub logical_region: LogicalRegion,
+    pub physical_size: Size,
 }
 
 impl TryFrom<&FrameCopy> for DynamicImage {

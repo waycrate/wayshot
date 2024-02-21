@@ -336,7 +336,7 @@ impl WayshotConnection {
     }
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
-    #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{:}", r))))]
+    #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{:}", r)).unwrap_or("fullscreen".to_string())))]
     fn capture_frame_copy(
         &self,
         cursor_overlay: bool,
@@ -364,7 +364,7 @@ impl WayshotConnection {
             tracing::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
             return Err(Error::NoSupportedBufferFormat);
         };
-        let rotated_size = match output_info.transform {
+        let rotated_physical_size = match output_info.transform {
             Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270 => {
                 Size {
                     width: frame_format.size.height,
@@ -378,16 +378,10 @@ impl WayshotConnection {
             frame_color_type,
             frame_mmap,
             transform: output_info.transform,
-            region: LogicalRegion {
-                inner: Region {
-                    position: capture_region
-                        .map(|capture_region: EmbeddedRegion| {
-                            capture_region.logical().inner.position
-                        })
-                        .unwrap_or_else(|| output_info.region.position),
-                    size: rotated_size,
-                },
-            },
+            logical_region: capture_region
+                .map(|capture_region| capture_region.logical())
+                .unwrap_or(output_info.logical_region),
+            physical_size: rotated_physical_size,
         };
         tracing::debug!("Created frame copy: {:#?}", frame_copy);
         Ok((frame_copy, frame_guard))
@@ -492,7 +486,7 @@ impl WayshotConnection {
                 }
 
                 surface.set_buffer_transform(output_info.transform);
-                surface.set_buffer_scale(output_info.scale);
+                // surface.set_buffer_scale(output_info.scale());
                 surface.attach(Some(&frame_guard.buffer), 0, 0);
 
                 debug!("Committing surface with attached buffer.");
@@ -507,6 +501,7 @@ impl WayshotConnection {
     }
 
     /// Take a screenshot from the specified region.
+    #[tracing::instrument(skip_all, fields(max_scale = tracing::field::Empty))]
     fn screenshot_region_capturer(
         &self,
         region_capturer: RegionCapturer,
@@ -562,7 +557,17 @@ impl WayshotConnection {
             }
         };
 
+        // TODO When freeze was used, we can still further remove the outputs
+        // that don't intersect with the capture region.
+
         thread::scope(|scope| {
+            let max_scale = outputs_capture_regions
+                .iter()
+                .map(|(output_info, _)| output_info.scale())
+                .fold(1.0, f64::max);
+
+            tracing::Span::current().record("max_scale", &max_scale);
+
             let rotate_join_handles = frames
                 .into_iter()
                 .map(|(frame_copy, _, _)| {
@@ -572,8 +577,8 @@ impl WayshotConnection {
                             image_util::rotate_image_buffer(
                                 image,
                                 frame_copy.transform,
-                                frame_copy.frame_format.size.width,
-                                frame_copy.frame_format.size.height,
+                                frame_copy.logical_region.inner.size,
+                                max_scale,
                             ),
                             frame_copy,
                         ))
@@ -591,8 +596,8 @@ impl WayshotConnection {
                         // Default to a transparent image.
                         let composite_image = composite_image.unwrap_or_else(|| {
                             Ok(DynamicImage::new_rgba8(
-                                capture_region.inner.size.width,
-                                capture_region.inner.size.height,
+                                (capture_region.inner.size.width as f64 * max_scale) as u32,
+                                (capture_region.inner.size.height as f64 * max_scale) as u32,
                             ))
                         });
 
@@ -600,15 +605,17 @@ impl WayshotConnection {
                             let mut composite_image = composite_image?;
                             let (image, frame_copy) = image?;
                             let (x, y) = (
-                                frame_copy.region.inner.position.x as i64
-                                    - capture_region.inner.position.x as i64,
-                                frame_copy.region.inner.position.y as i64
-                                    - capture_region.inner.position.y as i64,
+                                ((frame_copy.logical_region.inner.position.x as f64
+                                    - capture_region.inner.position.x as f64)
+                                    * max_scale) as i64,
+                                ((frame_copy.logical_region.inner.position.y as f64
+                                    - capture_region.inner.position.y as f64)
+                                    * max_scale) as i64,
                             );
                             tracing::span!(
                                 tracing::Level::DEBUG,
                                 "replace",
-                                frame_copy_region = format!("{}", frame_copy.region),
+                                frame_copy_region = format!("{}", frame_copy.logical_region),
                                 capture_region = format!("{}", capture_region),
                                 x = x,
                                 y = y,
