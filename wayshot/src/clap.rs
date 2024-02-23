@@ -21,6 +21,7 @@ pub fn set_flags() -> Command {
             arg!(-f - -file <FILE_PATH>)
                 .required(false)
                 .conflicts_with("stdout")
+                .conflicts_with("clipboard")
                 .action(ArgAction::Set)
                 .help("Mention a custom file path"),
         )
@@ -34,8 +35,17 @@ pub fn set_flags() -> Command {
             arg!(--stdout)
                 .required(false)
                 .conflicts_with("file")
+                .conflicts_with("clipboard")
                 .action(ArgAction::SetTrue)
                 .help("Output the image data to standard out"),
+        )
+        .arg(
+            arg!(-p - -clipboard)
+                .required(false)
+                .conflicts_with("file")
+                .conflicts_with("stdout")
+                .action(ArgAction::SetTrue)
+                .help("Output the image data to clipboard"),
         )
         .arg(
             arg!(-e --extension <FILE_EXTENSION>)

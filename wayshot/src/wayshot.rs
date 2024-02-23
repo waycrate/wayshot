@@ -12,6 +12,8 @@ mod utils;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
 use tracing::Level;
 
+use wl_clipboard_rs::copy::{MimeType, Options, Source};
+
 use crate::utils::{EncodingFormat, SaveLocation};
 
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
@@ -61,6 +63,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let save_location = if args.get_flag("stdout") {
         SaveLocation::StdOut
+    } else if args.get_flag("clipboard") {
+        SaveLocation::Clipboard
     } else if let Some(filepath) = args.get_one::<String>("file") {
         SaveLocation::File(filepath.trim().to_string())
     } else {
@@ -125,6 +129,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             image_buffer.write_to(&mut buffer, extension)?;
 
             writer.write_all(buffer.get_ref())?;
+        }
+        SaveLocation::Clipboard => {
+            let mut opts = Options::new();
+
+            let mut buffer = Cursor::new(Vec::new());
+            image_buffer.write_to(&mut buffer, extension)?;
+            opts.serve_requests(wl_clipboard_rs::copy::ServeRequests::Only(1));
+            opts.copy(
+                Source::Bytes(buffer.into_inner().into()),
+                MimeType::Autodetect,
+            )?;
         }
     }
 

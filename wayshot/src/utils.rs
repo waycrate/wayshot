@@ -44,6 +44,7 @@ pub fn parse_geometry(g: &str) -> Option<CaptureRegion> {
 pub enum SaveLocation {
     File(String),
     StdOut,
+    Clipboard,
 }
 
 /// Supported image encoding formats.
