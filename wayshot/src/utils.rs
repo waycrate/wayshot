@@ -40,6 +40,12 @@ pub fn parse_geometry(g: &str) -> Option<CaptureRegion> {
     })
 }
 
+/// Supported locations to save the screenshot to.
+pub enum SaveLocation {
+    File(String),
+    StdOut,
+}
+
 /// Supported image encoding formats.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum EncodingFormat {

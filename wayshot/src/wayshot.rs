@@ -12,7 +12,7 @@ mod utils;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
 use tracing::Level;
 
-use crate::utils::EncodingFormat;
+use crate::utils::{EncodingFormat, SaveLocation};
 
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where
@@ -59,16 +59,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         EncodingFormat::Png
     };
 
-    let mut file_is_stdout: bool = false;
-    let mut file_path: Option<String> = None;
-
-    if args.get_flag("stdout") {
-        file_is_stdout = true;
+    let save_location = if args.get_flag("stdout") {
+        SaveLocation::StdOut
     } else if let Some(filepath) = args.get_one::<String>("file") {
-        file_path = Some(filepath.trim().to_string());
+        SaveLocation::File(filepath.trim().to_string())
     } else {
-        file_path = Some(utils::get_default_file_name(extension));
-    }
+        SaveLocation::File(utils::get_default_file_name(extension))
+    };
 
     let wayshot_conn = WayshotConnection::new()?;
 
@@ -116,16 +113,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         wayshot_conn.screenshot_all(cursor_overlay)?
     };
 
-    if file_is_stdout {
-        let stdout = stdout();
-        let mut buffer = Cursor::new(Vec::new());
+    match save_location {
+        SaveLocation::File(filepath) => {
+            image_buffer.save(filepath)?;
+        }
+        SaveLocation::StdOut => {
+            let stdout = stdout();
+            let mut buffer = Cursor::new(Vec::new());
 
-        let mut writer = BufWriter::new(stdout.lock());
-        image_buffer.write_to(&mut buffer, extension)?;
+            let mut writer = BufWriter::new(stdout.lock());
+            image_buffer.write_to(&mut buffer, extension)?;
 
-        writer.write_all(buffer.get_ref())?;
-    } else {
-        image_buffer.save(file_path.unwrap())?;
+            writer.write_all(buffer.get_ref())?;
+        }
     }
 
     Ok(())
