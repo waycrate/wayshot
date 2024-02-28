@@ -58,22 +58,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         EncodingFormat::Png
     };
-
-    let mut file_is_stdout: bool = false;
-    let mut file_path: Option<String> = None;
-
-    if args.get_flag("stdout") {
-        file_is_stdout = true;
-    } else if let Some(filepath) = args.get_one::<String>("file") {
-        file_path = Some(filepath.trim().to_string());
-    } else {
-        if args.get_flag("human_time") {
-            file_path = Some(utils::get_human_time_file_name(extension));
-        } else {
-            file_path = Some(utils::get_default_file_name(extension));
-        }
-    }
-
     let wayshot_conn = WayshotConnection::new()?;
 
     if args.get_flag("listoutputs") {
@@ -119,6 +103,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         wayshot_conn.screenshot_all(cursor_overlay)?
     };
+
+    let mut file_is_stdout: bool = false;
+    let mut file_path: Option<String> = None;
+
+    if args.get_flag("stdout") {
+        file_is_stdout = true;
+    } else if let Some(filepath) = args.get_one::<String>("file") {
+        file_path = Some(filepath.trim().to_string());
+    } else {
+        if args.get_flag("time_stamp") {
+            file_path = Some(utils::get_human_time_file_name(extension));
+        } else {
+            file_path = Some(utils::get_default_file_name(extension));
+        }
+    }
 
     if file_is_stdout {
         let stdout = stdout();

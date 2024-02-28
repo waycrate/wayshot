@@ -1,4 +1,3 @@
-use chrono::Local;
 use std::{
     process::exit,
     time::{SystemTime, UNIX_EPOCH},
@@ -81,17 +80,40 @@ pub fn get_default_file_name(extension: EncodingFormat) -> String {
         Ok(n) => n.as_secs().to_string(),
         Err(_) => {
             tracing::error!("SystemTime before UNIX EPOCH!");
-            exit(1);
+            // didn't think this place needed to exit
+            String::from("")
         }
     };
 
     time + "-wayshot." + extension.into()
 }
+fn get_hour_minute_from_unix_seconds(seconds: u64) -> String {
+    let total_minutes = seconds / 60;
 
+    let mut current_hour = (((total_minutes / 60) % 24) + 5) % 24;
+
+    let mut current_minute = (total_minutes % 60) + 30;
+    // println!("{}", current_minute);
+    if current_minute > 60 {
+        current_hour += 1;
+    }
+    current_minute = current_minute % 60;
+    if current_hour == 24 {
+        current_hour = 0;
+    }
+
+    // println!("{}", total_minutes as f64 / 60.0);
+
+    format!("{}:{}:{}", current_hour, current_minute, seconds % 60)
+}
 pub fn get_human_time_file_name(extension: EncodingFormat) -> String {
-    let current_time = Local::now();
-
-    let time = String::from(current_time.format("%H:%M:%S").to_string());
+    let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(n) => get_hour_minute_from_unix_seconds(n.as_secs()),
+        Err(_) => {
+            tracing::error!("SystemTime before UNIX EPOCH!");
+            String::from("")
+        }
+    };
 
     time + "-wayshot." + extension.into()
 }
