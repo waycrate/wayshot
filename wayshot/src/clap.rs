@@ -38,6 +38,13 @@ pub fn set_flags() -> Command {
                 .help("Output the image data to standard out"),
         )
         .arg(
+            arg!(--time_stamp)
+                .required(false)
+                .conflicts_with("file")
+                .action(ArgAction::SetTrue)
+                .help("Uses human readable time for image file name"),
+        )
+        .arg(
             arg!(-e --extension <FILE_EXTENSION>)
                 .required(false)
                 .action(ArgAction::Set)
