@@ -13,6 +13,8 @@ mod utils;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
 use utils::EncodingFormat;
 
+use wl_clipboard_rs::copy::{MimeType, Options, Source};
+
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where
     T: ToString,
@@ -51,17 +53,6 @@ fn main() -> Result<()> {
             );
         }
     }
-
-    let file = match cli.file {
-        Some(pathbuf) => {
-            if pathbuf.to_string_lossy() == "-" {
-                None
-            } else {
-                Some(pathbuf)
-            }
-        }
-        None => Some(utils::get_default_file_name(requested_encoding)),
-    };
 
     let wayshot_conn = WayshotConnection::new()?;
 
@@ -111,16 +102,43 @@ fn main() -> Result<()> {
         wayshot_conn.screenshot_all(cli.cursor)?
     };
 
+    let mut stdout_print = false;
+    let file = match cli.file {
+        Some(pathbuf) => {
+            if pathbuf.to_string_lossy() == "-" {
+                stdout_print = true;
+                None
+            } else {
+                Some(pathbuf)
+            }
+        }
+        None => {
+            if cli.clipboard {
+                None
+            } else {
+                Some(utils::get_default_file_name(requested_encoding))
+            }
+        }
+    };
+
     if let Some(file) = file {
         image_buffer.save(file)?;
     } else {
-        let stdout = stdout();
         let mut buffer = Cursor::new(Vec::new());
-
-        let mut writer = BufWriter::new(stdout.lock());
         image_buffer.write_to(&mut buffer, requested_encoding)?;
 
-        writer.write_all(buffer.get_ref())?;
+        if stdout_print {
+            let stdout = stdout();
+            let mut writer = BufWriter::new(stdout.lock());
+            writer.write_all(buffer.get_ref())?;
+        }
+        if cli.clipboard {
+            let opts = Options::new();
+            opts.copy(
+                Source::Bytes(buffer.into_inner().into()),
+                MimeType::Autodetect,
+            )?;
+        }
     }
 
     Ok(())
