@@ -1,3 +1,4 @@
+use chrono::Local;
 use std::{
     process::exit,
     time::{SystemTime, UNIX_EPOCH},
@@ -83,6 +84,14 @@ pub fn get_default_file_name(extension: EncodingFormat) -> String {
             exit(1);
         }
     };
+
+    time + "-wayshot." + extension.into()
+}
+
+pub fn get_human_time_file_name(extension: EncodingFormat) -> String {
+    let current_time = Local::now();
+
+    let time = String::from(current_time.format("%H:%M:%S").to_string());
 
     time + "-wayshot." + extension.into()
 }

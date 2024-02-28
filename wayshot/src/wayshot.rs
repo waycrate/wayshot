@@ -67,7 +67,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else if let Some(filepath) = args.get_one::<String>("file") {
         file_path = Some(filepath.trim().to_string());
     } else {
-        file_path = Some(utils::get_default_file_name(extension));
+        if args.get_flag("human_time") {
+            file_path = Some(utils::get_human_time_file_name(extension));
+        } else {
+            file_path = Some(utils::get_default_file_name(extension));
+        }
     }
 
     let wayshot_conn = WayshotConnection::new()?;
