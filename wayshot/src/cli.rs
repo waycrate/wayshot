@@ -43,4 +43,8 @@ pub struct Cli {
     /// Present a fuzzy selector for output/display selection
     #[arg(long, alias = "chooseoutput", conflicts_with_all = ["slurp", "output"])]
     pub choose_output: bool,
+
+    /// Uses time stamp(%H:%M:%S) as file name
+    #[arg(short, long)]
+    pub time_stamp: bool,
 }
