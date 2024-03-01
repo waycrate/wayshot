@@ -61,7 +61,7 @@ fn main() -> Result<()> {
             }
         }
         None => {
-            if (cli.time_stamp) {
+            if cli.time_stamp {
                 Some(utils::get_time_stamp_file_name(requested_encoding))
             } else {
                 Some(utils::get_default_file_name(requested_encoding))

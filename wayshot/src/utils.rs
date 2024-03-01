@@ -139,28 +139,27 @@ pub fn get_default_file_name(extension: EncodingFormat) -> PathBuf {
         .map(|time| time.as_secs().to_string())
         .unwrap_or("unknown".into());
 
-    format!("{time}-wayshot.{extension}").into()
+    format!("wayshot-{time}.{extension}").into()
 }
 
 fn get_hour_minute_from_unix_seconds(seconds: u64) -> String {
     let total_minutes = seconds / 60;
-
     let mut current_hour = (((total_minutes / 60) % 24) + 5) % 24;
-
     let mut current_minute = (total_minutes % 60) + 30;
-    // println!("{}", current_minute);
+
     if current_minute > 60 {
         current_hour += 1;
     }
+
     current_minute = current_minute % 60;
+
     if current_hour == 24 {
         current_hour = 0;
     }
 
-    // println!("{}", total_minutes as f64 / 60.0);
-
     format!("{}:{}:{}", current_hour, current_minute, seconds % 60)
 }
+
 pub fn get_time_stamp_file_name(extension: EncodingFormat) -> PathBuf {
     let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(n) => get_hour_minute_from_unix_seconds(n.as_secs()),
@@ -170,5 +169,5 @@ pub fn get_time_stamp_file_name(extension: EncodingFormat) -> PathBuf {
         }
     };
 
-    format!("{time}-wayshot.{extension}").into()
+    format!("wayshot-{time}.{extension}").into()
 }
