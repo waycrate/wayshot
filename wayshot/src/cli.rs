@@ -11,7 +11,7 @@ use clap::builder::TypedValueParser;
 #[derive(Parser)]
 #[command(version, about)]
 pub struct Cli {
-    /// Where to save the screenshot, "-" for stdout. Defaults to "$UNIX_TIMESTAMP-wayshot.$EXTENSION".
+    ///Provide a custom file path ( encoding format is inferred from the file extension ). If path provided is directory then the output image is saved to provided path with default naming scheme. Default path is ./ , `-` indicates writing to terminal (stdout).
     #[arg(value_name = "OUTPUT")]
     pub file: Option<PathBuf>,
 

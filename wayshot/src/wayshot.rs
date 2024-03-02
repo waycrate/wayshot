@@ -53,11 +53,16 @@ fn main() -> Result<()> {
     }
 
     let file = match cli.file {
-        Some(pathbuf) => {
+        Some(mut pathbuf) => {
             if pathbuf.to_string_lossy() == "-" {
                 None
             } else {
-                Some(pathbuf)
+                if pathbuf.is_dir() {
+                    pathbuf.push(utils::get_default_file_name(requested_encoding));
+                    Some(pathbuf)
+                } else {
+                    Some(pathbuf)
+                }
             }
         }
         None => Some(utils::get_default_file_name(requested_encoding)),
