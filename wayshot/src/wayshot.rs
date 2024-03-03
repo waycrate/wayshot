@@ -15,6 +15,8 @@ use utils::EncodingFormat;
 
 use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
+use fork::{fork, Fork};
+
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where
     T: ToString,
@@ -133,11 +135,28 @@ fn main() -> Result<()> {
             writer.write_all(buffer.get_ref())?;
         }
         if cli.clipboard {
-            let opts = Options::new();
-            opts.copy(
-                Source::Bytes(buffer.into_inner().into()),
-                MimeType::Autodetect,
-            )?;
+            let mut opts = Options::new();
+            match fork() {
+                // Having the image persistently available on the clipboard requires a wayshot process to be alive.
+                // Fork the process with a child detached from the main process and have the parent exit
+                Ok(Fork::Parent(_)) => {
+                    return Ok(());
+                }
+                Ok(Fork::Child) => {
+                    opts.foreground(true); //Offer the image till somthing else is available on the clipboard
+                    opts.copy(
+                        Source::Bytes(buffer.into_inner().into()),
+                        MimeType::Autodetect,
+                    )?;
+                }
+                Err(e) => {
+                    println!("Fork failed with error: {e}, couldn't offer image on the clipboard persistently. Use a clipboard manager.");
+                    opts.copy(
+                        Source::Bytes(buffer.into_inner().into()),
+                        MimeType::Autodetect,
+                    )?;
+                }
+            }
         }
     }
 
