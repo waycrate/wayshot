@@ -50,8 +50,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             "png" => EncodingFormat::Png,
             "ppm" => EncodingFormat::Ppm,
             "qoi" => EncodingFormat::Qoi,
+            "webp" => EncodingFormat::WebP,
             _ => {
-                tracing::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm\n5) qoi");
+                tracing::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm\n5) qoi\n6) webp");
                 exit(1);
             }
         }
