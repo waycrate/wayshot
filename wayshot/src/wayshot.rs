@@ -150,7 +150,8 @@ fn main() -> Result<()> {
                     )?;
                 }
                 Err(e) => {
-                    println!("Fork failed with error: {e}, couldn't offer image on the clipboard persistently. Use a clipboard manager.");
+                    tracing::warn!("Fork failed with error: {e}, couldn't offer image on the clipboard persistently.
+                     Use a clipboard manager to record screenshot.");
                     opts.copy(
                         Source::Bytes(buffer.into_inner().into()),
                         MimeType::Autodetect,
