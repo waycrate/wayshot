@@ -98,9 +98,9 @@ fn main() -> Result<()> {
         }
     } else if cli.choose_output {
         let outputs = wayshot_conn.get_all_outputs();
-        let output_names: Vec<String> = outputs
+        let output_names: Vec<&str> = outputs
             .iter()
-            .map(|display| display.name.to_string())
+            .map(|display| display.name.as_str())
             .collect();
         if let Some(index) = select_ouput(&output_names) {
             wayshot_conn.screenshot_single_output(&outputs[index], cli.cursor)?
