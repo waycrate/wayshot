@@ -792,7 +792,6 @@ dependencies = [
  "clap",
  "dialoguer",
  "eyre",
- "flate2",
  "image",
  "libwayshot",
  "tracing",

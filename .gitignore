@@ -1,6 +1,5 @@
 target
 *.gz
-*.out
 .direnv
 *.jpg
 *.jpeg

@@ -13,7 +13,14 @@ build:
 run:
 	@cargo run
 
-install: build
+docs:
+	@echo -n 'Generating docs with scdoc and gzip ... '
+	@for file in ./docs/*.scd ; do \
+		scdoc < "$$file" | gzip --best > "$${file%.scd}.gz" ; \
+	done
+	@echo 'done!'
+
+install: build docs
 	@mkdir -p $(TARGET_DIR)
 	@cp $(SOURCE_DIR)/$(BINARY) $(TARGET_DIR)
 	@chmod +x $(TARGET_DIR)/$(BINARY)
@@ -37,4 +44,4 @@ setup:
 	@rustup install stable
 	@rustup default stable
 
-.PHONY: check clean setup all install build
+.PHONY: check clean setup all install build docs
