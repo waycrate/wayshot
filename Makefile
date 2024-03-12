@@ -21,15 +21,16 @@ docs:
 	@echo 'done!'
 
 install: build docs
-	@mkdir -p $(TARGET_DIR)
-	@cp $(SOURCE_DIR)/$(BINARY) $(TARGET_DIR)
+	@mkdir -pv $(TARGET_DIR)
+	@cp -v $(SOURCE_DIR)/$(BINARY) $(TARGET_DIR)
 	@chmod +x $(TARGET_DIR)/$(BINARY)
-	@find ./docs -type f -iname "*.1.gz" -exec cp {} $(MAN1_DIR) \;
-	@find ./docs -type f -iname "*.7.gz" -exec cp {} $(MAN7_DIR) \;
+	@cp -v ./docs/wayshot.1.gz $(MAN1_DIR)
+	@cp -v ./docs/wayshot.7.gz $(MAN7_DIR)
+
 
 uninstall:
-	@rm -f $(TARGET_DIR)/$(BINARY)
-	@rm -f /usr/share/man/**/wayshot.*
+	@rm -fv $(TARGET_DIR)/$(BINARY)
+	@rm -fv /usr/share/man/**/wayshot.*
 
 check:
 	@cargo fmt
@@ -38,7 +39,7 @@ check:
 
 clean:
 	@cargo clean
-	@rm -f ./docs/*.1.gz
+	@rm -fv ./docs/*.gz
 
 setup:
 	@rustup install stable
