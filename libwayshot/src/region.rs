@@ -116,7 +116,7 @@ impl EmbeddedRegion {
         };
 
         Some(Self {
-            relative_to: relative_to,
+            relative_to,
             inner: Region {
                 position: Position { x: x1, y: y1 },
                 size: Size { width, height },

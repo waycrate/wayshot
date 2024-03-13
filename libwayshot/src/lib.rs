@@ -389,30 +389,25 @@ impl WayshotConnection {
 
     pub fn capture_frame_copies(
         &self,
-        output_capture_regions: &Vec<(OutputInfo, Option<EmbeddedRegion>)>,
+        output_capture_regions: &[(OutputInfo, Option<EmbeddedRegion>)],
         cursor_overlay: bool,
     ) -> Result<Vec<(FrameCopy, FrameGuard, OutputInfo)>> {
         let frame_copies = thread::scope(|scope| -> Result<_> {
             let join_handles = output_capture_regions
-                .into_iter()
+                .iter()
                 .map(|(output_info, capture_region)| {
                     scope.spawn(move || {
-                        self.capture_frame_copy(
-                            cursor_overlay,
-                            &output_info,
-                            capture_region.clone(),
-                        )
-                        .map(|(frame_copy, frame_guard)| {
-                            (frame_copy, frame_guard, output_info.clone())
-                        })
+                        self.capture_frame_copy(cursor_overlay, output_info, *capture_region)
+                            .map(|(frame_copy, frame_guard)| {
+                                (frame_copy, frame_guard, output_info.clone())
+                            })
                     })
                 })
                 .collect::<Vec<_>>();
 
             join_handles
                 .into_iter()
-                .map(|join_handle| join_handle.join())
-                .flatten()
+                .flat_map(|join_handle| join_handle.join())
                 .collect::<Result<_>>()
         })?;
 
@@ -510,12 +505,12 @@ impl WayshotConnection {
         let outputs_capture_regions: &Vec<(OutputInfo, Option<EmbeddedRegion>)> =
             &match region_capturer {
                 RegionCapturer::Outputs(ref outputs) => outputs
-                    .into_iter()
+                    .iter()
                     .map(|output_info| (output_info.clone(), None))
                     .collect(),
                 RegionCapturer::Region(capture_region) => self
                     .get_all_outputs()
-                    .into_iter()
+                    .iter()
                     .filter_map(|output_info| {
                         tracing::span!(
                             tracing::Level::DEBUG,
@@ -542,7 +537,7 @@ impl WayshotConnection {
                     .collect(),
                 RegionCapturer::Freeze(_) => self
                     .get_all_outputs()
-                    .into_iter()
+                    .iter()
                     .map(|output_info| (output_info.clone(), None))
                     .collect(),
             };
@@ -566,7 +561,7 @@ impl WayshotConnection {
                 .map(|(output_info, _)| output_info.scale())
                 .fold(1.0, f64::max);
 
-            tracing::Span::current().record("max_scale", &max_scale);
+            tracing::Span::current().record("max_scale", max_scale);
 
             let rotate_join_handles = frames
                 .into_iter()
@@ -588,8 +583,7 @@ impl WayshotConnection {
 
             rotate_join_handles
                 .into_iter()
-                .map(|join_handle| join_handle.join())
-                .flatten()
+                .flat_map(|join_handle| join_handle.join())
                 .fold(
                     None,
                     |composite_image: Option<Result<_>>, image: Result<_>| {
@@ -667,14 +661,14 @@ impl WayshotConnection {
     /// Take a screenshot from all of the specified outputs.
     pub fn screenshot_outputs(
         &self,
-        outputs: &Vec<OutputInfo>,
+        outputs: &[OutputInfo],
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
         if outputs.is_empty() {
             return Err(Error::NoOutputs);
         }
 
-        self.screenshot_region_capturer(RegionCapturer::Outputs(outputs.clone()), cursor_overlay)
+        self.screenshot_region_capturer(RegionCapturer::Outputs(outputs.to_owned()), cursor_overlay)
     }
 
     /// Take a screenshot from all accessible outputs.

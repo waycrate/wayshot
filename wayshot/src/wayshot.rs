@@ -79,7 +79,7 @@ fn main() -> Result<()> {
             Box::new(move || {
                 || -> Result<LogicalRegion> {
                     let slurp_output = Command::new("slurp")
-                        .args(slurp_region.split(" "))
+                        .args(slurp_region.split(' '))
                         .output()?
                         .stdout;
 
