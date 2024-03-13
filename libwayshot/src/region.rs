@@ -195,10 +195,10 @@ impl From<&OutputInfo> for LogicalRegion {
     }
 }
 
-impl TryFrom<&Vec<OutputInfo>> for LogicalRegion {
+impl TryFrom<&[OutputInfo]> for LogicalRegion {
     type Error = Error;
 
-    fn try_from(output_info: &Vec<OutputInfo>) -> std::result::Result<Self, Self::Error> {
+    fn try_from(output_info: &[OutputInfo]) -> std::result::Result<Self, Self::Error> {
         let x1 = output_info
             .iter()
             .map(|output| output.logical_region.inner.position.x)

@@ -100,8 +100,8 @@ impl WayshotConnection {
     }
 
     /// Fetch all accessible wayland outputs.
-    pub fn get_all_outputs(&self) -> &Vec<OutputInfo> {
-        &self.output_infos
+    pub fn get_all_outputs(&self) -> &[OutputInfo] {
+        self.output_infos.as_slice()
     }
 
     /// refresh the outputs, to get new outputs
@@ -414,7 +414,7 @@ impl WayshotConnection {
         Ok(frame_copies)
     }
 
-    fn overlay_frames(&self, frames: &Vec<(FrameCopy, FrameGuard, OutputInfo)>) -> Result<()> {
+    fn overlay_frames(&self, frames: &[(FrameCopy, FrameGuard, OutputInfo)]) -> Result<()> {
         let mut state = LayerShellState {
             configured_outputs: HashSet::new(),
         };
@@ -502,8 +502,8 @@ impl WayshotConnection {
         region_capturer: RegionCapturer,
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
-        let outputs_capture_regions: &Vec<(OutputInfo, Option<EmbeddedRegion>)> =
-            &match region_capturer {
+        let outputs_capture_regions: Vec<(OutputInfo, Option<EmbeddedRegion>)> =
+            match region_capturer {
                 RegionCapturer::Outputs(ref outputs) => outputs
                     .iter()
                     .map(|output_info| (output_info.clone(), None))
@@ -542,10 +542,10 @@ impl WayshotConnection {
                     .collect(),
             };
 
-        let frames = self.capture_frame_copies(outputs_capture_regions, cursor_overlay)?;
+        let frames = self.capture_frame_copies(&outputs_capture_regions, cursor_overlay)?;
 
         let capture_region: LogicalRegion = match region_capturer {
-            RegionCapturer::Outputs(ref outputs) => outputs.try_into()?,
+            RegionCapturer::Outputs(outputs) => outputs.as_slice().try_into()?,
             RegionCapturer::Region(region) => region,
             RegionCapturer::Freeze(callback) => {
                 self.overlay_frames(&frames).and_then(|_| callback())?
