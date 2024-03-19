@@ -139,7 +139,7 @@ fn main() -> Result<()> {
             match unsafe { fork() } {
                 // Having the image persistently available on the clipboard requires a wayshot process to be alive.
                 // Fork the process with a child detached from the main process and have the parent exit
-                Ok(ForkResult::Parent{..}) => {
+                Ok(ForkResult::Parent { .. }) => {
                     return Ok(());
                 }
                 Ok(ForkResult::Child) => {
