@@ -143,7 +143,7 @@ fn main() -> Result<()> {
                     return Ok(());
                 }
                 Ok(ForkResult::Child) => {
-                    opts.foreground(true); //Offer the image till somthing else is available on the clipboard
+                    opts.foreground(true); // Offer the image till something else is available on the clipboard
                     opts.copy(
                         Source::Bytes(buffer.into_inner().into()),
                         MimeType::Autodetect,
