@@ -15,7 +15,7 @@ use utils::EncodingFormat;
 
 use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
-use fork::{fork, Fork};
+use nix::unistd::{fork, ForkResult};
 
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where
@@ -136,13 +136,13 @@ fn main() -> Result<()> {
         }
         if cli.clipboard {
             let mut opts = Options::new();
-            match fork() {
+            match unsafe { fork() } {
                 // Having the image persistently available on the clipboard requires a wayshot process to be alive.
                 // Fork the process with a child detached from the main process and have the parent exit
-                Ok(Fork::Parent(_)) => {
+                Ok(ForkResult::Parent{..}) => {
                     return Ok(());
                 }
-                Ok(Fork::Child) => {
+                Ok(ForkResult::Child) => {
                     opts.foreground(true); //Offer the image till somthing else is available on the clipboard
                     opts.copy(
                         Source::Bytes(buffer.into_inner().into()),
