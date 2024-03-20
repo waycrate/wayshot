@@ -8,6 +8,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use chrono::{DateTime, Local};
 use libwayshot::region::{LogicalRegion, Position, Region, Size};
 
 pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
@@ -142,32 +143,9 @@ pub fn get_default_file_name(extension: EncodingFormat) -> PathBuf {
     format!("wayshot-{time}.{extension}").into()
 }
 
-fn get_hour_minute_from_unix_seconds(seconds: u64) -> String {
-    let total_minutes = seconds / 60;
-    let mut current_hour = (((total_minutes / 60) % 24) + 5) % 24;
-    let mut current_minute = (total_minutes % 60) + 30;
-
-    if current_minute > 60 {
-        current_hour += 1;
-    }
-
-    current_minute = current_minute % 60;
-
-    if current_hour == 24 {
-        current_hour = 0;
-    }
-
-    format!("{}:{}:{}", current_hour, current_minute, seconds % 60)
-}
-
 pub fn get_time_stamp_file_name(extension: EncodingFormat) -> PathBuf {
-    let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(n) => get_hour_minute_from_unix_seconds(n.as_secs()),
-        Err(_) => {
-            tracing::error!("SystemTime before UNIX EPOCH!");
-            String::from("")
-        }
-    };
+    let current_datetime: DateTime<Local> = Local::now();
+    let formated_time = format!("{}", current_datetime.format("%Y_%m_%d-%H_%M_%S"));
 
-    format!("wayshot-{time}.{extension}").into()
+    format!("wayshot-{formated_time}.{extension}").into()
 }

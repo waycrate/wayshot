@@ -46,5 +46,5 @@ pub struct Cli {
 
     /// Uses time stamp(%H:%M:%S) as file name
     #[arg(short, long)]
-    pub time_stamp: bool,
+    pub timestamp: bool,
 }
