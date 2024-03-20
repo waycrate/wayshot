@@ -1,0 +1,77 @@
+name: Benchmark Wayshot
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: |
+        # install sway and flamegraph dependencies
+        sudo apt update
+        sudo apt install --no-install-recommends -y sway \
+             linux-tools-common linux-tools-generic linux-tools-`uname -r`
+        # install flamegraph-rs
+        cargo install flamegraph
+        # install hyperfine
+        wget https://github.com/sharkdp/hyperfine/releases/download/v1.16.1/hyperfine_1.16.1_amd64.deb
+        sudo dpkg -i hyperfine_1.16.1_amd64.deb
+
+    - name: Run benchmarks
+      run: |
+        export XDG_RUNTIME_DIR=/tmp
+        export WLR_BACKENDS=headless
+        export WLR_LIBINPUT_NODEVICES=1
+        export WLR_RENDERER_ALLOW_SOFTWARE=1
+        export SWAYSOCK=/tmp/swaysock
+
+        # file where we'll store $WAYLAND_DISPLAY
+        export SWAY_STARTUP=/tmp/sway_startup
+
+        sway -c ./test/swayconfig -d &
+        export SWAY_PID=$!
+        # TODO: maybe find a more elegant way to wait for sway to start
+        sleep 10
+
+        # load WAYLAND_DISPLAY from the file we stored it in, as defined
+        # in the test sway config
+        read wayland_display < "$SWAY_STARTUP"
+        export WAYLAND_DISPLAY="$wayland_display"
+        sudo sh -c 'echo -1 >/proc/sys/kernel/perf_event_paranoid'
+        cargo flamegraph --release -- --log-level debug - > /dev/null
+        hyperfine --export-markdown hyperfine.md --export-json hyperfine.json "cargo run --release -- --log-level debug - > /dev/null"
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      id: upload-artifacts
+      with:
+        name: benchmark-results
+        path: |
+          flamegraph.svg
+          perf.data
+          hyperfine.json
+
+    - name: Generate PR comment
+      run: |
+        touch comment.txt
+        echo "Here are the benchmark results for this changeset:" >> comment.txt
+        echo "" >> comment.txt
+        cat hyperfine.md >> comment.txt
+        FLAMEGRAPH_ARTIFACT_URL=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/${{ steps.upload-artifacts.outputs.artifact-id }}
+        echo "" >> comment.txt
+        echo "You can download perf data and a flamegraph heatmap for this changeset [here]($FLAMEGRAPH_ARTIFACT_URL)." >> comment.txt
+
+    - name: Post comment with results on PR
+      uses: thollander/actions-comment-pull-request@v2
+      with:
+        filePath: ./comment.txt
