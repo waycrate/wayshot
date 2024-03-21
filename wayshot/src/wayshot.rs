@@ -60,13 +60,7 @@ fn main() -> Result<()> {
                 Some(pathbuf)
             }
         }
-        None => {
-            if cli.timestamp {
-                Some(utils::get_time_stamp_file_name(requested_encoding))
-            } else {
-                Some(utils::get_default_file_name(requested_encoding))
-            }
-        }
+        None => Some(utils::get_default_file_name(requested_encoding)),
     };
 
     let wayshot_conn = WayshotConnection::new()?;
