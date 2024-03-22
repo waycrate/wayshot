@@ -1,0 +1,26 @@
+# base screenshot properties
+[screenshot]
+# display to take screenshot
+display = "default"
+# should contain cursor?
+cursor = false
+
+# properties, related to
+# clipboard copy
+[clipboard]
+# should copy resulting screenshot
+# to clipborad?
+clipboard = true
+
+# properties related to
+# writing screenshot to filesystem
+[filesystem]
+# should write resulting screenshot
+# to filesystem?
+filesystem = true
+# output directory
+path = "~/images/screenshots"
+# output filename format
+format = "%Y-%m-%d_%H:%M:%S"
+# output file encoding
+encoding = "png"
