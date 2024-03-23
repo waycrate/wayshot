@@ -11,9 +11,13 @@ use clap::builder::TypedValueParser;
 #[derive(Parser)]
 #[command(version, about)]
 pub struct Cli {
-    /// Where to save the screenshot, "-" for stdout. Defaults to "$UNIX_TIMESTAMP-wayshot.$EXTENSION".
+    /// Where to save the screenshot, "-" for stdout. Defaults to "$UNIX_TIMESTAMP-wayshot.$EXTENSION" unless --clipboard is present.
     #[arg(value_name = "OUTPUT")]
     pub file: Option<PathBuf>,
+
+    /// Copy image to clipboard along with [OUTPUT] or stdout. wayshot persists in the background to offer the image till the clipboard is overwritten.
+    #[arg(long)]
+    pub clipboard: bool,
 
     /// Log level to be used for printing to stderr
     #[arg(long, default_value = "info", value_parser = clap::builder::PossibleValuesParser::new(["trace", "debug", "info", "warn", "error"]).map(|s| -> tracing::Level{ s.parse().wrap_err_with(|| format!("Failed to parse log level: {}", s)).unwrap()}))]
