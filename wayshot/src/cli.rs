@@ -11,12 +11,16 @@ use clap::builder::TypedValueParser;
 #[derive(Parser)]
 #[command(version, about)]
 pub struct Cli {
-    ///Provide a custom file path ( encoding format is inferred from the file extension ). If path provided is directory then the output image is saved to provided path with default naming scheme. Default path is ./ , `-` indicates writing to terminal (stdout).
-    #[arg(value_name = "OUTPUT")]
+    /// Custom output path can be of the following types:
+    ///     1. Directory (Default naming scheme is used for the image output).
+    ///     2. Path (Encoding is automatically inferred from the extension).
+    ///     3. `-` (Indicates writing to terminal [stdout]).
+    #[arg(value_name = "OUTPUT", verbatim_doc_comment)]
     pub file: Option<PathBuf>,
 
-    /// Copy image to clipboard along with [OUTPUT] or stdout. Wayshot persists in the background to offer the image till the clipboard is overwritten.
-    #[arg(long)]
+    /// Copy image to clipboard along with [OUTPUT] or stdout.
+    /// Wayshot persists in the background to offer the image till the clipboard is overwritten.
+    #[arg(long, verbatim_doc_comment)]
     pub clipboard: bool,
 
     /// Log level to be used for printing to stderr
@@ -33,7 +37,7 @@ pub struct Cli {
 
     /// Set image encoder, by default uses the file extension from the OUTPUT
     /// positional argument. Otherwise defaults to png.
-    #[arg(long, visible_aliases = ["extension", "format", "output-format"], value_name = "FILE_EXTENSION")]
+    #[arg(long, verbatim_doc_comment, visible_aliases = ["extension", "format", "output-format"], value_name = "FILE_EXTENSION")]
     pub encoding: Option<EncodingFormat>,
 
     /// List all valid outputs
