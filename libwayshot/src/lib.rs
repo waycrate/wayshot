@@ -129,7 +129,6 @@ impl WayshotConnection {
         // Fetch all outputs; when their names arrive, add them to the list
         let _ = self.conn.display().get_registry(&qh, ());
         event_queue.roundtrip(&mut state)?;
-        event_queue.roundtrip(&mut state)?;
 
         // We loop over each output and request its position data.
         let xdg_outputs: Vec<ZxdgOutputV1> = state
