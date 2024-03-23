@@ -58,6 +58,8 @@ pub enum EncodingFormat {
     Ppm,
     /// Qut encoder.
     Qoi,
+    /// WebP encoder,
+    Webp,
 }
 
 impl Default for EncodingFormat {
@@ -73,6 +75,7 @@ impl From<EncodingFormat> for image::ImageOutputFormat {
             EncodingFormat::Png => image::ImageFormat::Png.into(),
             EncodingFormat::Ppm => image::ImageFormat::Pnm.into(),
             EncodingFormat::Qoi => image::ImageFormat::Qoi.into(),
+            EncodingFormat::Webp => image::ImageFormat::WebP.into(),
         }
     }
 }
@@ -111,6 +114,7 @@ impl From<EncodingFormat> for &str {
             EncodingFormat::Png => "png",
             EncodingFormat::Ppm => "ppm",
             EncodingFormat::Qoi => "qoi",
+            EncodingFormat::Webp => "webp",
         }
     }
 }
