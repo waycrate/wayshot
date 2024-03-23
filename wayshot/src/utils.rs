@@ -1,13 +1,9 @@
 use clap::ValueEnum;
 use eyre::{bail, ContextCompat, Error, Result};
 
-use std::{
-    fmt::Display,
-    path::PathBuf,
-    str::FromStr,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{fmt::Display, path::PathBuf, str::FromStr};
 
+use chrono::{DateTime, Local};
 use libwayshot::region::{LogicalRegion, Position, Region, Size};
 
 pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
@@ -134,10 +130,8 @@ impl FromStr for EncodingFormat {
 }
 
 pub fn get_default_file_name(extension: EncodingFormat) -> PathBuf {
-    let time = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|time| time.as_secs().to_string())
-        .unwrap_or("unknown".into());
+    let current_datetime: DateTime<Local> = Local::now();
+    let formated_time = format!("{}", current_datetime.format("%Y_%m_%d-%H_%M_%S"));
 
-    format!("{time}-wayshot.{extension}").into()
+    format!("wayshot-{formated_time}.{extension}").into()
 }
