@@ -15,7 +15,8 @@ pub struct Cli {
     #[arg(value_name = "OUTPUT")]
     pub file: Option<PathBuf>,
 
-    /// Copy image to clipboard along with [OUTPUT] or stdout. Wayshot persists in the background to offer the image till the clipboard is overwritten.
+    /// Copy image to clipboard. Can be used simultaneously with [OUTPUT] or stdout.
+    /// Wayshot persists in the background offering the image till the clipboard is overwritten.
     #[arg(long)]
     pub clipboard: bool,
 
