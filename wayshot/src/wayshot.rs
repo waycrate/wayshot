@@ -1,4 +1,5 @@
 use std::{
+    fs::File,
     io::{stdout, BufWriter, Cursor, Write},
     process::Command,
 };
@@ -123,40 +124,42 @@ fn main() -> Result<()> {
         }
     };
 
-    if let Some(file) = file {
-        image_buffer.save(file)?;
-    } else {
-        let mut buffer = Cursor::new(Vec::new());
-        image_buffer.write_to(&mut buffer, requested_encoding)?;
+    let mut buffer = Cursor::new(Vec::new());
+    image_buffer.write_to(&mut buffer, requested_encoding)?;
 
+    if let Some(file) = file {
+        let mut file = File::create(file)?;
+        file.write_all(buffer.get_ref())?;
+    } else {
         if stdout_print {
             let stdout = stdout();
             let mut writer = BufWriter::new(stdout.lock());
             writer.write_all(buffer.get_ref())?;
         }
-        if cli.clipboard {
-            let mut opts = Options::new();
-            match unsafe { fork() } {
-                // Having the image persistently available on the clipboard requires a wayshot process to be alive.
-                // Fork the process with a child detached from the main process and have the parent exit
-                Ok(ForkResult::Parent { .. }) => {
-                    return Ok(());
-                }
-                Ok(ForkResult::Child) => {
-                    opts.foreground(true); // Offer the image till something else is available on the clipboard
-                    opts.copy(
-                        Source::Bytes(buffer.into_inner().into()),
-                        MimeType::Autodetect,
-                    )?;
-                }
-                Err(e) => {
-                    tracing::warn!("Fork failed with error: {e}, couldn't offer image on the clipboard persistently.
-                     Use a clipboard manager to record screenshot.");
-                    opts.copy(
-                        Source::Bytes(buffer.into_inner().into()),
-                        MimeType::Autodetect,
-                    )?;
-                }
+    }
+
+    if cli.clipboard {
+        let mut opts = Options::new();
+        match unsafe { fork() } {
+            // Having the image persistently available on the clipboard requires a wayshot process to be alive.
+            // Fork the process with a child detached from the main process and have the parent exit
+            Ok(ForkResult::Parent { .. }) => {
+                return Ok(());
+            }
+            Ok(ForkResult::Child) => {
+                opts.foreground(true); // Offer the image till something else is available on the clipboard
+                opts.copy(
+                    Source::Bytes(buffer.into_inner().into()),
+                    MimeType::Autodetect,
+                )?;
+            }
+            Err(e) => {
+                tracing::warn!("Fork failed with error: {e}, couldn't offer image on the clipboard persistently.
+                 Use a clipboard manager to record screenshot.");
+                opts.copy(
+                    Source::Bytes(buffer.into_inner().into()),
+                    MimeType::Autodetect,
+                )?;
             }
         }
     }
