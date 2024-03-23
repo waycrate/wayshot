@@ -56,20 +56,6 @@ fn main() -> Result<()> {
         }
     }
 
-    let file = match cli.file {
-        Some(mut pathbuf) => {
-            if pathbuf.to_string_lossy() == "-" {
-                None
-            } else {
-                if pathbuf.is_dir() {
-                    pathbuf.push(utils::get_default_file_name(requested_encoding));
-                }
-                Some(pathbuf)
-            }
-        }
-        None => Some(utils::get_default_file_name(requested_encoding)),
-    };
-
     let wayshot_conn = WayshotConnection::new()?;
 
     if cli.list_outputs {
@@ -120,11 +106,14 @@ fn main() -> Result<()> {
 
     let mut stdout_print = false;
     let file = match cli.file {
-        Some(pathbuf) => {
+        Some(mut pathbuf) => {
             if pathbuf.to_string_lossy() == "-" {
                 stdout_print = true;
                 None
             } else {
+                if pathbuf.is_dir() {
+                    pathbuf.push(utils::get_default_file_name(requested_encoding));
+                }
                 Some(pathbuf)
             }
         }
