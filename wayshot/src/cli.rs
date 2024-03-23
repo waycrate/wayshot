@@ -17,7 +17,7 @@ pub struct Cli {
 
     /// Copy image to clipboard. Can be used simultaneously with [OUTPUT] or stdout.
     /// Wayshot persists in the background offering the image till the clipboard is overwritten.
-    #[arg(long)]
+    #[arg(long, verbatim_doc_comment)]
     pub clipboard: bool,
 
     /// Log level to be used for printing to stderr
