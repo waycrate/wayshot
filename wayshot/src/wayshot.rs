@@ -106,11 +106,14 @@ fn main() -> Result<()> {
 
     let mut stdout_print = false;
     let file = match cli.file {
-        Some(pathbuf) => {
+        Some(mut pathbuf) => {
             if pathbuf.to_string_lossy() == "-" {
                 stdout_print = true;
                 None
             } else {
+                if pathbuf.is_dir() {
+                    pathbuf.push(utils::get_default_file_name(requested_encoding));
+                }
                 Some(pathbuf)
             }
         }
