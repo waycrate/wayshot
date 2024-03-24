@@ -11,8 +11,11 @@ use clap::builder::TypedValueParser;
 #[derive(Parser)]
 #[command(version, about)]
 pub struct Cli {
-    /// Where to save the screenshot, "-" for stdout. Defaults to "$UNIX_TIMESTAMP-wayshot.$EXTENSION" unless --clipboard is present.
-    #[arg(value_name = "OUTPUT")]
+    /// Custom output path can be of the following types:
+    ///     1. Directory (Default naming scheme is used for the image output).
+    ///     2. Path (Encoding is automatically inferred from the extension).
+    ///     3. `-` (Indicates writing to terminal [stdout]).
+    #[arg(value_name = "OUTPUT", verbatim_doc_comment)]
     pub file: Option<PathBuf>,
 
     /// Copy image to clipboard. Can be used simultaneously with [OUTPUT] or stdout.
@@ -34,7 +37,7 @@ pub struct Cli {
 
     /// Set image encoder, by default uses the file extension from the OUTPUT
     /// positional argument. Otherwise defaults to png.
-    #[arg(long, visible_aliases = ["extension", "format", "output-format"], value_name = "FILE_EXTENSION")]
+    #[arg(long, verbatim_doc_comment, visible_aliases = ["extension", "format", "output-format"], value_name = "FILE_EXTENSION")]
     pub encoding: Option<EncodingFormat>,
 
     /// List all valid outputs
