@@ -127,6 +127,7 @@ fn main() -> Result<()> {
         }
     };
 
+    let mut image_buf: Option<Cursor<Vec<u8>>> = None;
     if let Some(file) = file {
         image_buffer.save(file)?;
     } else if stdout_print {
@@ -135,14 +136,18 @@ fn main() -> Result<()> {
         let stdout = stdout();
         let mut writer = BufWriter::new(stdout.lock());
         writer.write_all(buffer.get_ref())?;
-        if cli.clipboard {
-            clipboard_daemonize(buffer)?;
-        }
+        image_buf = Some(buffer);
     }
 
-    if !stdout_print && cli.clipboard {
-        let mut buffer = Cursor::new(Vec::new());
-        image_buffer.write_to(&mut buffer, requested_encoding)?;
+    if cli.clipboard {
+        let buffer = match image_buf {
+            Some(buf) => buf,
+            None => {
+                let mut buffer = Cursor::new(Vec::new());
+                image_buffer.write_to(&mut buffer, requested_encoding)?;
+                buffer
+            }
+        };
         clipboard_daemonize(buffer)?;
     }
 
