@@ -11,9 +11,17 @@ use clap::builder::TypedValueParser;
 #[derive(Parser)]
 #[command(version, about)]
 pub struct Cli {
-    /// Where to save the screenshot, "-" for stdout. Defaults to "$UNIX_TIMESTAMP-wayshot.$EXTENSION".
-    #[arg(value_name = "OUTPUT")]
+    /// Custom output path can be of the following types:
+    ///     1. Directory (Default naming scheme is used for the image output).
+    ///     2. Path (Encoding is automatically inferred from the extension).
+    ///     3. `-` (Indicates writing to terminal [stdout]).
+    #[arg(value_name = "OUTPUT", verbatim_doc_comment)]
     pub file: Option<PathBuf>,
+
+    /// Copy image to clipboard along with [OUTPUT] or stdout.
+    /// Wayshot persists in the background to offer the image till the clipboard is overwritten.
+    #[arg(long, verbatim_doc_comment)]
+    pub clipboard: bool,
 
     /// Log level to be used for printing to stderr
     #[arg(long, default_value = "info", value_parser = clap::builder::PossibleValuesParser::new(["trace", "debug", "info", "warn", "error"]).map(|s| -> tracing::Level{ s.parse().wrap_err_with(|| format!("Failed to parse log level: {}", s)).unwrap()}))]
@@ -29,7 +37,7 @@ pub struct Cli {
 
     /// Set image encoder, by default uses the file extension from the OUTPUT
     /// positional argument. Otherwise defaults to png.
-    #[arg(long, visible_aliases = ["extension", "format", "output-format"], value_name = "FILE_EXTENSION")]
+    #[arg(long, verbatim_doc_comment, visible_aliases = ["extension", "format", "output-format"], value_name = "FILE_EXTENSION")]
     pub encoding: Option<EncodingFormat>,
 
     /// List all valid outputs

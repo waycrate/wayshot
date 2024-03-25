@@ -13,6 +13,10 @@ mod utils;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
 use utils::EncodingFormat;
 
+use wl_clipboard_rs::copy::{MimeType, Options, Source};
+
+use nix::unistd::{fork, ForkResult};
+
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where
     T: ToString,
@@ -52,17 +56,6 @@ fn main() -> Result<()> {
         }
     }
 
-    let file = match cli.file {
-        Some(pathbuf) => {
-            if pathbuf.to_string_lossy() == "-" {
-                None
-            } else {
-                Some(pathbuf)
-            }
-        }
-        None => Some(utils::get_default_file_name(requested_encoding)),
-    };
-
     let wayshot_conn = WayshotConnection::new()?;
 
     if cli.list_outputs {
@@ -79,7 +72,7 @@ fn main() -> Result<()> {
             Box::new(move || {
                 || -> Result<LogicalRegion> {
                     let slurp_output = Command::new("slurp")
-                        .args(slurp_region.split(" "))
+                        .args(slurp_region.split(' '))
                         .output()?
                         .stdout;
 
@@ -98,9 +91,9 @@ fn main() -> Result<()> {
         }
     } else if cli.choose_output {
         let outputs = wayshot_conn.get_all_outputs();
-        let output_names: Vec<String> = outputs
+        let output_names: Vec<&str> = outputs
             .iter()
-            .map(|display| display.name.to_string())
+            .map(|display| display.name.as_str())
             .collect();
         if let Some(index) = select_ouput(&output_names) {
             wayshot_conn.screenshot_single_output(&outputs[index], cli.cursor)?
@@ -111,16 +104,64 @@ fn main() -> Result<()> {
         wayshot_conn.screenshot_all(cli.cursor)?
     };
 
+    let mut stdout_print = false;
+    let file = match cli.file {
+        Some(mut pathbuf) => {
+            if pathbuf.to_string_lossy() == "-" {
+                stdout_print = true;
+                None
+            } else {
+                if pathbuf.is_dir() {
+                    pathbuf.push(utils::get_default_file_name(requested_encoding));
+                }
+                Some(pathbuf)
+            }
+        }
+        None => {
+            if cli.clipboard {
+                None
+            } else {
+                Some(utils::get_default_file_name(requested_encoding))
+            }
+        }
+    };
+
     if let Some(file) = file {
         image_buffer.save(file)?;
     } else {
-        let stdout = stdout();
         let mut buffer = Cursor::new(Vec::new());
-
-        let mut writer = BufWriter::new(stdout.lock());
         image_buffer.write_to(&mut buffer, requested_encoding)?;
 
-        writer.write_all(buffer.get_ref())?;
+        if stdout_print {
+            let stdout = stdout();
+            let mut writer = BufWriter::new(stdout.lock());
+            writer.write_all(buffer.get_ref())?;
+        }
+        if cli.clipboard {
+            let mut opts = Options::new();
+            match unsafe { fork() } {
+                // Having the image persistently available on the clipboard requires a wayshot process to be alive.
+                // Fork the process with a child detached from the main process and have the parent exit
+                Ok(ForkResult::Parent { .. }) => {
+                    return Ok(());
+                }
+                Ok(ForkResult::Child) => {
+                    opts.foreground(true); // Offer the image till something else is available on the clipboard
+                    opts.copy(
+                        Source::Bytes(buffer.into_inner().into()),
+                        MimeType::Autodetect,
+                    )?;
+                }
+                Err(e) => {
+                    tracing::warn!("Fork failed with error: {e}, couldn't offer image on the clipboard persistently.
+                     Use a clipboard manager to record screenshot.");
+                    opts.copy(
+                        Source::Bytes(buffer.into_inner().into()),
+                        MimeType::Autodetect,
+                    )?;
+                }
+            }
+        }
     }
 
     Ok(())
