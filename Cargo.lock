@@ -1016,7 +1016,6 @@ dependencies = [
  "clap",
  "dialoguer",
  "eyre",
- "flate2",
  "image",
  "libwayshot",
  "nix 0.28.0",

@@ -11,7 +11,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Build
       run: |
@@ -23,7 +23,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Check formatting
       run: |
@@ -37,7 +37,11 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Check docs
+      env:
+        DEBIAN_FRONTEND: noninteractive
       run: |
         sudo apt update
         sudo apt install --no-install-recommends scdoc
-        for file in $(find . -type f -iwholename "./docs/*.scd"); do scdoc < $file > /dev/null; done
+        for file in ./docs/*.scd; do
+          scdoc < "$file" > /dev/null;
+        done
