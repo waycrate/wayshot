@@ -140,15 +140,14 @@ fn main() -> Result<()> {
     }
 
     if cli.clipboard {
-        let buffer = match image_buf {
+        clipboard_daemonize(match image_buf {
             Some(buf) => buf,
             None => {
                 let mut buffer = Cursor::new(Vec::new());
                 image_buffer.write_to(&mut buffer, requested_encoding)?;
                 buffer
             }
-        };
-        clipboard_daemonize(buffer)?;
+        })?;
     }
 
     Ok(())
