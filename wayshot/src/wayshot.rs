@@ -14,7 +14,6 @@ mod config;
 mod utils;
 
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
-use utils::EncodingFormat;
 
 use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
@@ -67,15 +66,15 @@ fn main() -> Result<()> {
         .file
         .as_ref()
         .and_then(|pathbuf| pathbuf.try_into().ok());
-    let requested_encoding = cli
+    let encoding = cli
         .encoding
         .or(input_encoding)
-        .unwrap_or(EncodingFormat::default());
+        .unwrap_or(fs.encoding.unwrap_or_default());
 
     if let Some(input_encoding) = input_encoding {
-        if input_encoding != requested_encoding {
+        if input_encoding != encoding {
             tracing::warn!(
-                "The encoding requested '{requested_encoding}' does not match the output file's encoding '{input_encoding}'. Still using the requested encoding however.",
+                "The encoding requested '{encoding}' does not match the output file's encoding '{input_encoding}'. Still using the requested encoding however.",
             );
         }
     }
@@ -136,10 +135,7 @@ fn main() -> Result<()> {
                 None
             } else {
                 if pathbuf.is_dir() {
-                    pathbuf.push(utils::get_default_file_name(
-                        &filename_format,
-                        requested_encoding,
-                    ));
+                    pathbuf.push(utils::get_default_file_name(&filename_format, encoding));
                 }
                 Some(pathbuf)
             }
@@ -148,10 +144,7 @@ fn main() -> Result<()> {
             if clipboard {
                 None
             } else {
-                Some(utils::get_default_file_name(
-                    &filename_format,
-                    requested_encoding,
-                ))
+                Some(utils::get_default_file_name(&filename_format, encoding))
             }
         }
     };
@@ -161,7 +154,7 @@ fn main() -> Result<()> {
         image_buffer.save(file)?;
     } else if stdout_print {
         let mut buffer = Cursor::new(Vec::new());
-        image_buffer.write_to(&mut buffer, requested_encoding)?;
+        image_buffer.write_to(&mut buffer, encoding)?;
         let stdout = stdout();
         let mut writer = BufWriter::new(stdout.lock());
         writer.write_all(buffer.get_ref())?;
@@ -173,7 +166,7 @@ fn main() -> Result<()> {
             Some(buf) => buf,
             None => {
                 let mut buffer = Cursor::new(Vec::new());
-                image_buffer.write_to(&mut buffer, requested_encoding)?;
+                image_buffer.write_to(&mut buffer, encoding)?;
                 buffer
             }
         })?;

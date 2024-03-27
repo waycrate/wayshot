@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use std::{fmt::Display, fmt::Write, path::PathBuf, str::FromStr};
 
-use chrono::{DateTime, Local};
+use chrono::Local;
 use libwayshot::region::{LogicalRegion, Position, Region, Size};
 
 pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
@@ -135,12 +135,12 @@ impl FromStr for EncodingFormat {
     }
 }
 
-pub fn get_default_file_name(filename_format: &str, extension: EncodingFormat) -> PathBuf {
+pub fn get_default_file_name(filename_format: &str, encoding: EncodingFormat) -> PathBuf {
     let now = Local::now();
     let format = now.format(filename_format);
 
     let mut file_name = String::new();
-    let write_result = write!(file_name, "{format}.{extension}");
+    let write_result = write!(file_name, "{format}.{encoding}");
 
     if let Ok(_) = write_result {
         file_name.into()
@@ -151,6 +151,6 @@ pub fn get_default_file_name(filename_format: &str, extension: EncodingFormat) -
 
         let format = now.format("wayshot-%Y_%m_%d-%H_%M_%S");
 
-        format!("{format}.{extension}").into()
+        format!("{format}.{encoding}").into()
     }
 }
