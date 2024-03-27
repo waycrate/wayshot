@@ -5,6 +5,7 @@ use std::{
 };
 
 use clap::Parser;
+use config::Config;
 use eyre::{bail, Result};
 use libwayshot::{region::LogicalRegion, WayshotConnection};
 
@@ -35,11 +36,23 @@ where
 }
 
 fn main() -> Result<()> {
+    // cli args
     let cli = cli::Cli::parse();
     tracing_subscriber::fmt()
         .with_max_level(cli.log_level)
         .with_writer(std::io::stderr)
         .init();
+
+    // config path
+    let config_path = dirs::config_local_dir()
+        .and_then(|path| Some(path.join("wayshot").join("config.toml")))
+        .unwrap_or_default();
+    let config_path = cli.config.unwrap_or(config_path);
+
+    // config
+    let config = Config::load(&config_path).unwrap_or_default();
+    let screenshot = config.screenshot.unwrap_or_default();
+    let fs = config.fs.unwrap_or_default();
 
     let input_encoding = cli
         .file
