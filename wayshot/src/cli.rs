@@ -1,8 +1,7 @@
 use crate::utils::EncodingFormat;
-use clap::builder::TypedValueParser;
 use clap::Parser;
-use eyre::WrapErr;
 use std::path::PathBuf;
+use tracing::Level;
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -20,9 +19,9 @@ pub struct Cli {
     #[arg(long, verbatim_doc_comment)]
     pub clipboard: Option<bool>,
 
-    /// Log level to be used for printing to stderr
-    #[arg(long, default_value = "info", value_parser = clap::builder::PossibleValuesParser::new(["trace", "debug", "info", "warn", "error"]).map(|s| -> tracing::Level{ s.parse().wrap_err_with(|| format!("Failed to parse log level: {}", s)).unwrap()}))]
-    pub log_level: tracing::Level,
+    /// Defaults to config value (`info`)
+    #[arg(long, verbatim_doc_comment)]
+    pub log_level: Option<Level>,
 
     /// Arguments to call slurp with for selecting a region
     #[arg(short, long, value_name = "SLURP_ARGS")]

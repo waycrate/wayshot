@@ -5,7 +5,7 @@ use eyre::{bail, Result};
 use libwayshot::{region::LogicalRegion, WayshotConnection};
 use nix::unistd::{fork, ForkResult};
 use std::{
-    io::{stdout, BufWriter, Cursor, Write},
+    io::{self, stdout, BufWriter, Cursor, Write},
     process::Command,
 };
 use wl_clipboard_rs::copy::{MimeType, Options, Source};
@@ -39,16 +39,23 @@ fn main() -> Result<()> {
 
     // config path
     let config_path = dirs::config_local_dir()
-        .and_then(|path| Some(path.join("wayshot").join("config.toml")))
+        .map(|path| path.join("wayshot").join("config.toml"))
         .unwrap_or_default();
     let config_path = cli.config.unwrap_or(config_path);
 
     // config
     let config = Config::load(&config_path).unwrap_or_default();
+    let log = config.log.unwrap_or_default();
     let screenshot = config.screenshot.unwrap_or_default();
     let fs = config.fs.unwrap_or_default();
 
     // pre-work vars definitions
+    let log_level = cli.log_level.unwrap_or(log.get_level());
+    tracing_subscriber::fmt()
+        .with_max_level(log_level)
+        .with_writer(io::stderr)
+        .init();
+
     let cursor = cli.cursor.unwrap_or(screenshot.cursor.unwrap_or_default());
     let clipboard = cli
         .clipboard
