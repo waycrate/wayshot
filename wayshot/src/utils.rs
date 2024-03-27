@@ -1,11 +1,13 @@
+use chrono::Local;
 use clap::ValueEnum;
 use eyre::{bail, ContextCompat, Error, Result};
-use serde::{Deserialize, Serialize};
-
-use std::{fmt::Display, fmt::Write, path::PathBuf, str::FromStr};
-
-use chrono::Local;
 use libwayshot::region::{LogicalRegion, Position, Region, Size};
+use serde::{Deserialize, Serialize};
+use std::{
+    fmt::{Display, Write},
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
     let tail = g.trim();
@@ -136,6 +138,12 @@ impl FromStr for EncodingFormat {
     }
 }
 
+pub fn get_full_file_name(dir: &Path, filename_format: &str, encoding: EncodingFormat) -> PathBuf {
+    let filename = get_default_file_name(filename_format, encoding);
+
+    dir.join(filename)
+}
+
 pub fn get_default_file_name(filename_format: &str, encoding: EncodingFormat) -> PathBuf {
     let now = Local::now();
     let format = now.format(filename_format);
@@ -143,7 +151,7 @@ pub fn get_default_file_name(filename_format: &str, encoding: EncodingFormat) ->
     let mut file_name = String::new();
     let write_result = write!(file_name, "{format}.{encoding}");
 
-    if let Ok(_) = write_result {
+    if write_result.is_ok() {
         file_name.into()
     } else {
         tracing::warn!(
