@@ -51,4 +51,12 @@ pub struct Cli {
     /// Present a fuzzy selector for output/display selection
     #[arg(long, alias = "chooseoutput", conflicts_with_all = ["slurp", "output"])]
     pub choose_output: bool,
+
+    /// Path to your config file
+    /// defaults to:
+    ///     1. `$XDG_CONFIG_HOME/wayshot/config.toml`
+    ///     2. `$HOME/wayshot/config.toml` -- if `$XDG_CONFIG_HOME` variable doesn't exist
+    ///     3. None -- if the config isn't found, the `Config::default()` will be used
+    #[arg(long)]
+    pub config: Option<PathBuf>,
 }
