@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::Read, path::PathBuf};
+use std::{env, fs::File, io::Read, path::PathBuf};
 use tracing::Level;
 
 use crate::utils::EncodingFormat;
@@ -62,7 +62,7 @@ pub struct Fs {
 impl Default for Fs {
     fn default() -> Self {
         Fs {
-            path: None,
+            path: Some(env::current_dir().unwrap_or_default()),
             format: Some("wayshot-%Y_%m_%d-%H_%M_%S".to_string()),
             encoding: Some(EncodingFormat::Png),
         }
