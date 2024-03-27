@@ -52,7 +52,7 @@ fn main() -> Result<()> {
     let cursor = cli.cursor.unwrap_or(screenshot.cursor.unwrap_or_default());
     let clipboard = cli
         .clipboard
-        .unwrap_or(screenshot.clipboard.unwrap_or_default());
+        .unwrap_or(screenshot.clipboard.unwrap_or(true));
     let filename_format = cli
         .filename_format
         .unwrap_or(fs.format.unwrap_or("wayshot-%Y_%m_%d-%H_%M_%S".to_string()));
