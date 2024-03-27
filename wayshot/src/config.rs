@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Read, path::PathBuf};
 use toml;
+use tracing::Level;
 
 use crate::utils::EncodingFormat;
 
@@ -8,6 +9,7 @@ use crate::utils::EncodingFormat;
 pub struct Config {
     pub screenshot: Option<Screenshot>,
     pub fs: Option<Fs>,
+    pub log: Option<Log>,
 }
 
 impl Default for Config {
@@ -15,6 +17,7 @@ impl Default for Config {
         Config {
             screenshot: Some(Screenshot::default()),
             fs: Some(Fs::default()),
+            log: Some(Log::default()),
         }
     }
 }
@@ -64,5 +67,32 @@ impl Default for Fs {
             format: Some("wayshot-%Y_%m_%d-%H_%M_%S".to_string()),
             encoding: Some(EncodingFormat::Png),
         }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Log {
+    pub level: Option<String>,
+}
+
+impl Default for Log {
+    fn default() -> Self {
+        Log {
+            level: Some("info".to_string()),
+        }
+    }
+}
+
+impl Log {
+    pub fn get_level(self) -> Level {
+        self.level
+            .map_or(Level::INFO, |level| match level.as_str() {
+                "trace" => Level::TRACE,
+                "debug" => Level::DEBUG,
+                "info" => Level::INFO,
+                "warn" => Level::WARN,
+                "error" => Level::ERROR,
+                _ => Level::INFO,
+            })
     }
 }

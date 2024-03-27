@@ -19,3 +19,8 @@ path = "$HOME/images/screenshots"
 format = "wayshot-%Y_%m_%d-%H_%M_%S"
 # output file encoding
 encoding = "png"
+
+# logging properties
+[log]
+# max logging level
+level = "info"
