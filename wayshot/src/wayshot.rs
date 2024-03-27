@@ -59,6 +59,9 @@ fn main() -> Result<()> {
     let clipboard = cli
         .clipboard
         .unwrap_or(screenshot.clipboard.unwrap_or_default());
+    let filename_format = cli
+        .filename_format
+        .unwrap_or(fs.format.unwrap_or("wayshot-%Y_%m_%d-%H_%M_%S".to_string()));
 
     let input_encoding = cli
         .file

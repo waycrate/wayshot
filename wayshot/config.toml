@@ -16,6 +16,6 @@ stdout = false
 # output directory
 path = "$HOME/images/screenshots"
 # output filename format
-format = "%Y-%m-%d_%H:%M:%S"
+format = "wayshot-%Y_%m_%d-%H_%M_%S"
 # output file encoding
 encoding = "png"

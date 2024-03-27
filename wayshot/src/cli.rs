@@ -32,9 +32,9 @@ pub struct Cli {
     #[arg(short, long, value_name = "SLURP_ARGS")]
     pub slurp: Option<String>,
 
-    /// Enable cursor in screenshots
-    /// defaults to config value
-    #[arg(short, long)]
+    /// Enable cursor in screenshots.
+    /// Defaults to config value
+    #[arg(short, long, verbatim_doc_comment)]
     pub cursor: Option<bool>,
 
     /// Set image encoder, by default uses the file extension from the OUTPUT
@@ -54,11 +54,16 @@ pub struct Cli {
     #[arg(long, alias = "chooseoutput", conflicts_with_all = ["slurp", "output"])]
     pub choose_output: bool,
 
-    /// Path to your config file
-    /// defaults to:
+    /// Path to your config file.
+    /// Defaults to:
     ///     1. `$XDG_CONFIG_HOME/wayshot/config.toml`
     ///     2. `$HOME/wayshot/config.toml` -- if `$XDG_CONFIG_HOME` variable doesn't exist
-    ///     3. None -- if the config isn't found, the `Config::default()` will be used
-    #[arg(long)]
+    ///     3. `None` -- if the config isn't found, the `Config::default()` will be used
+    #[arg(long, verbatim_doc_comment)]
     pub config: Option<PathBuf>,
+
+    /// Output filename's formatting.
+    /// Defaults to config value, or `wayshot-%Y_%m_%d-%H_%M_%S`
+    #[arg(long, verbatim_doc_comment)]
+    pub filename_format: Option<String>,
 }
