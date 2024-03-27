@@ -1,12 +1,8 @@
-use std::path::PathBuf;
-
-use clap::arg;
-
-use clap::Parser;
-use eyre::WrapErr;
-
 use crate::utils::EncodingFormat;
 use clap::builder::TypedValueParser;
+use clap::Parser;
+use eyre::WrapErr;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(version, about)]

@@ -1,23 +1,18 @@
+use clap::Parser;
+use config::Config;
+use dialoguer::{theme::ColorfulTheme, FuzzySelect};
+use eyre::{bail, Result};
+use libwayshot::{region::LogicalRegion, WayshotConnection};
+use nix::unistd::{fork, ForkResult};
 use std::{
-    fs::File,
     io::{stdout, BufWriter, Cursor, Write},
     process::Command,
 };
-
-use clap::Parser;
-use config::Config;
-use eyre::{bail, Result};
-use libwayshot::{region::LogicalRegion, WayshotConnection};
+use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
 mod cli;
 mod config;
 mod utils;
-
-use dialoguer::{theme::ColorfulTheme, FuzzySelect};
-
-use wl_clipboard_rs::copy::{MimeType, Options, Source};
-
-use nix::unistd::{fork, ForkResult};
 
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where

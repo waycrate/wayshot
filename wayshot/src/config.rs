@@ -1,8 +1,7 @@
+use crate::utils::EncodingFormat;
 use serde::{Deserialize, Serialize};
 use std::{env, fs::File, io::Read, path::PathBuf};
 use tracing::Level;
-
-use crate::utils::EncodingFormat;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
