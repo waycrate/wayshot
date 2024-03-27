@@ -20,8 +20,9 @@ pub struct Cli {
 
     /// Copy image to clipboard. Can be used simultaneously with [OUTPUT] or stdout.
     /// Wayshot persists in the background offering the image till the clipboard is overwritten.
+    /// Defaults to config value
     #[arg(long, verbatim_doc_comment)]
-    pub clipboard: bool,
+    pub clipboard: Option<bool>,
 
     /// Log level to be used for printing to stderr
     #[arg(long, default_value = "info", value_parser = clap::builder::PossibleValuesParser::new(["trace", "debug", "info", "warn", "error"]).map(|s| -> tracing::Level{ s.parse().wrap_err_with(|| format!("Failed to parse log level: {}", s)).unwrap()}))]
@@ -32,8 +33,9 @@ pub struct Cli {
     pub slurp: Option<String>,
 
     /// Enable cursor in screenshots
+    /// defaults to config value
     #[arg(short, long)]
-    pub cursor: bool,
+    pub cursor: Option<bool>,
 
     /// Set image encoder, by default uses the file extension from the OUTPUT
     /// positional argument. Otherwise defaults to png.

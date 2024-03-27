@@ -54,6 +54,12 @@ fn main() -> Result<()> {
     let screenshot = config.screenshot.unwrap_or_default();
     let fs = config.fs.unwrap_or_default();
 
+    // pre-work vars definitions
+    let cursor = cli.cursor.unwrap_or(screenshot.cursor.unwrap_or_default());
+    let clipboard = cli
+        .clipboard
+        .unwrap_or(screenshot.clipboard.unwrap_or_default());
+
     let input_encoding = cli
         .file
         .as_ref()
@@ -95,12 +101,12 @@ fn main() -> Result<()> {
                 }()
                 .map_err(|_| libwayshot::Error::FreezeCallbackError)
             }),
-            cli.cursor,
+            cursor,
         )?
     } else if let Some(output_name) = cli.output {
         let outputs = wayshot_conn.get_all_outputs();
         if let Some(output) = outputs.iter().find(|output| output.name == output_name) {
-            wayshot_conn.screenshot_single_output(output, cli.cursor)?
+            wayshot_conn.screenshot_single_output(output, cursor)?
         } else {
             bail!("No output found!");
         }
@@ -111,12 +117,12 @@ fn main() -> Result<()> {
             .map(|display| display.name.as_str())
             .collect();
         if let Some(index) = select_ouput(&output_names) {
-            wayshot_conn.screenshot_single_output(&outputs[index], cli.cursor)?
+            wayshot_conn.screenshot_single_output(&outputs[index], cursor)?
         } else {
             bail!("No output found!");
         }
     } else {
-        wayshot_conn.screenshot_all(cli.cursor)?
+        wayshot_conn.screenshot_all(cursor)?
     };
 
     let mut stdout_print = false;
@@ -133,7 +139,7 @@ fn main() -> Result<()> {
             }
         }
         None => {
-            if cli.clipboard {
+            if clipboard {
                 None
             } else {
                 Some(utils::get_default_file_name(requested_encoding))
@@ -153,7 +159,7 @@ fn main() -> Result<()> {
         image_buf = Some(buffer);
     }
 
-    if cli.clipboard {
+    if clipboard {
         clipboard_daemonize(match image_buf {
             Some(buf) => buf,
             None => {
