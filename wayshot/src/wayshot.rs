@@ -9,6 +9,7 @@ use eyre::{bail, Result};
 use libwayshot::{region::LogicalRegion, WayshotConnection};
 
 mod cli;
+mod config;
 mod utils;
 
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
