@@ -4,22 +4,17 @@
 display = "default"
 # should contain cursor?
 cursor = false
-
-# properties, related to
-# clipboard copy
-[clipboard]
-# should copy resulting screenshot
-# to clipborad?
+# should copy screenshot to clipborad?
 clipboard = true
+# should write screenshot as file in filesystem?
+fs = true
+# should write screenshot in stdout?
+stdout = false
 
-# properties related to
-# writing screenshot to filesystem
-[filesystem]
-# should write resulting screenshot
-# to filesystem?
-filesystem = true
+# properties related to writing screenshot as file in filesystem
+[fs]
 # output directory
-path = "~/images/screenshots"
+path = "$HOME/images/screenshots"
 # output filename format
 format = "%Y-%m-%d_%H:%M:%S"
 # output file encoding

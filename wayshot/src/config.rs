@@ -7,18 +7,14 @@ use crate::utils::EncodingFormat;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub screenshot: Option<Screenshot>,
-    #[serde(rename = "clipboard")]
-    pub clipboard: Option<Clipboard>,
-    #[serde(rename = "filesystem")]
-    pub filesystem: Option<Filesystem>,
+    pub fs: Option<Fs>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
             screenshot: Some(Screenshot::default()),
-            clipboard: Some(Clipboard::default()),
-            filesystem: Some(Filesystem::default()),
+            fs: Some(Fs::default()),
         }
     }
 }
@@ -37,6 +33,9 @@ impl Config {
 pub struct Screenshot {
     pub display: Option<String>,
     pub cursor: Option<bool>,
+    pub clipboard: Option<bool>,
+    pub fs: Option<bool>,
+    pub stdout: Option<bool>,
 }
 
 impl Default for Screenshot {
@@ -44,37 +43,24 @@ impl Default for Screenshot {
         Screenshot {
             display: None,
             cursor: Some(false),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Clipboard {
-    pub clipboard: Option<bool>,
-}
-
-impl Default for Clipboard {
-    fn default() -> Self {
-        Clipboard {
             clipboard: Some(true),
+            fs: Some(true),
+            stdout: Some(false),
         }
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Filesystem {
-    pub filesystem: Option<bool>,
+pub struct Fs {
     pub path: Option<PathBuf>,
     pub format: Option<String>,
     pub encoding: Option<EncodingFormat>,
 }
 
-impl Default for Filesystem {
+impl Default for Fs {
     fn default() -> Self {
-        Filesystem {
-            filesystem: Some(true),
+        Fs {
             path: None,
-            // PR #93
             format: Some("wayshot-%Y_%m_%d-%H_%M_%S".to_string()),
             encoding: Some(EncodingFormat::Png),
         }
