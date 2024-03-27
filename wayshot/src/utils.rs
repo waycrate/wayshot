@@ -1,5 +1,6 @@
 use clap::ValueEnum;
 use eyre::{bail, ContextCompat, Error, Result};
+use serde::{Deserialize, Serialize};
 
 use std::{fmt::Display, path::PathBuf, str::FromStr};
 
@@ -48,7 +49,8 @@ pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
 }
 
 /// Supported image encoding formats.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EncodingFormat {
     /// JPG/JPEG encoder.
     Jpg,
