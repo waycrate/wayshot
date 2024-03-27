@@ -15,7 +15,7 @@ pub struct Cli {
 
     /// Copy image to clipboard. Can be used simultaneously with [OUTPUT] or stdout.
     /// Wayshot persists in the background offering the image till the clipboard is overwritten.
-    /// Defaults to config value
+    /// Defaults to config value (`true`)
     #[arg(long, verbatim_doc_comment)]
     pub clipboard: Option<bool>,
 
@@ -28,12 +28,12 @@ pub struct Cli {
     pub slurp: Option<String>,
 
     /// Enable cursor in screenshots.
-    /// Defaults to config value
+    /// Defaults to config value (`false`)
     #[arg(short, long, verbatim_doc_comment)]
     pub cursor: Option<bool>,
 
     /// Set image encoder, by default uses the file extension from the OUTPUT
-    /// positional argument. Otherwise defaults to png.
+    /// positional argument. Otherwise defaults to config value (`png`).
     #[arg(long, verbatim_doc_comment, visible_aliases = ["extension", "format", "output-format"], value_name = "FILE_EXTENSION")]
     pub encoding: Option<EncodingFormat>,
 
@@ -58,7 +58,7 @@ pub struct Cli {
     pub config: Option<PathBuf>,
 
     /// Output filename's formatting.
-    /// Defaults to config value, or `wayshot-%Y_%m_%d-%H_%M_%S`
+    /// Defaults to config value (`wayshot-%Y_%m_%d-%H_%M_%S`)
     #[arg(long, verbatim_doc_comment)]
     pub filename_format: Option<String>,
 }
