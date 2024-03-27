@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Read, path::PathBuf};
-use toml;
 use tracing::Level;
 
 use crate::utils::EncodingFormat;
@@ -28,7 +27,7 @@ impl Config {
         let mut config_str = String::new();
         config_file.read_to_string(&mut config_str).ok()?;
 
-        toml::from_str(&mut config_str).ok()?
+        toml::from_str(&config_str).ok()?
     }
 }
 
