@@ -37,6 +37,8 @@ chrono = "0.4.35"
 
 wl-clipboard-rs = "0.8.0"
 nix = { version = "0.28.0", features = ["process"] }
+toml = { version = "0.8.12", default-features = false, features = ["parse"] }
+serde = { version = "1.0.197", features = ["derive"] }
 
 [[bin]]
 name = "wayshot"
