@@ -2,7 +2,7 @@ use clap::ValueEnum;
 use eyre::{bail, ContextCompat, Error, Result};
 use serde::{Deserialize, Serialize};
 
-use std::{fmt::Display, path::PathBuf, str::FromStr};
+use std::{fmt::Display, fmt::Write, path::PathBuf, str::FromStr};
 
 use chrono::{DateTime, Local};
 use libwayshot::region::{LogicalRegion, Position, Region, Size};
@@ -135,9 +135,22 @@ impl FromStr for EncodingFormat {
     }
 }
 
-pub fn get_default_file_name(extension: EncodingFormat) -> PathBuf {
-    let current_datetime: DateTime<Local> = Local::now();
-    let formated_time = format!("{}", current_datetime.format("%Y_%m_%d-%H_%M_%S"));
+pub fn get_default_file_name(filename_format: &str, extension: EncodingFormat) -> PathBuf {
+    let now = Local::now();
+    let format = now.format(filename_format);
 
-    format!("wayshot-{formated_time}.{extension}").into()
+    let mut file_name = String::new();
+    let write_result = write!(file_name, "{format}.{extension}");
+
+    if let Ok(_) = write_result {
+        file_name.into()
+    } else {
+        tracing::warn!(
+            "Couldn't write proposed filename_format: '{filename_format}', using default value."
+        );
+
+        let format = now.format("wayshot-%Y_%m_%d-%H_%M_%S");
+
+        format!("{format}.{extension}").into()
+    }
 }

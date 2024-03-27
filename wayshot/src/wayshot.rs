@@ -136,7 +136,10 @@ fn main() -> Result<()> {
                 None
             } else {
                 if pathbuf.is_dir() {
-                    pathbuf.push(utils::get_default_file_name(requested_encoding));
+                    pathbuf.push(utils::get_default_file_name(
+                        &filename_format,
+                        requested_encoding,
+                    ));
                 }
                 Some(pathbuf)
             }
@@ -145,7 +148,10 @@ fn main() -> Result<()> {
             if clipboard {
                 None
             } else {
-                Some(utils::get_default_file_name(requested_encoding))
+                Some(utils::get_default_file_name(
+                    &filename_format,
+                    requested_encoding,
+                ))
             }
         }
     };
