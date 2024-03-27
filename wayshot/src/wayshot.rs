@@ -32,10 +32,6 @@ where
 fn main() -> Result<()> {
     // cli args
     let cli = cli::Cli::parse();
-    tracing_subscriber::fmt()
-        .with_max_level(cli.log_level)
-        .with_writer(std::io::stderr)
-        .init();
 
     // config path
     let config_path = dirs::config_local_dir()
