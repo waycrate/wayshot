@@ -1,4 +1,4 @@
-use image::{DynamicImage, GenericImageView};
+use image::DynamicImage;
 use wayland_client::protocol::wl_output::Transform;
 
 use crate::region::Size;
@@ -12,7 +12,7 @@ pub(crate) fn rotate_image_buffer(
 ) -> DynamicImage {
     // TODO Better document whether width and height are before or after the transform.
     // Perhaps this should be part of a cleanup of the FrameCopy struct.
-    let (logical_width, logical_height) = match transform {
+    let (logical_width, _logical_height) = match transform {
         Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270 => {
             (logical_size.height, logical_size.width)
         }

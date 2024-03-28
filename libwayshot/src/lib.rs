@@ -52,7 +52,7 @@ use crate::{
     convert::create_converter,
     dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState},
     output::OutputInfo,
-    region::{LogicalRegion, Region, Size},
+    region::{LogicalRegion, Size},
     screencopy::{create_shm_fd, FrameCopy, FrameFormat},
 };
 
