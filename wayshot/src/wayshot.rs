@@ -84,7 +84,7 @@ fn main() -> Result<()> {
             if f.is_dir() {
                 Some(utils::get_full_file_name(&f, &filename_format, encoding))
             } else {
-                Some(f)
+                Some(utils::get_checked_path(f.to_str().unwrap_or_default()))
             }
         }
         _ => {

@@ -4,6 +4,7 @@ use eyre::{bail, ContextCompat, Error, Result};
 use libwayshot::region::{LogicalRegion, Position, Region, Size};
 use serde::{Deserialize, Serialize};
 use std::{
+    env,
     fmt::{Display, Write},
     path::{Path, PathBuf},
     str::FromStr,
@@ -138,10 +139,21 @@ impl FromStr for EncodingFormat {
     }
 }
 
+pub fn get_checked_path(path: &str) -> PathBuf {
+    let checked_path = shellexpand::full(path);
+
+    if let Ok(checked_path) = checked_path {
+        PathBuf::from(checked_path.into_owned())
+    } else {
+        env::current_dir().unwrap_or_default()
+    }
+}
+
 pub fn get_full_file_name(dir: &Path, filename_format: &str, encoding: EncodingFormat) -> PathBuf {
     let filename = get_default_file_name(filename_format, encoding);
 
-    dir.join(filename)
+    let checked_path = get_checked_path(dir.to_str().unwrap_or_default());
+    checked_path.join(filename)
 }
 
 pub fn get_default_file_name(filename_format: &str, encoding: EncodingFormat) -> PathBuf {

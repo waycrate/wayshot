@@ -40,6 +40,7 @@ nix = { version = "0.28.0", features = ["process"] }
 toml = { version = "0.8.12", default-features = false, features = ["parse"] }
 serde = { version = "1.0.197", features = ["derive"] }
 dirs = "5.0.1"
+shellexpand = "3.1.0"
 
 [[bin]]
 name = "wayshot"
