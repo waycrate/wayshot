@@ -14,6 +14,7 @@ mod screencopy;
 use std::{
     collections::HashSet,
     fs::File,
+    io::Write,
     os::fd::AsFd,
     sync::atomic::{AtomicBool, Ordering},
     thread,
@@ -446,6 +447,7 @@ impl WayshotConnection {
             }
         };
 
+        let shm = self.globals.bind::<WlShm, _, _>(&qh, 1..=1, ())?;
         for (frame_copy, frame_guard, output_info) in frames {
             tracing::span!(
                 tracing::Level::DEBUG,
@@ -453,6 +455,45 @@ impl WayshotConnection {
                 output = format!("{output_info}")
             )
             .in_scope(|| -> Result<()> {
+                let (scale, buffer) = {
+                    let output_size = output_info.logical_region.inner.size;
+                    if output_info.scale() % 1.0 >= 0.1 {
+                        let file = tempfile::tempfile()?;
+                        let image: DynamicImage = frame_copy.try_into()?;
+                        let image = image::imageops::resize(
+                            &image,
+                            output_size.width,
+                            output_size.height,
+                            image::imageops::FilterType::Triangle,
+                        );
+                        init_overlay(&image, &file);
+                        let pool = shm.create_pool(
+                            file.as_fd(),
+                            frame_copy
+                                .frame_format
+                                .byte_size()
+                                .try_into()
+                                .map_err(|_| Error::BufferTooSmall)?,
+                            &qh,
+                            (),
+                        );
+
+                        (
+                            1,
+                            pool.create_buffer(
+                                0,
+                                output_size.width as i32,
+                                output_size.height as i32,
+                                (output_size.width * 4) as i32,
+                                frame_copy.frame_format.format,
+                                &qh,
+                                (),
+                            ),
+                        )
+                    } else {
+                        (output_info.scale() as i32, frame_guard.buffer.clone())
+                    }
+                };
                 let surface = compositor.create_surface(&qh, ());
 
                 let layer_surface = layer_shell.get_layer_surface(
@@ -480,8 +521,8 @@ impl WayshotConnection {
                 }
 
                 surface.set_buffer_transform(output_info.transform);
-                // surface.set_buffer_scale(output_info.scale());
-                surface.attach(Some(&frame_guard.buffer), 0, 0);
+                surface.set_buffer_scale(scale);
+                surface.attach(Some(&buffer), 0, 0);
 
                 debug!("Committing surface with attached buffer.");
                 surface.commit();
@@ -674,4 +715,13 @@ impl WayshotConnection {
     pub fn screenshot_all(&self, cursor_overlay: bool) -> Result<DynamicImage> {
         self.screenshot_outputs(self.get_all_outputs(), cursor_overlay)
     }
+}
+
+fn init_overlay(origin_image: &image::ImageBuffer<image::Rgba<u8>, Vec<u8>>, tmp: &File) {
+    let mut buf = std::io::BufWriter::new(tmp);
+
+    for index in origin_image.pixels() {
+        buf.write_all(&index.0).unwrap();
+    }
+    buf.flush().unwrap();
 }

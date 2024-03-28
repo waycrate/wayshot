@@ -66,15 +66,11 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let image_buffer = if let Some(slurp_region) = cli.slurp {
-        let slurp_region = slurp_region.clone();
+    let image_buffer = if cli.slurp {
         wayshot_conn.screenshot_freeze(
             Box::new(move || {
                 || -> Result<LogicalRegion> {
-                    let slurp_output = Command::new("slurp")
-                        .args(slurp_region.split(' '))
-                        .output()?
-                        .stdout;
+                    let slurp_output = Command::new("slurp").arg("-d").output()?.stdout;
 
                     utils::parse_geometry(&String::from_utf8(slurp_output)?)
                 }()

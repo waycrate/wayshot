@@ -28,8 +28,8 @@ pub struct Cli {
     pub log_level: tracing::Level,
 
     /// Arguments to call slurp with for selecting a region
-    #[arg(short, long, value_name = "SLURP_ARGS")]
-    pub slurp: Option<String>,
+    #[arg(short, long)]
+    pub slurp: bool,
 
     /// Enable cursor in screenshots
     #[arg(short, long)]

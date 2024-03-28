@@ -476,6 +476,7 @@ dependencies = [
  "image",
  "memmap2",
  "nix 0.27.1",
+ "tempfile",
  "thiserror",
  "tracing",
  "wayland-client",
