@@ -1,5 +1,4 @@
 use std::{
-    fs::File,
     io::{stdout, BufWriter, Cursor, Write},
     process::Command,
 };

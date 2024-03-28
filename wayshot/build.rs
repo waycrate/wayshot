@@ -26,6 +26,7 @@ fn main() -> Result<()> {
         let output = OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(true)
             .open(Path::new(&man_page.1))?;
         _ = Command::new("scdoc")
             .stdin(Stdio::from(File::open(man_page.0)?))
@@ -41,6 +42,7 @@ fn main() -> Result<()> {
         let output = OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(true)
             .open(Path::new(&scdoc_output.1))?;
         let mut encoder = GzEncoder::new(output, Compression::default());
         copy(&mut input, &mut encoder)?;
