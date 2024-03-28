@@ -1,28 +1,35 @@
+use std::fmt::Display;
+
 use wayland_client::protocol::{wl_output, wl_output::WlOutput};
+
+use crate::region::{LogicalRegion, Size};
 
 /// Represents an accessible wayland output.
 ///
 /// Do not instantiate, instead use [`crate::WayshotConnection::get_all_outputs`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OutputInfo {
     pub wl_output: WlOutput,
     pub name: String,
     pub description: String,
     pub transform: wl_output::Transform,
-    pub dimensions: OutputPositioning,
-    pub mode: WlOutputMode,
+    pub physical_size: Size,
+    pub logical_region: LogicalRegion,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct WlOutputMode {
-    pub width: i32,
-    pub height: i32,
+impl Display for OutputInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{name} ({description})",
+            name = self.name,
+            description = self.description
+        )
+    }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct OutputPositioning {
-    pub x: i32,
-    pub y: i32,
-    pub width: i32,
-    pub height: i32,
+impl OutputInfo {
+    pub(crate) fn scale(&self) -> f64 {
+        self.physical_size.height as f64 / self.logical_region.inner.size.height as f64
+    }
 }

@@ -22,6 +22,9 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 *-c*, *--cursor*
 	Enable cursor visibility in screenshots.
 
+*--clipboard*
+	Copy image contents to clipboard.
+
 *-e*, *--extension*
 	Set the image encoder.
 	Valid arguments:
@@ -30,6 +33,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 		- png (Default encoder)
 		- ppm
 		- qoi
+		- webp
 
 *-f*, *--file*
 	Set a custom file path. The default path is `./{current_unix_timestamp}-wayshot.{encoder}`
