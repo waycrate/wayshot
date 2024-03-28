@@ -19,6 +19,7 @@ pub struct Cli {
     #[arg(long, verbatim_doc_comment)]
     pub clipboard: Option<bool>,
 
+    /// Log level to be used for printing to stderr
     /// Defaults to config value (`info`)
     #[arg(long, verbatim_doc_comment)]
     pub log_level: Option<Level>,

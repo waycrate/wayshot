@@ -77,6 +77,8 @@ fn main() -> Result<()> {
         }
     }
 
+    let output = cli.output.or(screenshot.output);
+
     let wayshot_conn = WayshotConnection::new()?;
 
     if cli.list_outputs {
@@ -103,7 +105,7 @@ fn main() -> Result<()> {
             }),
             cursor,
         )?
-    } else if let Some(output_name) = cli.output {
+    } else if let Some(output_name) = output {
         let outputs = wayshot_conn.get_all_outputs();
         if let Some(output) = outputs.iter().find(|output| output.name == output_name) {
             wayshot_conn.screenshot_single_output(output, cursor)?
@@ -147,6 +149,7 @@ fn main() -> Result<()> {
         }
     };
 
+    // save the screenshot data
     let mut image_buf: Option<Cursor<Vec<u8>>> = None;
     if let Some(file) = file {
         image_buffer.save(file)?;

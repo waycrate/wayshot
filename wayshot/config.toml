@@ -1,7 +1,7 @@
 # base screenshot properties
 [screenshot]
-# display to take screenshot
-display = "default"
+# output to take screenshot
+# output = "default"
 # should contain cursor?
 cursor = false
 # should copy screenshot to clipborad?
@@ -13,11 +13,11 @@ stdout = false
 
 # properties related to writing screenshot as file in filesystem
 [fs]
-# output directory
+# screenshots directory
 path = "$HOME/images/screenshots"
-# output filename format
+# screenshot filename format
 format = "wayshot-%Y_%m_%d-%H_%M_%S"
-# output file encoding
+# screenshot file encoding
 encoding = "png"
 
 # logging properties

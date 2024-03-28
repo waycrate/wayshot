@@ -32,7 +32,7 @@ impl Config {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Screenshot {
-    pub display: Option<String>,
+    pub output: Option<String>,
     pub cursor: Option<bool>,
     pub clipboard: Option<bool>,
     pub fs: Option<bool>,
@@ -42,7 +42,7 @@ pub struct Screenshot {
 impl Default for Screenshot {
     fn default() -> Self {
         Screenshot {
-            display: None,
+            output: None,
             cursor: Some(false),
             clipboard: Some(true),
             fs: Some(true),
