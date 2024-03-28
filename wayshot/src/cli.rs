@@ -6,14 +6,14 @@ use tracing::Level;
 #[derive(Parser)]
 #[command(version, about)]
 pub struct Cli {
-    /// Custom output path can be of the following types:
-    ///     1. Directory (Default naming scheme is used for the image output).
+    /// Custom screenshot file path can be of the following types:
+    ///     1. Directory (Default naming scheme is used for the image screenshot file).
     ///     2. Path (Encoding is automatically inferred from the extension).
     ///     3. `-` (Indicates writing to terminal [stdout]).
-    #[arg(value_name = "OUTPUT", verbatim_doc_comment)]
+    #[arg(value_name = "FILE", verbatim_doc_comment)]
     pub file: Option<PathBuf>,
 
-    /// Copy image to clipboard. Can be used simultaneously with [OUTPUT] or stdout.
+    /// Copy image to clipboard. Can be used simultaneously with [FILE] or stdout.
     /// Wayshot persists in the background offering the image till the clipboard is overwritten.
     /// Defaults to config value (`true`)
     #[arg(long, verbatim_doc_comment)]
@@ -33,9 +33,9 @@ pub struct Cli {
     #[arg(short, long, verbatim_doc_comment)]
     pub cursor: Option<bool>,
 
-    /// Set image encoder, by default uses the file extension from the OUTPUT
+    /// Set image encoder, by default uses the file extension from the FILE
     /// positional argument. Otherwise defaults to config value (`png`).
-    #[arg(long, verbatim_doc_comment, visible_aliases = ["extension", "format", "output-format"], value_name = "FILE_EXTENSION")]
+    #[arg(long, verbatim_doc_comment, visible_aliases = ["extension", "format", "file-format"], value_name = "FILE_EXTENSION")]
     pub encoding: Option<EncodingFormat>,
 
     /// List all valid outputs
