@@ -1,21 +1,19 @@
-use std::{
-    io::{stdout, BufWriter, Cursor, Write},
-    process::Command,
-};
-
 use clap::Parser;
+use config::Config;
+use dialoguer::{theme::ColorfulTheme, FuzzySelect};
 use eyre::{bail, Result};
 use libwayshot::{region::LogicalRegion, WayshotConnection};
-
-mod cli;
-mod utils;
-
-use dialoguer::{theme::ColorfulTheme, FuzzySelect};
-use utils::EncodingFormat;
-
+use nix::unistd::{fork, ForkResult};
+use std::{
+    env,
+    io::{self, BufWriter, Cursor, Write},
+    process::Command,
+};
 use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
-use nix::unistd::{fork, ForkResult};
+mod cli;
+mod config;
+mod utils;
 
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where
@@ -33,28 +31,74 @@ where
 }
 
 fn main() -> Result<()> {
+    // cli args
     let cli = cli::Cli::parse();
+
+    // config path
+    let config_path = dirs::config_local_dir()
+        .map(|path| path.join("wayshot").join("config.toml"))
+        .unwrap_or_default();
+    let config_path = cli.config.unwrap_or(config_path);
+
+    // config
+    let config = Config::load(&config_path).unwrap_or_default();
+    let log = config.log.unwrap_or_default();
+    let screenshot = config.screenshot.unwrap_or_default();
+    let fs = config.fs.unwrap_or_default();
+
+    // pre-work vars definitions
+    let log_level = cli.log_level.unwrap_or(log.get_level());
     tracing_subscriber::fmt()
-        .with_max_level(cli.log_level)
-        .with_writer(std::io::stderr)
+        .with_max_level(log_level)
+        .with_writer(io::stderr)
         .init();
+
+    let cursor = cli.cursor.unwrap_or(screenshot.cursor.unwrap_or_default());
+    let clipboard = cli
+        .clipboard
+        .unwrap_or(screenshot.clipboard.unwrap_or(true));
+    let filename_format = cli
+        .filename_format
+        .unwrap_or(fs.format.unwrap_or("wayshot-%Y_%m_%d-%H_%M_%S".to_string()));
 
     let input_encoding = cli
         .file
         .as_ref()
         .and_then(|pathbuf| pathbuf.try_into().ok());
-    let requested_encoding = cli
+    let encoding = cli
         .encoding
         .or(input_encoding)
-        .unwrap_or(EncodingFormat::default());
+        .unwrap_or(fs.encoding.unwrap_or_default());
 
     if let Some(input_encoding) = input_encoding {
-        if input_encoding != requested_encoding {
+        if input_encoding != encoding {
             tracing::warn!(
-                "The encoding requested '{requested_encoding}' does not match the output file's encoding '{input_encoding}'. Still using the requested encoding however.",
+                "The encoding requested '{encoding}' does not match the output file's encoding '{input_encoding}'. Still using the requested encoding however.",
             );
         }
     }
+
+    let stdout_print = cli.stdout.unwrap_or(screenshot.stdout.unwrap_or_default());
+    let file = match cli.file {
+        Some(f) => {
+            if f.is_dir() {
+                Some(utils::get_full_file_name(&f, &filename_format, encoding))
+            } else {
+                Some(utils::get_checked_path(f.to_str().unwrap_or_default()))
+            }
+        }
+        _ => {
+            if screenshot.fs.unwrap_or_default() {
+                // default to current dir
+                let dir = fs.path.unwrap_or(env::current_dir().unwrap_or_default());
+                Some(utils::get_full_file_name(&dir, &filename_format, encoding))
+            } else {
+                None
+            }
+        }
+    };
+
+    let output = cli.output.or(screenshot.output);
 
     let wayshot_conn = WayshotConnection::new()?;
 
@@ -66,6 +110,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    // take a screenshot
     let image_buffer = if let Some(slurp_region) = cli.slurp {
         let slurp_region = slurp_region.clone();
         wayshot_conn.screenshot_freeze(
@@ -80,12 +125,12 @@ fn main() -> Result<()> {
                 }()
                 .map_err(|_| libwayshot::Error::FreezeCallbackError)
             }),
-            cli.cursor,
+            cursor,
         )?
-    } else if let Some(output_name) = cli.output {
+    } else if let Some(output_name) = output {
         let outputs = wayshot_conn.get_all_outputs();
         if let Some(output) = outputs.iter().find(|output| output.name == output_name) {
-            wayshot_conn.screenshot_single_output(output, cli.cursor)?
+            wayshot_conn.screenshot_single_output(output, cursor)?
         } else {
             bail!("No output found!");
         }
@@ -96,54 +141,35 @@ fn main() -> Result<()> {
             .map(|display| display.name.as_str())
             .collect();
         if let Some(index) = select_ouput(&output_names) {
-            wayshot_conn.screenshot_single_output(&outputs[index], cli.cursor)?
+            wayshot_conn.screenshot_single_output(&outputs[index], cursor)?
         } else {
             bail!("No output found!");
         }
     } else {
-        wayshot_conn.screenshot_all(cli.cursor)?
+        wayshot_conn.screenshot_all(cursor)?
     };
 
-    let mut stdout_print = false;
-    let file = match cli.file {
-        Some(mut pathbuf) => {
-            if pathbuf.to_string_lossy() == "-" {
-                stdout_print = true;
-                None
-            } else {
-                if pathbuf.is_dir() {
-                    pathbuf.push(utils::get_default_file_name(requested_encoding));
-                }
-                Some(pathbuf)
-            }
-        }
-        None => {
-            if cli.clipboard {
-                None
-            } else {
-                Some(utils::get_default_file_name(requested_encoding))
-            }
-        }
-    };
-
+    // save the screenshot data
     let mut image_buf: Option<Cursor<Vec<u8>>> = None;
-    if let Some(file) = file {
-        image_buffer.save(file)?;
-    } else if stdout_print {
+    if let Some(file_path) = file {
+        image_buffer.save(file_path)?;
+    }
+
+    if stdout_print {
         let mut buffer = Cursor::new(Vec::new());
-        image_buffer.write_to(&mut buffer, requested_encoding)?;
-        let stdout = stdout();
+        image_buffer.write_to(&mut buffer, encoding)?;
+        let stdout = io::stdout();
         let mut writer = BufWriter::new(stdout.lock());
         writer.write_all(buffer.get_ref())?;
         image_buf = Some(buffer);
     }
 
-    if cli.clipboard {
+    if clipboard {
         clipboard_daemonize(match image_buf {
             Some(buf) => buf,
             None => {
                 let mut buffer = Cursor::new(Vec::new());
-                image_buffer.write_to(&mut buffer, requested_encoding)?;
+                image_buffer.write_to(&mut buffer, encoding)?;
                 buffer
             }
         })?;

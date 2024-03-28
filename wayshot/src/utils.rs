@@ -1,10 +1,14 @@
+use chrono::Local;
 use clap::ValueEnum;
 use eyre::{bail, ContextCompat, Error, Result};
-
-use std::{fmt::Display, path::PathBuf, str::FromStr};
-
-use chrono::{DateTime, Local};
 use libwayshot::region::{LogicalRegion, Position, Region, Size};
+use serde::{Deserialize, Serialize};
+use std::{
+    env,
+    fmt::{Display, Write},
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
     let tail = g.trim();
@@ -48,7 +52,8 @@ pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
 }
 
 /// Supported image encoding formats.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EncodingFormat {
     /// JPG/JPEG encoder.
     Jpg,
@@ -128,14 +133,45 @@ impl FromStr for EncodingFormat {
             "png" => Self::Png,
             "ppm" => Self::Ppm,
             "qoi" => Self::Qoi,
+            "webp" => Self::Webp,
             _ => bail!("unsupported extension '{s}'"),
         })
     }
 }
 
-pub fn get_default_file_name(extension: EncodingFormat) -> PathBuf {
-    let current_datetime: DateTime<Local> = Local::now();
-    let formated_time = format!("{}", current_datetime.format("%Y_%m_%d-%H_%M_%S"));
+pub fn get_checked_path(path: &str) -> PathBuf {
+    let checked_path = shellexpand::full(path);
 
-    format!("wayshot-{formated_time}.{extension}").into()
+    if let Ok(checked_path) = checked_path {
+        PathBuf::from(checked_path.into_owned())
+    } else {
+        env::current_dir().unwrap_or_default()
+    }
+}
+
+pub fn get_full_file_name(dir: &Path, filename_format: &str, encoding: EncodingFormat) -> PathBuf {
+    let filename = get_default_file_name(filename_format, encoding);
+
+    let checked_path = get_checked_path(dir.to_str().unwrap_or_default());
+    checked_path.join(filename)
+}
+
+pub fn get_default_file_name(filename_format: &str, encoding: EncodingFormat) -> PathBuf {
+    let now = Local::now();
+    let format = now.format(filename_format);
+
+    let mut file_name = String::new();
+    let write_result = write!(file_name, "{format}.{encoding}");
+
+    if write_result.is_ok() {
+        file_name.into()
+    } else {
+        tracing::warn!(
+            "Couldn't write proposed filename_format: '{filename_format}', using default value."
+        );
+
+        let format = now.format("wayshot-%Y_%m_%d-%H_%M_%S");
+
+        format!("{format}.{encoding}").into()
+    }
 }
