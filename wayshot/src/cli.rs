@@ -9,9 +9,14 @@ pub struct Cli {
     /// Custom screenshot file path can be of the following types:
     ///     1. Directory (Default naming scheme is used for the image screenshot file).
     ///     2. Path (Encoding is automatically inferred from the extension).
-    ///     3. `-` (Indicates writing to terminal [stdout]).
+    ///     3. None (no screenshot will be saved on filesystem/drive)
     #[arg(value_name = "FILE", verbatim_doc_comment)]
     pub file: Option<PathBuf>,
+
+    /// Write screenshot to terminal/stdout.
+    /// Defaults to config value (`false`)
+    #[arg(long, verbatim_doc_comment)]
+    pub stdout: Option<bool>,
 
     /// Copy image to clipboard. Can be used simultaneously with [FILE] or stdout.
     /// Wayshot persists in the background offering the image till the clipboard is overwritten.
