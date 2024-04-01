@@ -5,22 +5,19 @@
 # should contain cursor?
 cursor = false
 # should copy screenshot to clipborad?
-clipboard = true
+clipboard = false
 # should write screenshot as file in filesystem?
 fs = true
 # should write screenshot in stdout?
 stdout = false
+# max logging level
+log_level = "info"
 
 # properties related to writing screenshot as file in filesystem
 [fs]
 # screenshots directory
-path = "$HOME/images/screenshots"
+# path = "$HOME/images/screenshots"
 # screenshot filename format
 format = "wayshot-%Y_%m_%d-%H_%M_%S"
 # screenshot file encoding
 encoding = "png"
-
-# logging properties
-[log]
-# max logging level
-level = "info"
