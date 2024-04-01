@@ -26,6 +26,12 @@ impl Config {
 
         toml::from_str(&config_str).ok()?
     }
+
+    pub fn get_default_path() -> PathBuf {
+        dirs::config_local_dir()
+            .map(|path| path.join("wayshot").join("config.toml"))
+            .unwrap_or_default()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

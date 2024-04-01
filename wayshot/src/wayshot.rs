@@ -35,10 +35,7 @@ fn main() -> Result<()> {
     let cli = cli::Cli::parse();
 
     // config path
-    let config_path = dirs::config_local_dir()
-        .map(|path| path.join("wayshot").join("config.toml"))
-        .unwrap_or_default();
-    let config_path = cli.config.unwrap_or(config_path);
+    let config_path = cli.config.unwrap_or(Config::get_default_path());
 
     // config
     let config = Config::load(&config_path).unwrap_or_default();
