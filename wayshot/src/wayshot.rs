@@ -61,18 +61,23 @@ fn main() -> Result<()> {
         .file
         .as_ref()
         .and_then(|pathbuf| pathbuf.try_into().ok());
-    let encoding = cli
-        .encoding
-        .or(input_encoding)
-        .unwrap_or(fs.encoding.unwrap_or_default());
+    let requested_encoding = cli.encoding.or(input_encoding);
+    let encoding = match requested_encoding {
+        Some(e) => {
+            if let Some(input_encoding) = input_encoding {
+                if input_encoding.ne(&e) {
+                    tracing::warn!(
+                        "The encoding requested '{e}' does not match the output file's encoding '{input_encoding}'. Still using the requested encoding however.",
+                    );
+                }
 
-    if let Some(input_encoding) = input_encoding {
-        if input_encoding != encoding {
-            tracing::warn!(
-                "The encoding requested '{encoding}' does not match the output file's encoding '{input_encoding}'. Still using the requested encoding however.",
-            );
+                input_encoding
+            } else {
+                e
+            }
         }
-    }
+        _ => fs.encoding.unwrap_or_default(),
+    };
 
     let stdout_print = cli.stdout.unwrap_or(screenshot.stdout.unwrap_or_default());
     let file = match cli.file {

@@ -49,7 +49,7 @@ impl Default for Screenshot {
         Screenshot {
             output: None,
             cursor: Some(false),
-            clipboard: Some(true),
+            clipboard: Some(false),
             fs: Some(true),
             stdout: Some(false),
             log_level: Some("info".to_string()),
@@ -86,32 +86,5 @@ impl Default for Fs {
             format: Some("wayshot-%Y_%m_%d-%H_%M_%S".to_string()),
             encoding: Some(EncodingFormat::Png),
         }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Log {
-    pub level: Option<String>,
-}
-
-impl Default for Log {
-    fn default() -> Self {
-        Log {
-            level: Some("info".to_string()),
-        }
-    }
-}
-
-impl Log {
-    pub fn get_level(self) -> Level {
-        self.level
-            .map_or(Level::INFO, |level| match level.as_str() {
-                "trace" => Level::TRACE,
-                "debug" => Level::DEBUG,
-                "info" => Level::INFO,
-                "warn" => Level::WARN,
-                "error" => Level::ERROR,
-                _ => Level::INFO,
-            })
     }
 }
