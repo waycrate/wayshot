@@ -52,7 +52,7 @@ fn main() -> Result<()> {
     let cursor = cli.cursor.unwrap_or(screenshot.cursor.unwrap_or_default());
     let clipboard = cli
         .clipboard
-        .unwrap_or(screenshot.clipboard.unwrap_or(true));
+        .unwrap_or(screenshot.clipboard.unwrap_or_default());
     let filename_format = cli
         .filename_format
         .unwrap_or(fs.format.unwrap_or("wayshot-%Y_%m_%d-%H_%M_%S".to_string()));
@@ -81,16 +81,21 @@ fn main() -> Result<()> {
 
     let stdout_print = cli.stdout.unwrap_or(screenshot.stdout.unwrap_or_default());
     let file = match cli.file {
-        Some(f) => {
+        Some(mut f) => {
             if f.is_dir() {
                 Some(utils::get_full_file_name(&f, &filename_format, encoding))
             } else {
-                Some(utils::get_checked_path(f.to_str().unwrap_or_default()))
+                f.set_extension("");
+                let dir = fs.path.unwrap_or(env::current_dir().unwrap_or_default());
+                Some(utils::get_full_file_name(
+                    &dir,
+                    &f.to_str().unwrap(),
+                    encoding,
+                ))
             }
         }
         _ => {
             if screenshot.fs.unwrap_or_default() {
-                // default to current dir
                 let dir = fs.path.unwrap_or(env::current_dir().unwrap_or_default());
                 Some(utils::get_full_file_name(&dir, &filename_format, encoding))
             } else {
