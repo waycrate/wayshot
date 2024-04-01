@@ -7,7 +7,6 @@ use tracing::Level;
 pub struct Config {
     pub screenshot: Option<Screenshot>,
     pub fs: Option<Fs>,
-    pub log: Option<Log>,
 }
 
 impl Default for Config {
@@ -15,7 +14,6 @@ impl Default for Config {
         Config {
             screenshot: Some(Screenshot::default()),
             fs: Some(Fs::default()),
-            log: Some(Log::default()),
         }
     }
 }
@@ -37,6 +35,7 @@ pub struct Screenshot {
     pub clipboard: Option<bool>,
     pub fs: Option<bool>,
     pub stdout: Option<bool>,
+    pub log_level: Option<String>,
 }
 
 impl Default for Screenshot {
@@ -47,7 +46,23 @@ impl Default for Screenshot {
             clipboard: Some(true),
             fs: Some(true),
             stdout: Some(false),
+            log_level: Some("info".to_string()),
         }
+    }
+}
+
+impl Screenshot {
+    pub fn get_log_level(&self) -> Level {
+        self.log_level
+            .as_ref()
+            .map_or(Level::INFO, |level| match level.as_str() {
+                "trace" => Level::TRACE,
+                "debug" => Level::DEBUG,
+                "info" => Level::INFO,
+                "warn" => Level::WARN,
+                "error" => Level::ERROR,
+                _ => Level::INFO,
+            })
     }
 }
 

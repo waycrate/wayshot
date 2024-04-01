@@ -42,12 +42,11 @@ fn main() -> Result<()> {
 
     // config
     let config = Config::load(&config_path).unwrap_or_default();
-    let log = config.log.unwrap_or_default();
     let screenshot = config.screenshot.unwrap_or_default();
     let fs = config.fs.unwrap_or_default();
 
     // pre-work vars definitions
-    let log_level = cli.log_level.unwrap_or(log.get_level());
+    let log_level = cli.log_level.unwrap_or(screenshot.get_log_level());
     tracing_subscriber::fmt()
         .with_max_level(log_level)
         .with_writer(io::stderr)
