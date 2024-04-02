@@ -419,7 +419,7 @@ impl WayshotConnection {
         &self,
         frames: &[(FrameCopy, FrameGuard, OutputInfo)],
         callback: Box<dyn Fn() -> Result<LogicalRegion, Error>>,
-    ) -> Result<(LogicalRegion)> {
+    ) -> Result<LogicalRegion> {
         let mut state = LayerShellState {
             configured_outputs: HashSet::new(),
         };
@@ -497,10 +497,10 @@ impl WayshotConnection {
                 Ok(())
             })?;
         }
-        let region = callback()?;
+        let callback_result = callback();
         layer_shell.destroy();
         event_queue.blocking_dispatch(&mut state)?;
-        Ok(region)
+        callback_result
     }
 
     /// Take a screenshot from the specified region.
