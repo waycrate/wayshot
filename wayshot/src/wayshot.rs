@@ -40,7 +40,7 @@ fn main() -> Result<()> {
     // config
     let config = Config::load(&config_path).unwrap_or_default();
     let base = config.base.unwrap_or_default();
-    let fs = config.fs.unwrap_or_default();
+    let file = config.file.unwrap_or_default();
 
     // pre-work vars definitions
     let log_level = cli.log_level.unwrap_or(base.get_log_level());
@@ -55,7 +55,7 @@ fn main() -> Result<()> {
         .unwrap_or(base.clipboard.unwrap_or_default());
     let filename_format = cli
         .filename_format
-        .unwrap_or(fs.format.unwrap_or("wayshot-%Y_%m_%d-%H_%M_%S".to_string()));
+        .unwrap_or(file.format.unwrap_or("wayshot-%Y_%m_%d-%H_%M_%S".to_string()));
 
     let input_encoding = cli
         .file
@@ -76,17 +76,17 @@ fn main() -> Result<()> {
                 e
             }
         }
-        _ => fs.encoding.unwrap_or_default(),
+        _ => file.encoding.unwrap_or_default(),
     };
 
     let stdout_print = cli.stdout.unwrap_or(base.stdout.unwrap_or_default());
-    let file = match cli.file {
+    let file_path = match cli.file {
         Some(mut f) => {
             if f.is_dir() {
                 Some(utils::get_full_file_name(&f, &filename_format, encoding))
             } else {
                 f.set_extension("");
-                let dir = fs.path.unwrap_or(env::current_dir().unwrap_or_default());
+                let dir = file.path.unwrap_or(env::current_dir().unwrap_or_default());
                 Some(utils::get_full_file_name(
                     &dir,
                     &f.to_str().unwrap(),
@@ -96,7 +96,7 @@ fn main() -> Result<()> {
         }
         _ => {
             if base.fs.unwrap_or_default() {
-                let dir = fs.path.unwrap_or(env::current_dir().unwrap_or_default());
+                let dir = file.path.unwrap_or(env::current_dir().unwrap_or_default());
                 Some(utils::get_full_file_name(&dir, &filename_format, encoding))
             } else {
                 None
@@ -157,7 +157,7 @@ fn main() -> Result<()> {
 
     // save the screenshot data
     let mut image_buf: Option<Cursor<Vec<u8>>> = None;
-    if let Some(file_path) = file {
+    if let Some(file_path) = file_path {
         image_buffer.save(file_path)?;
     }
 

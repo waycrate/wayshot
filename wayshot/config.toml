@@ -7,14 +7,14 @@ cursor = false
 # should copy screenshot to clipborad?
 clipboard = false
 # should write screenshot as file in filesystem?
-fs = true
+file = true
 # should write screenshot in stdout?
 stdout = false
 # max logging level
 log_level = "info"
 
 # properties related to writing screenshot as file in filesystem
-[fs]
+[file]
 # screenshots directory
 # path = "$HOME/images/screenshots"
 # screenshot filename format

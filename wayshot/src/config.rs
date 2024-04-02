@@ -1,26 +1,26 @@
 use crate::utils::EncodingFormat;
 use serde::{Deserialize, Serialize};
-use std::{env, fs::File, io::Read, path::PathBuf};
+use std::{env, io::Read, path::PathBuf};
 use tracing::Level;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub base: Option<Base>,
-    pub fs: Option<Fs>,
+    pub file: Option<File>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
             base: Some(Base::default()),
-            fs: Some(Fs::default()),
+            file: Some(File::default()),
         }
     }
 }
 
 impl Config {
     pub fn load(path: &PathBuf) -> Option<Config> {
-        let mut config_file = File::open(path).ok()?;
+        let mut config_file = std::fs::File::open(path).ok()?;
         let mut config_str = String::new();
         config_file.read_to_string(&mut config_str).ok()?;
 
@@ -73,15 +73,15 @@ impl Base {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Fs {
+pub struct File {
     pub path: Option<PathBuf>,
     pub format: Option<String>,
     pub encoding: Option<EncodingFormat>,
 }
 
-impl Default for Fs {
+impl Default for File {
     fn default() -> Self {
-        Fs {
+        File {
             path: Some(env::current_dir().unwrap_or_default()),
             format: Some("wayshot-%Y_%m_%d-%H_%M_%S".to_string()),
             encoding: Some(EncodingFormat::Png),
