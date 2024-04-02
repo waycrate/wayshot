@@ -50,12 +50,11 @@ fn main() -> Result<()> {
         .init();
 
     let cursor = cli.cursor.unwrap_or(base.cursor.unwrap_or_default());
-    let clipboard = cli
-        .clipboard
-        .unwrap_or(base.clipboard.unwrap_or_default());
-    let filename_format = cli
-        .filename_format
-        .unwrap_or(file.format.unwrap_or("wayshot-%Y_%m_%d-%H_%M_%S".to_string()));
+    let clipboard = cli.clipboard.unwrap_or(base.clipboard.unwrap_or_default());
+    let filename_format = cli.filename_format.unwrap_or(
+        file.format
+            .unwrap_or("wayshot-%Y_%m_%d-%H_%M_%S".to_string()),
+    );
 
     let input_encoding = cli
         .file
@@ -89,7 +88,7 @@ fn main() -> Result<()> {
                 let dir = file.path.unwrap_or(env::current_dir().unwrap_or_default());
                 Some(utils::get_full_file_name(
                     &dir,
-                    &f.to_str().unwrap(),
+                    f.to_str().unwrap(),
                     encoding,
                 ))
             }
