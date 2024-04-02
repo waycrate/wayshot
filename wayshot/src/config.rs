@@ -5,14 +5,14 @@ use tracing::Level;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
-    pub screenshot: Option<Screenshot>,
+    pub base: Option<Base>,
     pub fs: Option<Fs>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
-            screenshot: Some(Screenshot::default()),
+            base: Some(Base::default()),
             fs: Some(Fs::default()),
         }
     }
@@ -35,7 +35,7 @@ impl Config {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Screenshot {
+pub struct Base {
     pub output: Option<String>,
     pub cursor: Option<bool>,
     pub clipboard: Option<bool>,
@@ -44,9 +44,9 @@ pub struct Screenshot {
     pub log_level: Option<String>,
 }
 
-impl Default for Screenshot {
+impl Default for Base {
     fn default() -> Self {
-        Screenshot {
+        Base {
             output: None,
             cursor: Some(false),
             clipboard: Some(false),
@@ -57,7 +57,7 @@ impl Default for Screenshot {
     }
 }
 
-impl Screenshot {
+impl Base {
     pub fn get_log_level(&self) -> Level {
         self.log_level
             .as_ref()

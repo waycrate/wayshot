@@ -39,20 +39,20 @@ fn main() -> Result<()> {
 
     // config
     let config = Config::load(&config_path).unwrap_or_default();
-    let screenshot = config.screenshot.unwrap_or_default();
+    let base = config.base.unwrap_or_default();
     let fs = config.fs.unwrap_or_default();
 
     // pre-work vars definitions
-    let log_level = cli.log_level.unwrap_or(screenshot.get_log_level());
+    let log_level = cli.log_level.unwrap_or(base.get_log_level());
     tracing_subscriber::fmt()
         .with_max_level(log_level)
         .with_writer(io::stderr)
         .init();
 
-    let cursor = cli.cursor.unwrap_or(screenshot.cursor.unwrap_or_default());
+    let cursor = cli.cursor.unwrap_or(base.cursor.unwrap_or_default());
     let clipboard = cli
         .clipboard
-        .unwrap_or(screenshot.clipboard.unwrap_or_default());
+        .unwrap_or(base.clipboard.unwrap_or_default());
     let filename_format = cli
         .filename_format
         .unwrap_or(fs.format.unwrap_or("wayshot-%Y_%m_%d-%H_%M_%S".to_string()));
@@ -79,7 +79,7 @@ fn main() -> Result<()> {
         _ => fs.encoding.unwrap_or_default(),
     };
 
-    let stdout_print = cli.stdout.unwrap_or(screenshot.stdout.unwrap_or_default());
+    let stdout_print = cli.stdout.unwrap_or(base.stdout.unwrap_or_default());
     let file = match cli.file {
         Some(mut f) => {
             if f.is_dir() {
@@ -95,7 +95,7 @@ fn main() -> Result<()> {
             }
         }
         _ => {
-            if screenshot.fs.unwrap_or_default() {
+            if base.fs.unwrap_or_default() {
                 let dir = fs.path.unwrap_or(env::current_dir().unwrap_or_default());
                 Some(utils::get_full_file_name(&dir, &filename_format, encoding))
             } else {
@@ -104,7 +104,7 @@ fn main() -> Result<()> {
         }
     };
 
-    let output = cli.output.or(screenshot.output);
+    let output = cli.output.or(base.output);
 
     let wayshot_conn = WayshotConnection::new()?;
 

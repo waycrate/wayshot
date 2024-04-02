@@ -1,5 +1,5 @@
 # base screenshot properties
-[screenshot]
+[base]
 # output to take screenshot
 # output = "default"
 # should contain cursor?
