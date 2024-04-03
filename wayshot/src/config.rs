@@ -39,7 +39,7 @@ pub struct Base {
     pub output: Option<String>,
     pub cursor: Option<bool>,
     pub clipboard: Option<bool>,
-    pub fs: Option<bool>,
+    pub file: Option<bool>,
     pub stdout: Option<bool>,
     pub log_level: Option<String>,
 }
@@ -50,7 +50,7 @@ impl Default for Base {
             output: None,
             cursor: Some(false),
             clipboard: Some(false),
-            fs: Some(true),
+            file: Some(true),
             stdout: Some(false),
             log_level: Some("info".to_string()),
         }

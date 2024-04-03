@@ -94,7 +94,7 @@ fn main() -> Result<()> {
             }
         }
         _ => {
-            if base.fs.unwrap_or_default() {
+            if base.file.unwrap_or_default() {
                 let dir = file.path.unwrap_or(env::current_dir().unwrap_or_default());
                 Some(utils::get_full_file_name(&dir, &filename_format, encoding))
             } else {
