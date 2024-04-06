@@ -66,7 +66,9 @@ pub mod reexport {
 /// Struct to store wayland connection and globals list.
 /// # Example usage
 ///
-/// ```
+/// ```ignore
+/// use libwayshot::WayshotConnection;
+/// 
 /// let wayshot_connection = WayshotConnection::new()?;
 /// let image_buffer = wayshot_connection.screenshot_all()?;
 /// ```
