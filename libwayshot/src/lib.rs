@@ -413,7 +413,13 @@ impl WayshotConnection {
         Ok(frame_copies)
     }
 
-    fn overlay_frames(&self, frames: &[(FrameCopy, FrameGuard, OutputInfo)]) -> Result<()> {
+    /// Create a layer shell surface for each output,
+    /// render the screen captures on them and use the callback to select a region from them
+    fn overlay_frames_and_select_region(
+        &self,
+        frames: &[(FrameCopy, FrameGuard, OutputInfo)],
+        callback: Box<dyn Fn() -> Result<LogicalRegion, Error>>,
+    ) -> Result<LogicalRegion> {
         let mut state = LayerShellState {
             configured_outputs: HashSet::new(),
         };
@@ -491,7 +497,10 @@ impl WayshotConnection {
                 Ok(())
             })?;
         }
-        Ok(())
+        let callback_result = callback();
+        layer_shell.destroy();
+        event_queue.blocking_dispatch(&mut state)?;
+        callback_result
     }
 
     /// Take a screenshot from the specified region.
@@ -547,7 +556,7 @@ impl WayshotConnection {
             RegionCapturer::Outputs(outputs) => outputs.as_slice().try_into()?,
             RegionCapturer::Region(region) => region,
             RegionCapturer::Freeze(callback) => {
-                self.overlay_frames(&frames).and_then(|_| callback())?
+                self.overlay_frames_and_select_region(&frames, callback)?
             }
         };
 
