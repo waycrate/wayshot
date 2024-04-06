@@ -68,7 +68,6 @@ pub mod reexport {
 ///
 /// ```ignore
 /// use libwayshot::WayshotConnection;
-/// 
 /// let wayshot_connection = WayshotConnection::new()?;
 /// let image_buffer = wayshot_connection.screenshot_all()?;
 /// ```
