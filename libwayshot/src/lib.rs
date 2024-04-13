@@ -505,7 +505,7 @@ impl WayshotConnection {
         debug!("Unmapping and destroying layer shell surfaces.");
         for (surface, layer_shell_surface) in layer_shell_surfaces.iter() {
             surface.attach(None, 0, 0);
-            surface.commit(); //unmap surface by commiting a null buffer
+            surface.commit(); //unmap surface by committing a null buffer
             layer_shell_surface.destroy();
         }
         event_queue.roundtrip(&mut state)?;
