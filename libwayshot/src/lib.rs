@@ -493,7 +493,7 @@ impl WayshotConnection {
 
                 debug!("Committing surface with attached buffer.");
                 surface.commit();
-                layer_shell_surfaces.push(layer_surface);
+                layer_shell_surfaces.push((surface, layer_surface));
                 event_queue.blocking_dispatch(&mut state)?;
 
                 Ok(())
@@ -502,11 +502,13 @@ impl WayshotConnection {
 
         let callback_result = callback();
 
-        debug!("Destroying layer shell surfaces.");
-        for layer_shell_surface in layer_shell_surfaces.into_iter() {
+        debug!("Unmapping and destroying layer shell surfaces.");
+        for (surface, layer_shell_surface) in layer_shell_surfaces.iter() {
+            surface.attach(None, 0, 0);
+            surface.commit(); //unmap surface by commiting a null buffer
             layer_shell_surface.destroy();
         }
-        event_queue.blocking_dispatch(&mut state)?;
+        event_queue.roundtrip(&mut state)?;
 
         callback_result
     }
