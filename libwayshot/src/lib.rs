@@ -452,7 +452,7 @@ impl WayshotConnection {
             }
         };
 
-        let mut layer_shell_surfaces = Vec::new();
+        let mut layer_shell_surfaces = Vec::with_capacity(frames.len());
 
         for (frame_copy, frame_guard, output_info) in frames {
             tracing::span!(
