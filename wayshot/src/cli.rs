@@ -29,7 +29,7 @@ pub struct Cli {
 
     /// Arguments to call slurp with for selecting a region
     #[arg(short, long, value_name = "SLURP_ARGS")]
-    pub slurp: Option<String>,
+    pub slurp: Option<Option<String>>,
 
     /// Enable cursor in screenshots
     #[arg(short, long)]
