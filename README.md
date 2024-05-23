@@ -23,10 +23,10 @@ NOTE: Read `man 7 wayshot` for more examples.
 
 NOTE: Read `man wayshot` for flag information.
 
-Region Selection:
+Screenshot and Crop Region:
 
 ```bash
-wayshot -s "$(slurp)"
+wayshot -s 
 ```
 
 Fullscreen:
@@ -38,13 +38,13 @@ wayshot
 Screenshot and copy to clipboard:
 
 ```bash
-wayshot --stdout | wl-copy
+wayshot --clipboard
 ```
 
 Pick a hex color code, using ImageMagick:
 
 ```bash
-wayshot -s "$(slurp -p)" --stdout | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
+wayshot -s - | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
 ```
 
 # Installation
