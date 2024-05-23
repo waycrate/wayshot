@@ -6,15 +6,26 @@ use wayland_client::{
     delegate_noop,
     globals::GlobalListContents,
     protocol::{
-        wl_buffer::WlBuffer, wl_compositor::WlCompositor, wl_output, wl_output::WlOutput,
-        wl_registry, wl_registry::WlRegistry, wl_shm::WlShm, wl_shm_pool::WlShmPool,
+        wl_buffer::WlBuffer,
+        wl_compositor::WlCompositor,
+        wl_output::{self, WlOutput},
+        wl_registry::{self, WlRegistry},
+        wl_shm::WlShm,
+        wl_shm_pool::WlShmPool,
         wl_surface::WlSurface,
     },
-    Connection, Dispatch, QueueHandle, WEnum,
-    WEnum::Value,
+    Connection, Dispatch, Proxy, QueueHandle,
+    WEnum::{self, Value},
 };
-use wayland_protocols::xdg::xdg_output::zv1::client::{
-    zxdg_output_manager_v1::ZxdgOutputManagerV1, zxdg_output_v1, zxdg_output_v1::ZxdgOutputV1,
+use wayland_protocols::{
+    wp::linux_dmabuf::zv1::client::{
+        zwp_linux_buffer_params_v1::{self, ZwpLinuxBufferParamsV1},
+        zwp_linux_dmabuf_v1::{self, ZwpLinuxDmabufV1},
+    },
+    xdg::xdg_output::zv1::client::{
+        zxdg_output_manager_v1::ZxdgOutputManagerV1,
+        zxdg_output_v1::{self, ZxdgOutputV1},
+    },
 };
 use wayland_protocols_wlr::layer_shell::v1::client::{
     zwlr_layer_shell_v1::ZwlrLayerShellV1,
@@ -169,8 +180,42 @@ pub enum FrameState {
 
 pub struct CaptureFrameState {
     pub formats: Vec<FrameFormat>,
+    pub dmabuf_formats: Vec<(u32, u32, u32)>,
     pub state: Option<FrameState>,
     pub buffer_done: AtomicBool,
+}
+
+impl Dispatch<ZwpLinuxDmabufV1, ()> for CaptureFrameState {
+    fn event(
+        _state: &mut Self,
+        _proxy: &ZwpLinuxDmabufV1,
+        _event: zwp_linux_dmabuf_v1::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &wayland_client::QueueHandle<Self>,
+    ) {
+    }
+}
+
+impl Dispatch<ZwpLinuxBufferParamsV1, ()> for CaptureFrameState {
+    fn event(
+        _state: &mut Self,
+        _proxy: &ZwpLinuxBufferParamsV1,
+        event: zwp_linux_buffer_params_v1::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        match event {
+            zwp_linux_buffer_params_v1::Event::Created { buffer } => {
+                tracing::trace!("DMABUF Creation success")
+            }
+            zwp_linux_buffer_params_v1::Event::Failed => {
+                tracing::error!("DMABUF Creation failed")
+            }
+            _ => todo!(),
+        }
+    }
 }
 
 impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
@@ -209,7 +254,13 @@ impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
                 frame.state.replace(FrameState::Failed);
             }
             zwlr_screencopy_frame_v1::Event::Damage { .. } => {}
-            zwlr_screencopy_frame_v1::Event::LinuxDmabuf { .. } => {}
+            zwlr_screencopy_frame_v1::Event::LinuxDmabuf {
+                format,
+                width,
+                height,
+            } => {
+                frame.dmabuf_formats.push((format, width, height));
+            }
             zwlr_screencopy_frame_v1::Event::BufferDone => {
                 frame.buffer_done.store(true, Ordering::SeqCst);
             }
