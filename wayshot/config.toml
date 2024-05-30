@@ -1,0 +1,23 @@
+# base screenshot properties
+[base]
+# output to take screenshot
+# output = "default"
+# should contain cursor?
+cursor = false
+# should copy screenshot to clipborad?
+clipboard = false
+# should write screenshot as file in filesystem?
+file = true
+# should write screenshot in stdout?
+stdout = false
+# max logging level
+log_level = "info"
+
+# properties related to writing screenshot as file in filesystem
+[file]
+# screenshots directory
+# path = "$HOME/images/screenshots"
+# screenshot filename format
+format = "wayshot-%Y_%m_%d-%H_%M_%S"
+# screenshot file encoding
+encoding = "png"
