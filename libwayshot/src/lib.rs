@@ -452,6 +452,8 @@ impl WayshotConnection {
             }
         };
 
+        let mut layer_shell_surfaces = Vec::with_capacity(frames.len());
+
         for (frame_copy, frame_guard, output_info) in frames {
             tracing::span!(
                 tracing::Level::DEBUG,
@@ -491,15 +493,23 @@ impl WayshotConnection {
 
                 debug!("Committing surface with attached buffer.");
                 surface.commit();
-
+                layer_shell_surfaces.push((surface, layer_surface));
                 event_queue.blocking_dispatch(&mut state)?;
 
                 Ok(())
             })?;
         }
+
         let callback_result = callback();
-        layer_shell.destroy();
-        event_queue.blocking_dispatch(&mut state)?;
+
+        debug!("Unmapping and destroying layer shell surfaces.");
+        for (surface, layer_shell_surface) in layer_shell_surfaces.iter() {
+            surface.attach(None, 0, 0);
+            surface.commit(); //unmap surface by committing a null buffer
+            layer_shell_surface.destroy();
+        }
+        event_queue.roundtrip(&mut state)?;
+
         callback_result
     }
 
