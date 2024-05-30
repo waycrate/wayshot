@@ -128,6 +128,7 @@ impl FromStr for EncodingFormat {
             "png" => Self::Png,
             "ppm" => Self::Ppm,
             "qoi" => Self::Qoi,
+            "webp" => Self::Webp,
             _ => bail!("unsupported extension '{s}'"),
         })
     }
