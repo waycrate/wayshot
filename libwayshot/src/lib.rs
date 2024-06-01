@@ -14,8 +14,7 @@ mod screencopy;
 use std::{
     collections::HashSet,
     fs::File,
-    io::Read,
-    os::fd::{AsFd, AsRawFd, BorrowedFd},
+    os::fd::{AsFd, BorrowedFd},
     sync::atomic::{AtomicBool, Ordering},
     thread,
 };
@@ -24,7 +23,6 @@ use dispatch::LayerShellState;
 use drm::Device;
 use image::{imageops::replace, DynamicImage};
 use memmap2::MmapMut;
-use nix::unistd::write;
 use region::{EmbeddedRegion, RegionCapturer};
 use screencopy::FrameGuard;
 use tracing::debug;
@@ -38,10 +36,7 @@ use wayland_client::{
     Connection, EventQueue, Proxy,
 };
 use wayland_protocols::{
-    wp::linux_dmabuf::{
-        self,
-        zv1::client::{zwp_linux_buffer_params_v1, zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1},
-    },
+    wp::linux_dmabuf::zv1::client::zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1,
     xdg::xdg_output::zv1::client::{
         zxdg_output_manager_v1::ZxdgOutputManagerV1, zxdg_output_v1::ZxdgOutputV1,
     },
@@ -71,7 +66,7 @@ pub mod reexport {
     use wayland_client::protocol::wl_output;
     pub use wl_output::{Transform, WlOutput};
 }
-use gbm::{BufferObjectFlags, Device as GBMDevice, Format};
+use gbm::Device as GBMDevice;
 struct Card(std::fs::File);
 
 /// Implementing [`AsFd`] is a prerequisite to implementing the traits found
@@ -93,6 +88,12 @@ impl Card {
     }
 }
 
+#[derive(Debug)]
+struct DMABUFState {
+    linux_dmabuf: ZwpLinuxDmabufV1,
+    gbmdev: GBMDevice<Card>,
+}
+
 /// Struct to store wayland connection and globals list.
 /// # Example usage
 ///
@@ -105,6 +106,7 @@ pub struct WayshotConnection {
     pub conn: Connection,
     pub globals: GlobalList,
     output_infos: Vec<OutputInfo>,
+    dmabuf_state: Option<DMABUFState>,
 }
 
 impl WayshotConnection {
@@ -122,6 +124,30 @@ impl WayshotConnection {
             conn,
             globals,
             output_infos: Vec::new(),
+            dmabuf_state: None,
+        };
+
+        initial_state.refresh_outputs()?;
+
+        Ok(initial_state)
+    }
+
+    pub fn from_connection_with_dmabuf(conn: Connection) -> Result<Self> {
+        let (globals, evq) = registry_queue_init::<WayshotState>(&conn)?;
+        let linux_dmabuf =
+            globals.bind(&evq.handle(), 4..=ZwpLinuxDmabufV1::interface().version, ())?;
+        let gpu = Card::open("/dev/dri/renderD128");
+        println!("{:#?}", gpu.get_driver().unwrap());
+        // init a GBM device
+        let gbm = GBMDevice::new(gpu).unwrap();
+        let mut initial_state = Self {
+            conn,
+            globals,
+            output_infos: Vec::new(),
+            dmabuf_state: Some(DMABUFState {
+                linux_dmabuf,
+                gbmdev: gbm,
+            }),
         };
 
         initial_state.refresh_outputs()?;
@@ -307,46 +333,6 @@ impl WayshotConnection {
 
         // Instantiate shm global.
         let shm = self.globals.bind::<WlShm, _, _>(&qh, 1..=1, ())?;
-        let linux_dmabuf: ZwpLinuxDmabufV1 =
-            self.globals
-                .bind(&qh, 4..=ZwpLinuxDmabufV1::interface().version, ())?;
-        let gpu = Card::open("/dev/dri/renderD128");
-        println!("{:#?}", gpu.get_driver().unwrap());
-        // init a GBM device
-        let gbm = GBMDevice::new(gpu).unwrap();
-        // println!("{:#?}", gpu.get_driver().unwrap());
-        let dma_width = state.dmabuf_formats[0].1;
-        let dma_height = state.dmabuf_formats[0].2;
-        // create a buffer
-        let bo = gbm
-            .create_buffer_object::<()>(
-                dma_width,
-                dma_height,
-                Format::Xbgr8888,
-                BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR,
-            )
-            .unwrap();
-        //dbg!(bo);
-        let dma_params = linux_dmabuf.create_params(&qh, ());
-        dbg!(&dma_params);
-        let modifier: u64 = 72057594037927935;
-        let stride = bo.stride().unwrap();
-        dma_params.add(
-            bo.fd().unwrap().as_fd(),
-            0,
-            0,
-            stride,
-            (modifier >> 32) as u32,
-            (modifier & 0xffffffff) as u32,
-        );
-        let dmabuf = dma_params.create_immed(
-            dma_width as i32,
-            dma_height as i32,
-            state.dmabuf_formats[0].0,
-            zwp_linux_buffer_params_v1::Flags::empty(),
-            &qh,
-            (),
-        );
         let shm_pool = shm.create_pool(
             fd.as_fd(),
             frame_format
@@ -367,23 +353,7 @@ impl WayshotConnection {
         );
 
         // Copy the pixel data advertised by the compositor into the buffer we just created.
-        frame.copy(&dmabuf);
-        dbg!("copy complete");
-        let bobuffer = {
-            let mut bobuffer = Vec::new();
-            for i in 0..1280 {
-                for _ in 0..720 {
-                    bobuffer.push(if i % 2 == 0 { 0 } else { 255 });
-                }
-            }
-            bobuffer
-        };
-
-        //dma_params.destroy();
-        //linux_dmabuf.destroy();
-        //dbg!(bobuffer);
-        dbg!(&state.dmabuf_formats);
-        dbg!(&state.formats);
+        frame.copy(&buffer);
         // On copy the Ready / Failed events are fired by the frame object, so here we check for them.
         loop {
             // Basically reads, if frame state is not None then...
@@ -395,17 +365,6 @@ impl WayshotConnection {
                     }
                     FrameState::Finished => {
                         tracing::trace!("Frame copy finished");
-                        let mem = bo
-                            .map(&gbm, 0, 0, dma_width, dma_height, |obj| {
-                                obj.buffer().to_vec()
-                            })
-                            .unwrap()
-                            .unwrap();
-                        //dbg!(mem);
-                        unsafe {
-                            write(fd.as_fd().as_raw_fd(), mem.as_ref()).unwrap();
-                        }
-
                         return Ok(FrameGuard { buffer, shm_pool });
                     }
                 }
@@ -490,26 +449,13 @@ impl WayshotConnection {
         output_capture_regions: &[(OutputInfo, Option<EmbeddedRegion>)],
         cursor_overlay: bool,
     ) -> Result<Vec<(FrameCopy, FrameGuard, OutputInfo)>> {
-        let frame_copies = thread::scope(|scope| -> Result<_> {
-            let join_handles = output_capture_regions
-                .iter()
-                .map(|(output_info, capture_region)| {
-                    scope.spawn(move || {
-                        self.capture_frame_copy(cursor_overlay, output_info, *capture_region)
-                            .map(|(frame_copy, frame_guard)| {
-                                (frame_copy, frame_guard, output_info.clone())
-                            })
-                    })
-                })
-                .collect::<Vec<_>>();
-
-            join_handles
-                .into_iter()
-                .flat_map(|join_handle| join_handle.join())
-                .collect::<Result<_>>()
-        })?;
-
-        Ok(frame_copies)
+        output_capture_regions
+            .iter()
+            .map(|(output_info, capture_region)| {
+                self.capture_frame_copy(cursor_overlay, output_info, *capture_region)
+                    .map(|(frame_copy, frame_guard)| (frame_copy, frame_guard, output_info.clone()))
+            })
+            .collect()
     }
 
     /// Create a layer shell surface for each output,

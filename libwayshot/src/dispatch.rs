@@ -14,7 +14,7 @@ use wayland_client::{
         wl_shm_pool::WlShmPool,
         wl_surface::WlSurface,
     },
-    Connection, Dispatch, Proxy, QueueHandle,
+    Connection, Dispatch, QueueHandle,
     WEnum::{self, Value},
 };
 use wayland_protocols::{
@@ -206,15 +206,6 @@ impl Dispatch<ZwpLinuxBufferParamsV1, ()> for CaptureFrameState {
         _conn: &Connection,
         _qhandle: &QueueHandle<Self>,
     ) {
-        match event {
-            zwp_linux_buffer_params_v1::Event::Created { buffer } => {
-                tracing::trace!("DMABUF Creation success")
-            }
-            zwp_linux_buffer_params_v1::Event::Failed => {
-                tracing::error!("DMABUF Creation failed")
-            }
-            _ => todo!(),
-        }
     }
 }
 
@@ -277,7 +268,7 @@ delegate_noop!(CaptureFrameState: ignore ZwlrScreencopyManagerV1);
 // TODO: Create a xdg-shell surface, check for the enter event, grab the output from it.
 
 pub struct WayshotState {}
-
+delegate_noop!(WayshotState: ignore ZwpLinuxDmabufV1);
 impl wayland_client::Dispatch<wl_registry::WlRegistry, GlobalListContents> for WayshotState {
     fn event(
         _: &mut WayshotState,
