@@ -36,7 +36,7 @@ eyre = "0.6.8"
 chrono = "0.4.35"
 
 wl-clipboard-rs = "0.8.0"
-nix = { version = "0.28.0", features = ["process"] }
+rustix = { version = "0.38", features = ["process", "runtime"] }
 
 [[bin]]
 name = "wayshot"
