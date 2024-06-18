@@ -14,17 +14,16 @@ mod screencopy;
 use std::{
     collections::HashSet,
     fs::File,
-    os::fd::{AsFd, BorrowedFd},
+    os::fd::{AsFd, BorrowedFd, OwnedFd},
     sync::atomic::{AtomicBool, Ordering},
     thread,
 };
 
 use dispatch::LayerShellState;
-use drm::Device;
 use image::{imageops::replace, DynamicImage};
 use memmap2::MmapMut;
 use region::{EmbeddedRegion, RegionCapturer};
-use screencopy::FrameGuard;
+use screencopy::{DMAFrameFormat, DMAFrameGuard, FrameData, FrameGuard};
 use tracing::debug;
 use wayland_client::{
     globals::{registry_queue_init, GlobalList},
@@ -36,7 +35,9 @@ use wayland_client::{
     Connection, EventQueue, Proxy,
 };
 use wayland_protocols::{
-    wp::linux_dmabuf::zv1::client::zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1,
+    wp::linux_dmabuf::zv1::client::{
+        zwp_linux_buffer_params_v1, zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1,
+    },
     xdg::xdg_output::zv1::client::{
         zxdg_output_manager_v1::ZxdgOutputManagerV1, zxdg_output_v1::ZxdgOutputV1,
     },
@@ -66,7 +67,7 @@ pub mod reexport {
     use wayland_client::protocol::wl_output;
     pub use wl_output::{Transform, WlOutput};
 }
-use gbm::Device as GBMDevice;
+use gbm::{BufferObject, BufferObjectFlags, Device as GBMDevice};
 struct Card(std::fs::File);
 
 /// Implementing [`AsFd`] is a prerequisite to implementing the traits found
@@ -137,7 +138,6 @@ impl WayshotConnection {
         let linux_dmabuf =
             globals.bind(&evq.handle(), 4..=ZwpLinuxDmabufV1::interface().version, ())?;
         let gpu = Card::open("/dev/dri/renderD128");
-        println!("{:#?}", gpu.get_driver().unwrap());
         // init a GBM device
         let gbm = GBMDevice::new(gpu).unwrap();
         let mut initial_state = Self {
@@ -222,14 +222,74 @@ impl WayshotConnection {
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(FrameFormat, FrameGuard)> {
         let (state, event_queue, frame, frame_format) =
-            self.capture_output_frame_get_state(cursor_overlay, output, capture_region)?;
+            self.capture_output_frame_get_state_shm(cursor_overlay, output, capture_region)?;
         let frame_guard =
             self.capture_output_frame_inner(state, event_queue, frame, frame_format, fd)?;
 
         Ok((frame_format, frame_guard))
     }
 
-    fn capture_output_frame_get_state(
+    fn capture_output_frame_shm_from_file(
+        &self,
+        cursor_overlay: bool,
+        output: &WlOutput,
+        file: &File,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<(FrameFormat, FrameGuard)> {
+        let (state, event_queue, frame, frame_format) =
+            self.capture_output_frame_get_state_shm(cursor_overlay as i32, output, capture_region)?;
+
+        file.set_len(frame_format.byte_size())?;
+
+        let frame_guard =
+            self.capture_output_frame_inner(state, event_queue, frame, frame_format, file)?;
+
+        Ok((frame_format, frame_guard))
+    }
+
+    pub fn capture_output_frame_dmabuf(
+        &self,
+        cursor_overlay: bool,
+        output: &WlOutput,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<(DMAFrameFormat, DMAFrameGuard, BufferObject<()>)> {
+        match &self.dmabuf_state {
+            Some(dmabuf_state) => {
+                let (state, event_queue, frame, frame_format) = self
+                    .capture_output_frame_get_state_dmabuf(
+                        cursor_overlay as i32,
+                        output,
+                        capture_region,
+                    )?;
+                let gbm = &dmabuf_state.gbmdev;
+                let bo = gbm
+                    .create_buffer_object::<()>(
+                        frame_format.size.width,
+                        frame_format.size.height,
+                        gbm::Format::try_from(frame_format.format).unwrap(),
+                        BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR,
+                    )
+                    .unwrap();
+                let stride = bo.stride().unwrap();
+                let modifier: u64 = bo.modifier().unwrap().into();
+
+                let frame_guard = self.capture_output_frame_inner_dmabuf(
+                    state,
+                    event_queue,
+                    frame,
+                    frame_format,
+                    stride,
+                    modifier,
+                    bo.fd().unwrap(),
+                )?;
+
+                Ok((frame_format, frame_guard, bo))
+            }
+            None => todo!(),
+        }
+    }
+
+    fn capture_output_frame_get_state_shm(
         &self,
         cursor_overlay: i32,
         output: &WlOutput,
@@ -320,6 +380,144 @@ impl WayshotConnection {
         Ok((state, event_queue, frame, frame_format))
     }
 
+    fn capture_output_frame_get_state_dmabuf(
+        &self,
+        cursor_overlay: i32,
+        output: &WlOutput,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<(
+        CaptureFrameState,
+        EventQueue<CaptureFrameState>,
+        ZwlrScreencopyFrameV1,
+        DMAFrameFormat,
+    )> {
+        let mut state = CaptureFrameState {
+            formats: Vec::new(),
+            dmabuf_formats: Vec::new(),
+            state: None,
+            buffer_done: AtomicBool::new(false),
+        };
+        let mut event_queue = self.conn.new_event_queue::<CaptureFrameState>();
+        let qh = event_queue.handle();
+
+        // Instantiating screencopy manager.
+        let screencopy_manager = match self.globals.bind::<ZwlrScreencopyManagerV1, _, _>(
+            &qh,
+            3..=3,
+            (),
+        ) {
+            Ok(x) => x,
+            Err(e) => {
+                tracing::error!("Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?");
+                tracing::error!("err: {e}");
+                return Err(Error::ProtocolNotFound(
+                    "ZwlrScreencopy Manager not found".to_string(),
+                ));
+            }
+        };
+
+        debug!("Capturing output...");
+        let frame = if let Some(embedded_region) = capture_region {
+            screencopy_manager.capture_output_region(
+                cursor_overlay,
+                output,
+                embedded_region.inner.position.x,
+                embedded_region.inner.position.y,
+                embedded_region.inner.size.width as i32,
+                embedded_region.inner.size.height as i32,
+                &qh,
+                (),
+            )
+        } else {
+            screencopy_manager.capture_output(cursor_overlay, output, &qh, ())
+        };
+
+        // Empty internal event buffer until buffer_done is set to true which is when the Buffer done
+        // event is fired, aka the capture from the compositor is succesful.
+        while !state.buffer_done.load(Ordering::SeqCst) {
+            event_queue.blocking_dispatch(&mut state)?;
+        }
+
+        tracing::trace!(
+            "Received compositor frame buffer formats: {:#?}",
+            state.formats
+        );
+        // TODO select appropriate format if there is more than one
+        let frame_format = state.dmabuf_formats[0];
+        tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
+
+        Ok((state, event_queue, frame, frame_format))
+    }
+
+    fn capture_output_frame_inner_dmabuf(
+        &self,
+        mut state: CaptureFrameState,
+        mut event_queue: EventQueue<CaptureFrameState>,
+        frame: ZwlrScreencopyFrameV1,
+        frame_format: DMAFrameFormat,
+        stride: u32,
+        modifier: u64,
+        fd: OwnedFd,
+    ) -> Result<DMAFrameGuard> {
+        match &self.dmabuf_state {
+            Some(dmabuf_state) => {
+                // Connecting to wayland environment.
+                let qh = event_queue.handle();
+
+                let linux_dmabuf = &dmabuf_state.linux_dmabuf;
+                let dma_width = frame_format.size.width;
+                let dma_height = frame_format.size.height;
+
+                let dma_params = linux_dmabuf.create_params(&qh, ());
+                dma_params.add(
+                    fd.as_fd(),
+                    0,
+                    0,
+                    stride,
+                    (modifier >> 32) as u32,
+                    (modifier & 0xffffffff) as u32,
+                );
+                let dmabuf_wlbuf = dma_params.create_immed(
+                    dma_width as i32,
+                    dma_height as i32,
+                    frame_format.format,
+                    zwp_linux_buffer_params_v1::Flags::empty(),
+                    &qh,
+                    (),
+                );
+
+                // Copy the pixel data advertised by the compositor into the buffer we just created.
+                frame.copy(&dmabuf_wlbuf);
+                tracing::debug!("wlr-screencopy copy() with dmabuf complete");
+
+                //dma_params.destroy();
+                //linux_dmabuf.destroy();
+                // On copy the Ready / Failed events are fired by the frame object, so here we check for them.
+                loop {
+                    // Basically reads, if frame state is not None then...
+                    if let Some(state) = state.state {
+                        match state {
+                            FrameState::Failed => {
+                                tracing::error!("Frame copy failed");
+                                return Err(Error::FramecopyFailed);
+                            }
+                            FrameState::Finished => {
+                                tracing::trace!("Frame copy finished");
+
+                                return Ok(DMAFrameGuard {
+                                    buffer: dmabuf_wlbuf,
+                                });
+                            }
+                        }
+                    }
+
+                    event_queue.blocking_dispatch(&mut state)?;
+                }
+            }
+            None => todo!(),
+        }
+    }
+
     fn capture_output_frame_inner<T: AsFd>(
         &self,
         mut state: CaptureFrameState,
@@ -374,23 +572,47 @@ impl WayshotConnection {
         }
     }
 
-    fn capture_output_frame_shm_from_file(
-        &self,
-        cursor_overlay: bool,
-        output: &WlOutput,
-        file: &File,
-        capture_region: Option<EmbeddedRegion>,
-    ) -> Result<(FrameFormat, FrameGuard)> {
-        let (state, event_queue, frame, frame_format) =
-            self.capture_output_frame_get_state(cursor_overlay as i32, output, capture_region)?;
-
-        file.set_len(frame_format.byte_size())?;
-
-        let frame_guard =
-            self.capture_output_frame_inner(state, event_queue, frame, frame_format, file)?;
-
-        Ok((frame_format, frame_guard))
-    }
+    // /// Get a FrameCopy instance with screenshot pixel data for any wl_output object via dmabuf.
+    // #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{:}", r)).unwrap_or("fullscreen".to_string())))]
+    // fn capture_frame_copy_dmabuf(
+    //     &self,
+    //     cursor_overlay: bool,
+    //     output_info: &OutputInfo,
+    //     capture_region: Option<EmbeddedRegion>,
+    // ) -> Result<(FrameCopy, FrameGuard)> {
+    //     match &self.dmabuf_state {
+    //         Some(dmabuf_state) => {
+    //             let (frame_format, frame_guard, bo) = self.capture_output_frame_dmabuf_from_file(
+    //                 cursor_overlay,
+    //                 &output_info.wl_output,
+    //                 capture_region,
+    //             )?;
+    //             let rotated_physical_size = match output_info.transform {
+    //                 Transform::_90
+    //                 | Transform::_270
+    //                 | Transform::Flipped90
+    //                 | Transform::Flipped270 => Size {
+    //                     width: frame_format.size.height,
+    //                     height: frame_format.size.width,
+    //                 },
+    //                 _ => frame_format.size,
+    //             };
+    //             let frame_copy = FrameCopy {
+    //                 frame_format,
+    //                 frame_color_type,
+    //                 frame_data: FrameData::GBMBo(bo),
+    //                 transform: output_info.transform,
+    //                 logical_region: capture_region
+    //                     .map(|capture_region| capture_region.logical())
+    //                     .unwrap_or(output_info.logical_region),
+    //                 physical_size: rotated_physical_size,
+    //             };
+    //             tracing::debug!("Created frame copy: {:#?}", frame_copy);
+    //             Ok((frame_copy, frame_guard))
+    //         }
+    //         None => todo!(),
+    //     }
+    // }
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
     #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{:}", r)).unwrap_or("fullscreen".to_string())))]
@@ -433,7 +655,7 @@ impl WayshotConnection {
         let frame_copy = FrameCopy {
             frame_format,
             frame_color_type,
-            frame_mmap,
+            frame_data: FrameData::Mmap(frame_mmap),
             transform: output_info.transform,
             logical_region: capture_region
                 .map(|capture_region| capture_region.logical())

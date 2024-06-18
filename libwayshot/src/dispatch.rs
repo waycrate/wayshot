@@ -39,7 +39,7 @@ use wayland_protocols_wlr::screencopy::v1::client::{
 use crate::{
     output::OutputInfo,
     region::{LogicalRegion, Position, Size},
-    screencopy::FrameFormat,
+    screencopy::{DMAFrameFormat, FrameFormat},
 };
 
 #[derive(Debug)]
@@ -180,14 +180,14 @@ pub enum FrameState {
 
 pub struct CaptureFrameState {
     pub formats: Vec<FrameFormat>,
-    pub dmabuf_formats: Vec<(u32, u32, u32)>,
+    pub dmabuf_formats: Vec<DMAFrameFormat>,
     pub state: Option<FrameState>,
     pub buffer_done: AtomicBool,
 }
 
 impl Dispatch<ZwpLinuxDmabufV1, ()> for CaptureFrameState {
     fn event(
-        _state: &mut Self,
+        _frame: &mut Self,
         _proxy: &ZwpLinuxDmabufV1,
         _event: zwp_linux_dmabuf_v1::Event,
         _data: &(),
@@ -201,7 +201,7 @@ impl Dispatch<ZwpLinuxBufferParamsV1, ()> for CaptureFrameState {
     fn event(
         _state: &mut Self,
         _proxy: &ZwpLinuxBufferParamsV1,
-        event: zwp_linux_buffer_params_v1::Event,
+        _event: zwp_linux_buffer_params_v1::Event,
         _data: &(),
         _conn: &Connection,
         _qhandle: &QueueHandle<Self>,
@@ -227,6 +227,7 @@ impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
                 stride,
             } => {
                 if let Value(f) = format {
+                    tracing::debug!("Received Buffer event with format: {f:?}");
                     frame.formats.push(FrameFormat {
                         format: f,
                         size: Size { width, height },
@@ -250,7 +251,13 @@ impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
                 width,
                 height,
             } => {
-                frame.dmabuf_formats.push((format, width, height));
+                tracing::debug!(
+                    "Received wlr-screencopy linux_dmabuf event with format: {format} and size {width}x{height}"
+                );
+                frame.dmabuf_formats.push(DMAFrameFormat {
+                    format,
+                    size: Size { width, height },
+                });
             }
             zwlr_screencopy_frame_v1::Event::BufferDone => {
                 frame.buffer_done.store(true, Ordering::SeqCst);
