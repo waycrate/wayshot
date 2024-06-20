@@ -15,7 +15,7 @@ use utils::EncodingFormat;
 
 use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
-use nix::unistd::{fork, ForkResult};
+use rustix::runtime::{fork, Fork};
 
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where
@@ -158,10 +158,10 @@ fn clipboard_daemonize(buffer: Cursor<Vec<u8>>) -> Result<()> {
     match unsafe { fork() } {
         // Having the image persistently available on the clipboard requires a wayshot process to be alive.
         // Fork the process with a child detached from the main process and have the parent exit
-        Ok(ForkResult::Parent { .. }) => {
+        Ok(Fork::Parent(_)) => {
             return Ok(());
         }
-        Ok(ForkResult::Child) => {
+        Ok(Fork::Child(_)) => {
             opts.foreground(true); // Offer the image till something else is available on the clipboard
             opts.copy(
                 Source::Bytes(buffer.into_inner().into()),

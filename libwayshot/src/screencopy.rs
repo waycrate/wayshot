@@ -1,15 +1,14 @@
 use std::{
     ffi::CString,
-    os::fd::{AsRawFd, IntoRawFd, OwnedFd},
+    os::fd::OwnedFd,
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use image::{ColorType, DynamicImage, ImageBuffer, Pixel};
 use memmap2::MmapMut;
-use nix::{
-    fcntl,
-    sys::{memfd, mman, stat},
-    unistd,
+use rustix::{
+    fs::{self, SealFlags},
+    io, shm,
 };
 use wayland_client::protocol::{
     wl_buffer::WlBuffer, wl_output, wl_shm::Format, wl_shm_pool::WlShmPool,
@@ -117,24 +116,19 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     loop {
         // Create a file that closes on succesful execution and seal it's operations.
-        match memfd::memfd_create(
+        match fs::memfd_create(
             CString::new("libwayshot")?.as_c_str(),
-            memfd::MemFdCreateFlag::MFD_CLOEXEC | memfd::MemFdCreateFlag::MFD_ALLOW_SEALING,
+            fs::MemfdFlags::CLOEXEC | fs::MemfdFlags::ALLOW_SEALING,
         ) {
             Ok(fd) => {
                 // This is only an optimization, so ignore errors.
                 // F_SEAL_SRHINK = File cannot be reduced in size.
                 // F_SEAL_SEAL = Prevent further calls to fcntl().
-                let _ = fcntl::fcntl(
-                    fd.as_raw_fd(),
-                    fcntl::F_ADD_SEALS(
-                        fcntl::SealFlag::F_SEAL_SHRINK | fcntl::SealFlag::F_SEAL_SEAL,
-                    ),
-                );
+                let _ = fs::fcntl_add_seals(&fd, fs::SealFlags::SHRINK | SealFlags::SEAL);
                 return Ok(fd);
             }
-            Err(nix::errno::Errno::EINTR) => continue,
-            Err(nix::errno::Errno::ENOSYS) => break,
+            Err(io::Errno::INTR) => continue,
+            Err(io::Errno::NOSYS) => break,
             Err(errno) => return Err(std::io::Error::from(errno)),
         }
     }
@@ -142,7 +136,7 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
     // Fallback to using shm_open.
     let mut mem_file_handle = get_mem_file_handle();
     loop {
-        match mman::shm_open(
+        match shm::shm_open(
             // O_CREAT = Create file if does not exist.
             // O_EXCL = Error if create and file exists.
             // O_RDWR = Open for reading and writing.
@@ -150,25 +144,19 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
             // S_IRUSR = Set user read permission bit .
             // S_IWUSR = Set user write permission bit.
             mem_file_handle.as_str(),
-            fcntl::OFlag::O_CREAT
-                | fcntl::OFlag::O_EXCL
-                | fcntl::OFlag::O_RDWR
-                | fcntl::OFlag::O_CLOEXEC,
-            stat::Mode::S_IRUSR | stat::Mode::S_IWUSR,
+            shm::ShmOFlags::CREATE | shm::ShmOFlags::EXCL | shm::ShmOFlags::RDWR,
+            fs::Mode::RUSR | fs::Mode::WUSR,
         ) {
-            Ok(fd) => match mman::shm_unlink(mem_file_handle.as_str()) {
+            Ok(fd) => match shm::shm_unlink(mem_file_handle.as_str()) {
                 Ok(_) => return Ok(fd),
-                Err(errno) => match unistd::close(fd.into_raw_fd()) {
-                    Ok(_) => return Err(std::io::Error::from(errno)),
-                    Err(errno) => return Err(std::io::Error::from(errno)),
-                },
+                Err(errno) => return Err(std::io::Error::from(errno)),
             },
-            Err(nix::errno::Errno::EEXIST) => {
+            Err(io::Errno::EXIST) => {
                 // If a file with that handle exists then change the handle
                 mem_file_handle = get_mem_file_handle();
                 continue;
             }
-            Err(nix::errno::Errno::EINTR) => continue,
+            Err(io::Errno::INTR) => continue,
             Err(errno) => return Err(std::io::Error::from(errno)),
         }
     }
