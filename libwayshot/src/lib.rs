@@ -247,6 +247,8 @@ impl WayshotConnection {
         Ok((frame_format, frame_guard))
     }
 
+    /// Obtain a screencapture in the form of a WlBuffer backed by a GBM Bufferobject on the GPU.
+    /// Uses the dma-buf provisions of the wlr-screencopy copy protocol to avoid VRAM->RAM copies
     pub fn capture_output_frame_dmabuf(
         &self,
         cursor_overlay: bool,
@@ -262,16 +264,14 @@ impl WayshotConnection {
                         capture_region,
                     )?;
                 let gbm = &dmabuf_state.gbmdev;
-                let bo = gbm
-                    .create_buffer_object::<()>(
-                        frame_format.size.width,
-                        frame_format.size.height,
-                        gbm::Format::try_from(frame_format.format).unwrap(),
-                        BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR,
-                    )
-                    .unwrap();
-                let stride = bo.stride().unwrap();
-                let modifier: u64 = bo.modifier().unwrap().into();
+                let bo = gbm.create_buffer_object::<()>(
+                    frame_format.size.width,
+                    frame_format.size.height,
+                    gbm::Format::try_from(frame_format.format)?,
+                    BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR,
+                )?;
+                let stride = bo.stride()?;
+                let modifier: u64 = bo.modifier()?.into();
 
                 let frame_guard = self.capture_output_frame_inner_dmabuf(
                     state,
@@ -280,12 +280,12 @@ impl WayshotConnection {
                     frame_format,
                     stride,
                     modifier,
-                    bo.fd().unwrap(),
+                    bo.fd()?,
                 )?;
 
                 Ok((frame_format, frame_guard, bo))
             }
-            None => todo!(),
+            None => Err(Error::NoDMAStateError),
         }
     }
 
@@ -514,7 +514,7 @@ impl WayshotConnection {
                     event_queue.blocking_dispatch(&mut state)?;
                 }
             }
-            None => todo!(),
+            None => Err(Error::NoDMAStateError),
         }
     }
 
@@ -571,48 +571,6 @@ impl WayshotConnection {
             event_queue.blocking_dispatch(&mut state)?;
         }
     }
-
-    // /// Get a FrameCopy instance with screenshot pixel data for any wl_output object via dmabuf.
-    // #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{:}", r)).unwrap_or("fullscreen".to_string())))]
-    // fn capture_frame_copy_dmabuf(
-    //     &self,
-    //     cursor_overlay: bool,
-    //     output_info: &OutputInfo,
-    //     capture_region: Option<EmbeddedRegion>,
-    // ) -> Result<(FrameCopy, FrameGuard)> {
-    //     match &self.dmabuf_state {
-    //         Some(dmabuf_state) => {
-    //             let (frame_format, frame_guard, bo) = self.capture_output_frame_dmabuf_from_file(
-    //                 cursor_overlay,
-    //                 &output_info.wl_output,
-    //                 capture_region,
-    //             )?;
-    //             let rotated_physical_size = match output_info.transform {
-    //                 Transform::_90
-    //                 | Transform::_270
-    //                 | Transform::Flipped90
-    //                 | Transform::Flipped270 => Size {
-    //                     width: frame_format.size.height,
-    //                     height: frame_format.size.width,
-    //                 },
-    //                 _ => frame_format.size,
-    //             };
-    //             let frame_copy = FrameCopy {
-    //                 frame_format,
-    //                 frame_color_type,
-    //                 frame_data: FrameData::GBMBo(bo),
-    //                 transform: output_info.transform,
-    //                 logical_region: capture_region
-    //                     .map(|capture_region| capture_region.logical())
-    //                     .unwrap_or(output_info.logical_region),
-    //                 physical_size: rotated_physical_size,
-    //             };
-    //             tracing::debug!("Created frame copy: {:#?}", frame_copy);
-    //             Ok((frame_copy, frame_guard))
-    //         }
-    //         None => todo!(),
-    //     }
-    // }
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
     #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{:}", r)).unwrap_or("fullscreen".to_string())))]

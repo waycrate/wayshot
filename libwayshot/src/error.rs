@@ -1,5 +1,7 @@
 use std::{io, result};
 
+use drm::buffer::UnrecognizedFourcc;
+use gbm::{DeviceDestroyedError, FdError};
 use thiserror::Error;
 use wayland_client::{
     globals::{BindError, GlobalError},
@@ -34,4 +36,12 @@ pub enum Error {
     ProtocolNotFound(String),
     #[error("error occurred in freeze callback")]
     FreezeCallbackError,
+    #[error("dmabuf configuration not initialized")]
+    NoDMAStateError,
+    #[error("dmabuf color format provided by compositor is invalid")]
+    UnrecognizedColorCode(#[from] UnrecognizedFourcc),
+    #[error("dmabuf device is destroyed")]
+    DRMDeviceLost(#[from] DeviceDestroyedError),
+    #[error("obtaining gbm buffer object file descriptor failed")]
+    GBMBoFdError(#[from] FdError),
 }
