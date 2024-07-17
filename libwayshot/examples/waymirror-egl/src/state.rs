@@ -160,6 +160,7 @@ impl WaylandEGLState {
             .capture_output_frame_dmabuf(true, &self.wayshot.get_all_outputs()[0].wl_output, None)
             .unwrap();
         let modifier: u64 = dbg!(bo.modifier().unwrap().into());
+        dbg!(bo.plane_count().unwrap());
         let image_attribs = [
             egl::WIDTH as Attrib,
             frame_format.size.width as Attrib,
@@ -174,7 +175,7 @@ impl WaylandEGLState {
             0x3274, //EGL_DMA_BUF_PLANE0_PITCH_EXT
             bo.stride_for_plane(0).unwrap() as Attrib,
             0x3443, //EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT
-            (modifier as u32 & u32::MAX) as Attrib,
+            (modifier as u32) as Attrib,
             0x3444, //EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT
             (modifier >> 32) as Attrib,
             egl::ATTRIB_NONE,
