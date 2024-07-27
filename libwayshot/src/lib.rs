@@ -280,7 +280,7 @@ impl WayshotConnection {
                     frame_format,
                     stride,
                     modifier,
-                    bo.fd()?,
+                    bo.fd_for_plane(0)?,
                 )?;
 
                 Ok((frame_format, frame_guard, bo))
