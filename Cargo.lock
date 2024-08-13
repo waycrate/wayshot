@@ -567,7 +567,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6aae1df220ece3c0ada96b8153459b67eebe9ae9212258bb0134ae60416fdf76"
 dependencies = [
  "libc",
- "libloading",
+ "pkg-config",
 ]
 
 [[package]]
@@ -604,7 +604,10 @@ version = "0.3.2-dev"
 dependencies = [
  "drm",
  "gbm",
+ "gl",
+ "gl_loader",
  "image",
+ "khronos-egl",
  "memmap2",
  "nix 0.27.1",
  "thiserror",

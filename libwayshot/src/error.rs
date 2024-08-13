@@ -40,8 +40,10 @@ pub enum Error {
     NoDMAStateError,
     #[error("dmabuf color format provided by compositor is invalid")]
     UnrecognizedColorCode(#[from] UnrecognizedFourcc),
-    #[error("dmabuf device is destroyed")]
+    #[error("dmabuf device has been destroyed")]
     DRMDeviceLost(#[from] DeviceDestroyedError),
-    #[error("obtaining gbm buffer object file descriptor failed")]
+    #[error("obtaining gbm buffer object file descriptor failed {0}")]
     GBMBoFdError(#[from] FdError),
+    #[error(" EGLImage import from dmabuf failed: {0}")]
+    EGLError(#[from] khronos_egl::Error),
 }

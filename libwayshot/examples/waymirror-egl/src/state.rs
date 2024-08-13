@@ -4,8 +4,7 @@ use crate::utils::load_shader;
 use libwayshot::WayshotConnection;
 
 use gl::types::{GLeglImageOES, GLuint};
-use khronos_egl::{self as egl, Attrib, DynamicInstance, EGLClientBuffer};
-use std::os::fd::{AsRawFd, IntoRawFd};
+use khronos_egl::{self as egl};
 use std::{ffi::c_void, rc::Rc};
 use wayland_client::{
     protocol::{wl_compositor, wl_display::WlDisplay, wl_surface::WlSurface},
@@ -25,7 +24,7 @@ pub struct WaylandEGLState {
     pub wl_display: WlDisplay,
     pub wl_surface: Option<WlSurface>,
 
-    pub egl: egl::DynamicInstance,
+    pub egl: egl::Instance<egl::Static>,
     pub egl_window: Option<Rc<WlEglSurface>>,
     pub egl_display: Option<egl::Display>,
     pub egl_surface: Option<egl::Surface>,
@@ -47,12 +46,6 @@ impl WaylandEGLState {
     #[tracing::instrument]
     pub fn new() -> Result<Self, ConnectError> {
         let server_connection = Connection::connect_to_env()?;
-        let lib =
-            unsafe { libloading::Library::new("libEGL.so.1").expect("unable to find libEGL.so.1") };
-        let egl = unsafe {
-            egl::DynamicInstance::<egl::EGL1_5>::load_required_from(lib)
-                .expect("unable to load libEGL.so.1")
-        };
 
         Ok(Self {
             width: 1920,
@@ -64,7 +57,7 @@ impl WaylandEGLState {
             wl_display: server_connection.display(),
             wl_surface: None,
 
-            egl: egl,
+            egl: khronos_egl::Instance::new(egl::Static),
             egl_window: None,
             egl_display: None,
             egl_surface: None,
@@ -136,7 +129,6 @@ impl WaylandEGLState {
             .egl
             .choose_first_config(self.egl_display.unwrap(), &attributes)?
             .expect("unable to find an appropriate EGL configuration");
-        dbg!(config);
         self.egl_surface = Some(unsafe {
             self.egl.create_window_surface(
                 self.egl_display.unwrap(),
@@ -222,12 +214,11 @@ impl WaylandEGLState {
         unsafe {
             gl::GenTextures(1, &mut self.gl_texture);
 
-            self.dmabuf_to_egl();
+            self.dmabuf_to_texture();
 
             gl::GenVertexArrays(1, &mut vao as *mut u32);
             gl::GenBuffers(1, &mut vbo as *mut u32);
             gl::GenBuffers(1, &mut ebo as *mut u32);
-            dbg!(vbo, vao, ebo);
             gl::BindVertexArray(vao);
 
             gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
@@ -278,7 +269,7 @@ impl WaylandEGLState {
             gl::ClearColor(1.0, 1.0, 0.0, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
             gl::DeleteTextures(1, &mut self.gl_texture);
-            self.dmabuf_to_egl();
+            self.dmabuf_to_texture();
             gl::UseProgram(self.gl_program);
             //gl::BindTexture(gl::TEXTURE_2D, self.gl_texture);
             //gl::BindVertexArray(1);
@@ -286,83 +277,12 @@ impl WaylandEGLState {
         }
     }
 
-    pub fn dmabuf_to_egl(&self) {
-        type Attrib = egl::Attrib;
-        let (frame_format, guard, bo) = self
+    pub fn dmabuf_to_texture(&self) {
+        let image = self
             .wayshot
-            .capture_output_frame_dmabuf(true, &self.wayshot.get_all_outputs()[0].wl_output, None)
+            .capture_output_frame_eglimage(true, &self.wayshot.get_all_outputs()[0].wl_output, None)
             .unwrap();
-        self.egl_window.as_ref().unwrap().resize(
-            frame_format.size.width as i32,
-            frame_format.size.height as i32,
-            0,
-            0,
-        );
         unsafe {
-            gl::Viewport(
-                0,
-                0,
-                frame_format.size.width as i32,
-                frame_format.size.height as i32,
-            )
-        };
-        // let modifier: u64 = dbg!(bo.modifier().unwrap().into());
-        // dbg!(bo.plane_count().unwrap());
-        let image_attribs = [
-            egl::WIDTH as Attrib,
-            frame_format.size.width as Attrib,
-            egl::HEIGHT as Attrib,
-            frame_format.size.height as Attrib,
-            0x3271, //EGL_LINUX_DRM_FOURCC_EXT
-            bo.format().unwrap() as Attrib,
-            0x3272, //EGL_DMA_BUF_PLANE0_FD_EXT
-            bo.fd_for_plane(0).unwrap().into_raw_fd() as Attrib,
-            0x3273, //EGL_DMA_BUF_PLANE0_OFFSET_EXT
-            bo.offset(0).unwrap() as Attrib,
-            0x3274, //EGL_DMA_BUF_PLANE0_PITCH_EXT
-            bo.stride_for_plane(0).unwrap() as Attrib,
-            // 0x3443, //EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT
-            // (modifier as u32) as Attrib,
-            // 0x3444, //EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT
-            // (modifier >> 32) as Attrib,
-            egl::ATTRIB_NONE as Attrib,
-        ];
-
-        // self.wl_surface
-        //     .as_ref()
-        //     .unwrap()
-        //     .attach(Some(&guard.buffer), 0, 0);
-        // self.wl_surface.as_ref().unwrap().commit();
-        // let wlbuf = guard.buffer.id().as_ptr();
-        // dbg!(image_attribs, image_attribs.len());
-        unsafe {
-            // let egl_create_image_khr: unsafe extern "system" fn(
-            //     display: khronos_egl::EGLDisplay,
-            //     ctx: khronos_egl::EGLContext,
-            //     target: khronos_egl::Enum,
-            //     buffer: khronos_egl::EGLClientBuffer,
-            //     attrib_list: *const Attrib,
-            // )
-            //     -> khronos_egl::EGLImage =
-            //     std::mem::transmute(dbg!(self.egl.get_proc_address("eglCreateImage").unwrap()));
-            // let image = egl_create_image_khr(
-            //     self.egl_display.unwrap().as_ptr(),
-            //     egl::NO_CONTEXT,
-            //     0x3270,
-            //     std::ptr::null_mut() as EGLClientBuffer,
-            //     image_attribs.as_ptr(),
-            // );
-            let image = self
-                .egl
-                .create_image(
-                    self.egl_display.unwrap(),
-                    khronos_egl::Context::from_ptr(egl::NO_CONTEXT),
-                    0x3270, // EGL_LINUX_DMA_BUF_EXT
-                    khronos_egl::ClientBuffer::from_ptr(std::ptr::null_mut()), //NULL
-                    &image_attribs,
-                )
-                .unwrap();
-            //dbg!(image, self.egl.get_error());
             let gl_egl_image_texture_target_2d_oes: unsafe extern "system" fn(
                 target: gl::types::GLenum,
                 image: GLeglImageOES,
@@ -380,42 +300,7 @@ impl WaylandEGLState {
             self.egl
                 .destroy_image(self.egl_display.unwrap(), image)
                 .unwrap();
-
-            // let image_wl_attribs = [
-            //     0x31D6 as Attrib, //EGL_WAYLAND_PLANE_WL
-            //     0 as Attrib,
-            //     egl::ATTRIB_NONE as Attrib,
-            // ];
-            // let image = egl_create_image_khr(
-            //     self.egl_display.unwrap().as_ptr(),
-            //     egl::NO_CONTEXT as *mut c_void,
-            //     0x31D5, //EGL_WAYLAND_BUFFER_WL,
-            //     wlbuf as *mut c_void,
-            //     image_wl_attribs.as_ptr(),
-            // );
-            // dbg!(image, self.egl.get_error());
-            //assert_ne!(image, 0 as *mut c_void);
-            // self.egl
-            //     .create_image(
-            //         self.egl_display.unwrap(),
-            //         khronos_egl::Context::from_ptr(egl::NO_CONTEXT),
-            //         0x31D5, //EGL_WAYLAND_BUFFER_WL,
-            //         khronos_egl::ClientBuffer::from_ptr(wlbuf.display_ptr() as *mut c_void), //NULL
-            //         &image_wl_attribs,
-            //     )
-            //     .unwrap();
         }
-        // self.egl_image = Some(unsafe {
-        //     self.egl
-        //         .create_image(
-        //             self.egl_display.unwrap(),
-        //             khronos_egl::Context::from_ptr(egl::NO_CONTEXT),
-        //             0x3270,                                       // EGL_LINUX_DMA_BUF_EXT
-        //             ClientBuffer::from_ptr(std::ptr::null_mut()), //NULL
-        //             &image_attribs,
-        //         )
-        //         .unwrap()
-        // });
     }
 
     pub fn validate_globals(&self) -> Result<()> {

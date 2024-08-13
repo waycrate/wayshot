@@ -13,14 +13,16 @@ mod screencopy;
 
 use std::{
     collections::HashSet,
+    ffi::c_void,
     fs::File,
-    os::fd::{AsFd, BorrowedFd, OwnedFd},
+    os::fd::{AsFd, IntoRawFd, OwnedFd},
     sync::atomic::{AtomicBool, Ordering},
     thread,
 };
 
-use dispatch::LayerShellState;
+use dispatch::{DMABUFState, LayerShellState};
 use image::{imageops::replace, DynamicImage};
+use khronos_egl::{self as egl, Instance};
 use memmap2::MmapMut;
 use region::{EmbeddedRegion, RegionCapturer};
 use screencopy::{DMAFrameFormat, DMAFrameGuard, FrameData, FrameGuard};
@@ -68,32 +70,6 @@ pub mod reexport {
     pub use wl_output::{Transform, WlOutput};
 }
 use gbm::{BufferObject, BufferObjectFlags, Device as GBMDevice};
-struct Card(std::fs::File);
-
-/// Implementing [`AsFd`] is a prerequisite to implementing the traits found
-/// in this crate. Here, we are just calling [`File::as_fd()`] on the inner
-/// [`File`].
-impl AsFd for Card {
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        self.0.as_fd()
-    }
-}
-impl drm::Device for Card {}
-/// Simple helper methods for opening a `Card`.
-impl Card {
-    pub fn open(path: &str) -> Self {
-        let mut options = std::fs::OpenOptions::new();
-        options.read(true);
-        options.write(true);
-        Card(options.open(path).unwrap())
-    }
-}
-
-#[derive(Debug)]
-struct DMABUFState {
-    linux_dmabuf: ZwpLinuxDmabufV1,
-    gbmdev: GBMDevice<Card>,
-}
 
 /// Struct to store wayland connection and globals list.
 /// # Example usage
@@ -137,7 +113,7 @@ impl WayshotConnection {
         let (globals, evq) = registry_queue_init::<WayshotState>(&conn)?;
         let linux_dmabuf =
             globals.bind(&evq.handle(), 4..=ZwpLinuxDmabufV1::interface().version, ())?;
-        let gpu = Card::open("/dev/dri/renderD128");
+        let gpu = dispatch::Card::open("/dev/dri/renderD128");
         // init a GBM device
         let gbm = GBMDevice::new(gpu).unwrap();
         let mut initial_state = Self {
@@ -245,6 +221,72 @@ impl WayshotConnection {
             self.capture_output_frame_inner(state, event_queue, frame, frame_format, file)?;
 
         Ok((frame_format, frame_guard))
+    }
+    pub fn capture_output_frame_eglimage(
+        &self,
+        cursor_overlay: bool,
+        output: &WlOutput,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<egl::Image> {
+        let egl = khronos_egl::Instance::new(egl::Static);
+        let egl_display = unsafe {
+            match egl.get_display(self.conn.display().id().as_ptr() as *mut c_void) {
+                Some(disp) => disp,
+                None => return Err(egl.get_error().unwrap().into()),
+            }
+        };
+
+        egl.initialize(egl_display)?;
+        self.capture_output_frame_eglimage_on_display(
+            &egl,
+            egl_display,
+            cursor_overlay,
+            output,
+            capture_region,
+        )
+    }
+    pub fn capture_output_frame_eglimage_on_display<T: khronos_egl::api::EGL1_5>(
+        &self,
+        egl_instance: &Instance<T>,
+        egl_display: egl::Display,
+        cursor_overlay: bool,
+        output: &WlOutput,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<egl::Image> {
+        type Attrib = egl::Attrib;
+        let (frame_format, _guard, bo) =
+            self.capture_output_frame_dmabuf(cursor_overlay, output, capture_region)?;
+        let image_attribs = [
+            egl::WIDTH as Attrib,
+            frame_format.size.width as Attrib,
+            egl::HEIGHT as Attrib,
+            frame_format.size.height as Attrib,
+            0x3271, //EGL_LINUX_DRM_FOURCC_EXT
+            bo.format().unwrap() as Attrib,
+            0x3272, //EGL_DMA_BUF_PLANE0_FD_EXT
+            bo.fd_for_plane(0).unwrap().into_raw_fd() as Attrib,
+            0x3273, //EGL_DMA_BUF_PLANE0_OFFSET_EXT
+            bo.offset(0).unwrap() as Attrib,
+            0x3274, //EGL_DMA_BUF_PLANE0_PITCH_EXT
+            bo.stride_for_plane(0).unwrap() as Attrib,
+            // 0x3443, //EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT
+            // (modifier as u32) as Attrib,
+            // 0x3444, //EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT
+            // (modifier >> 32) as Attrib,
+            egl::ATTRIB_NONE as Attrib,
+        ];
+        unsafe {
+            match egl_instance.create_image(
+                egl_display,
+                khronos_egl::Context::from_ptr(egl::NO_CONTEXT),
+                0x3270, // EGL_LINUX_DMA_BUF_EXT
+                khronos_egl::ClientBuffer::from_ptr(std::ptr::null_mut()), //NULL
+                &image_attribs,
+            ) {
+                Ok(image) => Ok(image),
+                Err(e) => Err(e.into()),
+            }
+        }
     }
 
     /// Obtain a screencapture in the form of a WlBuffer backed by a GBM Bufferobject on the GPU.

@@ -1,5 +1,6 @@
 use std::{
     collections::HashSet,
+    os::fd::{AsFd, BorrowedFd},
     sync::atomic::{AtomicBool, Ordering},
 };
 use wayland_client::{
@@ -326,4 +327,29 @@ impl wayland_client::Dispatch<ZwlrLayerSurfaceV1, WlOutput> for LayerShellState 
             _ => {}
         }
     }
+}
+pub(crate) struct Card(std::fs::File);
+
+/// Implementing [`AsFd`] is a prerequisite to implementing the traits found
+/// in this crate. Here, we are just calling [`File::as_fd()`] on the inner
+/// [`File`].
+impl AsFd for Card {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.0.as_fd()
+    }
+}
+impl drm::Device for Card {}
+/// Simple helper methods for opening a `Card`.
+impl Card {
+    pub fn open(path: &str) -> Self {
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true);
+        options.write(true);
+        Card(options.open(path).unwrap())
+    }
+}
+#[derive(Debug)]
+pub(crate) struct DMABUFState {
+    pub linux_dmabuf: ZwpLinuxDmabufV1,
+    pub gbmdev: gbm::Device<Card>,
 }
