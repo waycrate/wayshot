@@ -36,7 +36,7 @@ pub enum Error {
     ProtocolNotFound(String),
     #[error("error occurred in freeze callback")]
     FreezeCallbackError,
-    #[error("dmabuf configuration not initialized")]
+    #[error("dmabuf configuration not initialized. Did you not use Wayshot::from_connection_with_dmabuf()?")]
     NoDMAStateError,
     #[error("dmabuf color format provided by compositor is invalid")]
     UnrecognizedColorCode(#[from] UnrecognizedFourcc),

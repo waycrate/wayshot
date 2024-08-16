@@ -109,6 +109,11 @@ impl WayshotConnection {
         Ok(initial_state)
     }
 
+    ///Create a WayshotConnection struct having DMA-BUF support
+    /// Using this connection is required to make use of the dmabuf functions
+    ///# Parameters
+    /// - conn: a Wayland connection
+    /// - device_path: string pointing to the DRI device that is to be used for creating the DMA-BUFs on. For example: "/dev/dri/renderD128"
     pub fn from_connection_with_dmabuf(conn: Connection, device_path: &str) -> Result<Self> {
         let (globals, evq) = registry_queue_init::<WayshotState>(&conn)?;
         let linux_dmabuf =
