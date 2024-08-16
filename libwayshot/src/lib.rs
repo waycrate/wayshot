@@ -25,7 +25,7 @@ use image::{imageops::replace, DynamicImage};
 use khronos_egl::{self as egl, Instance};
 use memmap2::MmapMut;
 use region::{EmbeddedRegion, RegionCapturer};
-use screencopy::{DMAFrameFormat, DMAFrameGuard, FrameData, FrameGuard};
+use screencopy::{DMAFrameFormat, DMAFrameGuard, EGLImageGuard, FrameData, FrameGuard};
 use tracing::debug;
 use wayland_client::{
     globals::{registry_queue_init, GlobalList},
@@ -222,40 +222,72 @@ impl WayshotConnection {
 
         Ok((frame_format, frame_guard))
     }
-    pub fn capture_output_frame_eglimage(
+
+    /// Obtain a screencapture in the form of a EGLImage.
+    /// The display on which this image is created is obtained from the Wayland Connection.
+    /// Uses the dma-buf provisions of the wlr-screencopy copy protocol to avoid VRAM->RAM copies
+    /// It returns the captured frame as an `EGLImage`, wrapped in an `EGLImageGuard`
+    /// for safe handling and cleanup.
+    /// # Parameters
+    /// - `egl_instance`: Reference to an `EGL1_5` instance, which is used to create the `EGLImage`.
+    /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
+    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
+    /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
+    ///
+    /// # Returns
+    /// If successful, an EGLImageGuard which contains a pointer 'image' to the created EGLImage
+    /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
+    pub fn capture_output_frame_eglimage<'a, T: khronos_egl::api::EGL1_5>(
         &self,
+        egl_instance: &'a Instance<T>,
         cursor_overlay: bool,
         output: &WlOutput,
         capture_region: Option<EmbeddedRegion>,
-    ) -> Result<egl::Image> {
-        let egl = khronos_egl::Instance::new(egl::Static);
+    ) -> Result<EGLImageGuard<'a, T>> {
         let egl_display = unsafe {
-            match egl.get_display(self.conn.display().id().as_ptr() as *mut c_void) {
+            match egl_instance.get_display(self.conn.display().id().as_ptr() as *mut c_void) {
                 Some(disp) => disp,
-                None => return Err(egl.get_error().unwrap().into()),
+                None => return Err(egl_instance.get_error().unwrap().into()),
             }
         };
 
-        egl.initialize(egl_display)?;
+        egl_instance.initialize(egl_display)?;
         self.capture_output_frame_eglimage_on_display(
-            &egl,
+            &egl_instance,
             egl_display,
             cursor_overlay,
             output,
             capture_region,
         )
     }
-    pub fn capture_output_frame_eglimage_on_display<T: khronos_egl::api::EGL1_5>(
+
+    /// Obtain a screencapture in the form of a EGLImage on the given EGLDisplay.
+    ///
+    /// Uses the dma-buf provisions of the wlr-screencopy copy protocol to avoid VRAM->RAM copies
+    /// It returns the captured frame as an `EGLImage`, wrapped in an `EGLImageGuard`
+    /// for safe handling and cleanup.
+    /// # Parameters
+    /// - `egl_instance`: Reference to an `EGL1_5` instance, which is used to create the `EGLImage`.
+    /// - `egl_display`: The `EGLDisplay` on which the image should be created.
+    /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
+    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
+    /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
+    ///
+    /// # Returns
+    /// If successful, an EGLImageGuard which contains a pointer 'image' to the created EGLImage
+    /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
+    pub fn capture_output_frame_eglimage_on_display<'a, T: khronos_egl::api::EGL1_5>(
         &self,
-        egl_instance: &Instance<T>,
+        egl_instance: &'a Instance<T>,
         egl_display: egl::Display,
         cursor_overlay: bool,
         output: &WlOutput,
         capture_region: Option<EmbeddedRegion>,
-    ) -> Result<egl::Image> {
+    ) -> Result<EGLImageGuard<'a, T>> {
         type Attrib = egl::Attrib;
         let (frame_format, _guard, bo) =
             self.capture_output_frame_dmabuf(cursor_overlay, output, capture_region)?;
+        let modifier: u64 = bo.modifier()?.into();
         let image_attribs = [
             egl::WIDTH as Attrib,
             frame_format.size.width as Attrib,
@@ -269,10 +301,10 @@ impl WayshotConnection {
             bo.offset(0).unwrap() as Attrib,
             0x3274, //EGL_DMA_BUF_PLANE0_PITCH_EXT
             bo.stride_for_plane(0).unwrap() as Attrib,
-            // 0x3443, //EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT
-            // (modifier as u32) as Attrib,
-            // 0x3444, //EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT
-            // (modifier >> 32) as Attrib,
+            0x3443, //EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT
+            (modifier as u32) as Attrib,
+            0x3444, //EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT
+            (modifier >> 32) as Attrib,
             egl::ATTRIB_NONE as Attrib,
         ];
         unsafe {
@@ -283,7 +315,11 @@ impl WayshotConnection {
                 khronos_egl::ClientBuffer::from_ptr(std::ptr::null_mut()), //NULL
                 &image_attribs,
             ) {
-                Ok(image) => Ok(image),
+                Ok(image) => Ok(EGLImageGuard {
+                    image,
+                    egl_instance,
+                    egl_display,
+                }),
                 Err(e) => Err(e.into()),
             }
         }
@@ -291,6 +327,16 @@ impl WayshotConnection {
 
     /// Obtain a screencapture in the form of a WlBuffer backed by a GBM Bufferobject on the GPU.
     /// Uses the dma-buf provisions of the wlr-screencopy copy protocol to avoid VRAM->RAM copies
+    /// The captured frame is returned as a tuple containing the frame format, a guard to manage
+    /// the WlBuffer's cleanup on drop, and the underlying `BufferObject`.
+    /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
+    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
+    /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
+    ///# Returns
+    /// On success, returns a tuple containing the frame format,
+    ///   a guard to manage the frame's lifecycle, and the GPU-backed `BufferObject`.
+    /// # Errors
+    /// - Returns `NoDMAStateError` if the DMA-BUF state is not initialized a the time of initialization of this struct.
     pub fn capture_output_frame_dmabuf(
         &self,
         cursor_overlay: bool,

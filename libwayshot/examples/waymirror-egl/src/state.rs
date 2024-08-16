@@ -51,7 +51,7 @@ impl WaylandEGLState {
             width: 1920,
             height: 1080,
             running: true,
-            title: "Nya".into(),
+            title: "Waymirror-EGL".into(),
 
             wl_connection: server_connection.clone(),
             wl_display: server_connection.display(),
@@ -259,8 +259,8 @@ impl WaylandEGLState {
             );
             gl::EnableVertexAttribArray(1);
             gl::BindBuffer(gl::ARRAY_BUFFER, 0);
-            //gl::BindVertexArray(0);
         }
+        self.dmabuf_to_texture();
         Ok(())
     }
 
@@ -268,19 +268,22 @@ impl WaylandEGLState {
         unsafe {
             gl::ClearColor(1.0, 1.0, 0.0, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
-            gl::DeleteTextures(1, &mut self.gl_texture);
-            self.dmabuf_to_texture();
+            // gl::DeleteTextures(1, &mut self.gl_texture);
+
             gl::UseProgram(self.gl_program);
-            //gl::BindTexture(gl::TEXTURE_2D, self.gl_texture);
-            //gl::BindVertexArray(1);
             gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, 0 as *const c_void);
         }
     }
 
     pub fn dmabuf_to_texture(&self) {
-        let image = self
+        let eglimage_guard = self
             .wayshot
-            .capture_output_frame_eglimage(true, &self.wayshot.get_all_outputs()[0].wl_output, None)
+            .capture_output_frame_eglimage(
+                &self.egl,
+                true,
+                &self.wayshot.get_all_outputs()[0].wl_output,
+                None,
+            )
             .unwrap();
         unsafe {
             let gl_egl_image_texture_target_2d_oes: unsafe extern "system" fn(
@@ -296,10 +299,7 @@ impl WaylandEGLState {
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
 
-            gl_egl_image_texture_target_2d_oes(gl::TEXTURE_2D, image.as_ptr());
-            self.egl
-                .destroy_image(self.egl_display.unwrap(), image)
-                .unwrap();
+            gl_egl_image_texture_target_2d_oes(gl::TEXTURE_2D, eglimage_guard.image.as_ptr());
         }
     }
 

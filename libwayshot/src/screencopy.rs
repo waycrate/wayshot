@@ -42,6 +42,22 @@ impl Drop for DMAFrameGuard {
     }
 }
 
+pub struct EGLImageGuard<'a, T: khronos_egl::api::EGL1_5> {
+    pub image: khronos_egl::Image,
+    pub(crate) egl_instance: &'a khronos_egl::Instance<T>,
+    pub(crate) egl_display: khronos_egl::Display,
+}
+
+impl<'a, T: khronos_egl::api::EGL1_5> Drop for EGLImageGuard<'a, T> {
+    fn drop(&mut self) {
+        self.egl_instance
+            .destroy_image(self.egl_display, self.image)
+            .unwrap_or_else(|e| {
+                tracing::error!("EGLimage destruction had error: {e}");
+            });
+    }
+}
+
 /// Type of frame supported by the compositor. For now we only support Argb8888, Xrgb8888, and
 /// Xbgr8888.
 ///

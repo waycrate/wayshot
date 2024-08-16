@@ -53,7 +53,6 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     while state.running {
         event_queue.dispatch_pending(&mut state)?;
         // event_queue.blocking_dispatch(&mut state)?;
-        // state.dmabuf_to_egl()
         state.draw();
         state
             .egl
