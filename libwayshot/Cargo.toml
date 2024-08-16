@@ -18,6 +18,7 @@ thiserror = "1"
 wayland-client = "0.31.1"
 wayland-protocols = { version = "0.31.0", features = ["client", "unstable"] }
 wayland-protocols-wlr = { version = "0.2.0", features = ["client"] }
+wayland-backend = { version = "0.3.3", features = ["client_system"] }
 
 gbm = "0.15.0"
 drm = "0.12.0"
