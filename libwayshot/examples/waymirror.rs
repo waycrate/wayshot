@@ -18,7 +18,8 @@ fn main() {
 
     let display = conn.display();
     display.get_registry(&qhandle, ());
-    let wayshot = WayshotConnection::from_connection_with_dmabuf(conn).unwrap();
+    let wayshot =
+        WayshotConnection::from_connection_with_dmabuf(conn, "/dev/dri/renderD128").unwrap();
 
     let mut state = State {
         wayshot,

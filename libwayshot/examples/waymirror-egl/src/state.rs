@@ -70,7 +70,11 @@ impl WaylandEGLState {
             xdg_surface: None,
             xdg_toplevel: None,
             wl_compositor: None,
-            wayshot: WayshotConnection::from_connection_with_dmabuf(server_connection).unwrap(),
+            wayshot: WayshotConnection::from_connection_with_dmabuf(
+                server_connection,
+                "/dev/dri/renderD128",
+            )
+            .unwrap(),
         })
     }
 

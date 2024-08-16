@@ -109,11 +109,11 @@ impl WayshotConnection {
         Ok(initial_state)
     }
 
-    pub fn from_connection_with_dmabuf(conn: Connection) -> Result<Self> {
+    pub fn from_connection_with_dmabuf(conn: Connection, device_path: &str) -> Result<Self> {
         let (globals, evq) = registry_queue_init::<WayshotState>(&conn)?;
         let linux_dmabuf =
             globals.bind(&evq.handle(), 4..=ZwpLinuxDmabufV1::interface().version, ())?;
-        let gpu = dispatch::Card::open("/dev/dri/renderD128");
+        let gpu = dispatch::Card::open(device_path);
         // init a GBM device
         let gbm = GBMDevice::new(gpu).unwrap();
         let mut initial_state = Self {
