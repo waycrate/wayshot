@@ -264,7 +264,6 @@ impl WaylandEGLState {
             gl::EnableVertexAttribArray(1);
             gl::BindBuffer(gl::ARRAY_BUFFER, 0);
         }
-        self.dmabuf_to_texture();
         Ok(())
     }
 
