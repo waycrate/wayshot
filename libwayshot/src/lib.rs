@@ -227,6 +227,49 @@ impl WayshotConnection {
 
         Ok((frame_format, frame_guard))
     }
+    /// Helper function/wrapper that uses the OpenGL extension OES_EGL_image to convert the EGLImage obtained from [`WayshotConnection::capture_output_frame_eglimage`]
+    /// into a OpenGL texture.
+    /// - The caller is supposed to setup everything required for the texture binding. An example call may look like:
+    /// ```
+    /// gl::BindTexture(gl::TEXTURE_2D, self.gl_texture);
+    /// gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+    /// wayshot_conn
+    ///     .bind_output_frame_to_gl_texture(
+    ///         true,
+    ///        &wayshot_conn.get_all_outputs()[0].wl_output,
+    ///        None)
+    ///```
+    /// # Parameters
+    /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
+    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
+    /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
+    /// # Returns
+    /// - If the function was found and called, an OK(()), note that this does not neccesarily mean that binding was successful, only that the function was called.
+    /// The caller may check for any OpenGL errors using the standard routes.
+    /// - If the function was not found, [`Error::EGLImageToTexProcNotFoundError`] is returned
+    pub unsafe fn bind_output_frame_to_gl_texture(
+        &self,
+        cursor_overlay: bool,
+        output: &WlOutput,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<()> {
+        let egl = khronos_egl::Instance::new(egl::Static);
+        let eglimage_guard =
+            self.capture_output_frame_eglimage(&egl, cursor_overlay, output, capture_region)?;
+        unsafe {
+            let gl_egl_image_texture_target_2d_oes: unsafe extern "system" fn(
+                target: gl::types::GLenum,
+                image: gl::types::GLeglImageOES,
+            ) -> () =
+                std::mem::transmute(match egl.get_proc_address("glEGLImageTargetTexture2DOES") {
+                    Some(a) => a,
+                    None => return Err(Error::EGLImageToTexProcNotFoundError),
+                });
+
+            gl_egl_image_texture_target_2d_oes(gl::TEXTURE_2D, eglimage_guard.image.as_ptr());
+            Ok(())
+        }
+    }
 
     /// Obtain a screencapture in the form of a EGLImage.
     /// The display on which this image is created is obtained from the Wayland Connection.
@@ -234,7 +277,7 @@ impl WayshotConnection {
     /// It returns the captured frame as an `EGLImage`, wrapped in an `EGLImageGuard`
     /// for safe handling and cleanup.
     /// # Parameters
-    /// - `egl_instance`: Reference to an `EGL1_5` instance, which is used to create the `EGLImage`.
+    /// - `egl_instance`: Reference to an egl API instance obtained from the khronos_egl crate, which is used to create the `EGLImage`.
     /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
     /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
     /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.

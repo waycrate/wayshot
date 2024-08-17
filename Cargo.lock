@@ -605,7 +605,6 @@ dependencies = [
  "drm",
  "gbm",
  "gl",
- "gl_loader",
  "image",
  "khronos-egl",
  "memmap2",

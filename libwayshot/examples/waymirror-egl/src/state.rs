@@ -3,7 +3,7 @@ use crate::utils::load_shader;
 
 use libwayshot::WayshotConnection;
 
-use gl::types::{GLeglImageOES, GLuint};
+use gl::types::GLuint;
 use khronos_egl::{self as egl};
 use std::{ffi::c_void, rc::Rc};
 use wayland_client::{
@@ -279,30 +279,17 @@ impl WaylandEGLState {
     }
 
     pub fn dmabuf_to_texture(&self) {
-        let eglimage_guard = self
-            .wayshot
-            .capture_output_frame_eglimage(
-                &self.egl,
-                true,
-                &self.wayshot.get_all_outputs()[0].wl_output,
-                None,
-            )
-            .unwrap();
         unsafe {
-            let gl_egl_image_texture_target_2d_oes: unsafe extern "system" fn(
-                target: gl::types::GLenum,
-                image: GLeglImageOES,
-            ) -> () = std::mem::transmute(
-                self.egl
-                    .get_proc_address("glEGLImageTargetTexture2DOES")
-                    .unwrap(),
-            );
-
             gl::BindTexture(gl::TEXTURE_2D, self.gl_texture);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
 
-            gl_egl_image_texture_target_2d_oes(gl::TEXTURE_2D, eglimage_guard.image.as_ptr());
+            self.wayshot
+                .bind_output_frame_to_gl_texture(
+                    true,
+                    &self.wayshot.get_all_outputs()[0].wl_output,
+                    None,
+                )
+                .unwrap();
         }
     }
 

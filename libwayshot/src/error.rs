@@ -46,4 +46,6 @@ pub enum Error {
     GBMBoFdError(#[from] FdError),
     #[error(" EGLImage import from dmabuf failed: {0}")]
     EGLError(#[from] khronos_egl::Error),
+    #[error("No EGLImageTargetTexture2DOES function located, this extension may not be supported")]
+    EGLImageToTexProcNotFoundError,
 }
