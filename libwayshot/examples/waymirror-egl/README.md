@@ -1,7 +1,8 @@
-# wayland-egl-ctx
+# waymirror-egl
+Example code for using the libwayshot DMA-BUF GL screencapture pipeline.
 
-Example wayland xdg window driven using egl
+This example sets up an EGL+OpenGL context, sets up libwayshot and renders the main display onto a rectangle after converting the screencapture into a texture.
 
-# TODO
+Adapted from https://github.com/Shinyzenith/wayland-egl-ctx, all credits to @Shinyzenith
 
-- [x] Get GL calls to work
+Run using `cargo run` inside this directory.
