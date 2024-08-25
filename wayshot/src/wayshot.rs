@@ -66,8 +66,8 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let image_buffer = if let Some(slurp_region) = cli.slurp {
-        let slurp_region = slurp_region.clone();
+    let image_buffer = if let Some(slurp_args) = cli.slurp {
+        let slurp_region = slurp_args.unwrap_or("".to_string());
         wayshot_conn.screenshot_freeze(
             Box::new(move || {
                 || -> Result<LogicalRegion> {
