@@ -8,7 +8,7 @@ use state::WaylandEGLState;
 
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::TRACE)
+        .with_max_level(tracing::Level::DEBUG)
         .with_writer(std::io::stderr)
         .init();
 
@@ -51,13 +51,12 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     state.init_egl()?;
     while state.running {
         event_queue.dispatch_pending(&mut state)?;
-        // event_queue.blocking_dispatch(&mut state)?;
         state.draw();
         state
             .egl
             .swap_buffers(state.egl_display.unwrap(), state.egl_surface.unwrap())?;
 
-        //tracing::event!(tracing::Level::DEBUG, "eglSwapBuffers called");
+        tracing::trace!("eglSwapBuffers called");
     }
     state.deinit()?;
 
