@@ -29,7 +29,6 @@ pub struct WaylandEGLState {
     pub egl_display: Option<egl::Display>,
     pub egl_surface: Option<egl::Surface>,
     pub egl_context: Option<egl::Context>,
-    pub egl_image: Option<egl::Image>,
 
     pub gl_program: GLuint,
     pub gl_texture: GLuint,
@@ -62,7 +61,6 @@ impl WaylandEGLState {
             egl_display: None,
             egl_surface: None,
             egl_context: None,
-            egl_image: None,
             gl_program: 0,
             gl_texture: 0,
 
