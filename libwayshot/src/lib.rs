@@ -262,11 +262,18 @@ impl WayshotConnection {
                 image: gl::types::GLeglImageOES,
             ) -> () =
                 std::mem::transmute(match egl.get_proc_address("glEGLImageTargetTexture2DOES") {
-                    Some(a) => a,
-                    None => return Err(Error::EGLImageToTexProcNotFoundError),
+                    Some(f) => {
+                        tracing::debug!("glEGLImageTargetTexture2DOES found at address {:#?}", f);
+                        f
+                    }
+                    None => {
+                        tracing::error!("glEGLImageTargetTexture2DOES not found");
+                        return Err(Error::EGLImageToTexProcNotFoundError);
+                    }
                 });
 
             gl_egl_image_texture_target_2d_oes(gl::TEXTURE_2D, eglimage_guard.image.as_ptr());
+            tracing::trace!("glEGLImageTargetTexture2DOES called");
             Ok(())
         }
     }
@@ -298,6 +305,7 @@ impl WayshotConnection {
                 None => return Err(egl_instance.get_error().unwrap().into()),
             }
         };
+        tracing::trace!("eglDisplay obtained from Wayland connection's display");
 
         egl_instance.initialize(egl_display)?;
         self.capture_output_frame_eglimage_on_display(
@@ -355,6 +363,10 @@ impl WayshotConnection {
             (modifier >> 32) as Attrib,
             egl::ATTRIB_NONE as Attrib,
         ];
+        tracing::debug!(
+            "Calling eglCreateImage with attributes: {:#?}",
+            image_attribs
+        );
         unsafe {
             match egl_instance.create_image(
                 egl_display,
@@ -368,7 +380,10 @@ impl WayshotConnection {
                     egl_instance,
                     egl_display,
                 }),
-                Err(e) => Err(e.into()),
+                Err(e) => {
+                    tracing::error!("eglCreateImage call failed with error {e}");
+                    Err(e.into())
+                }
             }
         }
     }
@@ -406,9 +421,14 @@ impl WayshotConnection {
                     gbm::Format::try_from(frame_format.format)?,
                     BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR,
                 )?;
+
                 let stride = bo.stride()?;
                 let modifier: u64 = bo.modifier()?.into();
-
+                tracing::debug!(
+                    "Created GBM Buffer object with input frame format {:#?}, stride {:#?} and modifier {:#?} ",
+                    frame_format,
+                    stride,modifier
+                );
                 let frame_guard = self.capture_output_frame_inner_dmabuf(
                     state,
                     event_queue,
@@ -461,7 +481,7 @@ impl WayshotConnection {
             }
         };
 
-        debug!("Capturing output...");
+        tracing::debug!("Capturing output(shm buffer)...");
         let frame = if let Some(embedded_region) = capture_region {
             screencopy_manager.capture_output_region(
                 cursor_overlay,
@@ -552,7 +572,7 @@ impl WayshotConnection {
             }
         };
 
-        debug!("Capturing output...");
+        tracing::debug!("Capturing output for DMA-BUF API...");
         let frame = if let Some(embedded_region) = capture_region {
             screencopy_manager.capture_output_region(
                 cursor_overlay,
@@ -605,6 +625,7 @@ impl WayshotConnection {
                 let dma_height = frame_format.size.height;
 
                 let dma_params = linux_dmabuf.create_params(&qh, ());
+
                 dma_params.add(
                     fd.as_fd(),
                     0,
@@ -613,6 +634,7 @@ impl WayshotConnection {
                     (modifier >> 32) as u32,
                     (modifier & 0xffffffff) as u32,
                 );
+                tracing::trace!("Called  ZwpLinuxBufferParamsV1::create_params ");
                 let dmabuf_wlbuf = dma_params.create_immed(
                     dma_width as i32,
                     dma_height as i32,
@@ -621,13 +643,11 @@ impl WayshotConnection {
                     &qh,
                     (),
                 );
-
+                tracing::trace!("Called  ZwpLinuxBufferParamsV1::create_immed to create WlBuffer ");
                 // Copy the pixel data advertised by the compositor into the buffer we just created.
                 frame.copy(&dmabuf_wlbuf);
                 tracing::debug!("wlr-screencopy copy() with dmabuf complete");
 
-                //dma_params.destroy();
-                //linux_dmabuf.destroy();
                 // On copy the Ready / Failed events are fired by the frame object, so here we check for them.
                 loop {
                     // Basically reads, if frame state is not None then...
