@@ -1,5 +1,7 @@
 use std::{io, result};
 
+use drm::buffer::UnrecognizedFourcc;
+use gbm::{DeviceDestroyedError, FdError};
 use thiserror::Error;
 use wayland_client::{
     globals::{BindError, GlobalError},
@@ -34,4 +36,16 @@ pub enum Error {
     ProtocolNotFound(String),
     #[error("error occurred in freeze callback")]
     FreezeCallbackError,
+    #[error("dmabuf configuration not initialized. Did you not use Wayshot::from_connection_with_dmabuf()?")]
+    NoDMAStateError,
+    #[error("dmabuf color format provided by compositor is invalid")]
+    UnrecognizedColorCode(#[from] UnrecognizedFourcc),
+    #[error("dmabuf device has been destroyed")]
+    DRMDeviceLost(#[from] DeviceDestroyedError),
+    #[error("obtaining gbm buffer object file descriptor failed {0}")]
+    GBMBoFdError(#[from] FdError),
+    #[error(" EGLImage import from dmabuf failed: {0}")]
+    EGLError(#[from] khronos_egl::Error),
+    #[error("No EGLImageTargetTexture2DOES function located, this extension may not be supported")]
+    EGLImageToTexProcNotFoundError,
 }

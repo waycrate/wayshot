@@ -4,6 +4,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use gbm::BufferObject;
 use image::{ColorType, DynamicImage, ImageBuffer, Pixel};
 use memmap2::MmapMut;
 use rustix::{
@@ -31,6 +32,31 @@ impl Drop for FrameGuard {
     }
 }
 
+pub struct DMAFrameGuard {
+    pub buffer: WlBuffer,
+}
+impl Drop for DMAFrameGuard {
+    fn drop(&mut self) {
+        self.buffer.destroy();
+    }
+}
+
+pub struct EGLImageGuard<'a, T: khronos_egl::api::EGL1_5> {
+    pub image: khronos_egl::Image,
+    pub(crate) egl_instance: &'a khronos_egl::Instance<T>,
+    pub(crate) egl_display: khronos_egl::Display,
+}
+
+impl<'a, T: khronos_egl::api::EGL1_5> Drop for EGLImageGuard<'a, T> {
+    fn drop(&mut self) {
+        self.egl_instance
+            .destroy_image(self.egl_display, self.image)
+            .unwrap_or_else(|e| {
+                tracing::error!("EGLimage destruction had error: {e}");
+            });
+    }
+}
+
 /// Type of frame supported by the compositor. For now we only support Argb8888, Xrgb8888, and
 /// Xbgr8888.
 ///
@@ -45,6 +71,17 @@ pub struct FrameFormat {
     pub stride: u32,
 }
 
+/// Type of DMABUF frame supported by the compositor
+///
+/// See `zwlr_screencopy_frame_v1::Event::linux_dmabuf` as it's retrieved from there.
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct DMAFrameFormat {
+    pub format: u32,
+    /// Size of the frame in pixels. This will always be in "landscape" so a
+    /// portrait 1080x1920 frame will be 1920x1080 and will need to be rotated!
+    pub size: Size,
+}
+
 impl FrameFormat {
     /// Returns the size of the frame in bytes, which is the stride * height.
     pub fn byte_size(&self) -> u64 {
@@ -52,30 +89,38 @@ impl FrameFormat {
     }
 }
 
-#[tracing::instrument(skip(frame_mmap))]
+#[tracing::instrument(skip(frame_data))]
 fn create_image_buffer<P>(
     frame_format: &FrameFormat,
-    frame_mmap: &MmapMut,
+    frame_data: &FrameData,
 ) -> Result<ImageBuffer<P, Vec<P::Subpixel>>>
 where
     P: Pixel<Subpixel = u8>,
 {
     tracing::debug!("Creating image buffer");
-    ImageBuffer::from_vec(
-        frame_format.size.width,
-        frame_format.size.height,
-        frame_mmap.to_vec(),
-    )
-    .ok_or(Error::BufferTooSmall)
+    match frame_data {
+        FrameData::Mmap(frame_mmap) => ImageBuffer::from_vec(
+            frame_format.size.width,
+            frame_format.size.height,
+            frame_mmap.to_vec(),
+        )
+        .ok_or(Error::BufferTooSmall),
+        FrameData::GBMBo(_) => todo!(),
+    }
 }
 
+#[derive(Debug)]
+pub enum FrameData {
+    Mmap(MmapMut),
+    GBMBo(BufferObject<()>),
+}
 /// The copied frame comprising of the FrameFormat, ColorType (Rgba8), and a memory backed shm
 /// file that holds the image data in it.
 #[derive(Debug)]
 pub struct FrameCopy {
     pub frame_format: FrameFormat,
     pub frame_color_type: ColorType,
-    pub frame_mmap: MmapMut,
+    pub frame_data: FrameData,
     pub transform: wl_output::Transform,
     /// Logical region with the transform already applied.
     pub logical_region: LogicalRegion,
@@ -88,10 +133,10 @@ impl TryFrom<&FrameCopy> for DynamicImage {
     fn try_from(value: &FrameCopy) -> Result<Self> {
         Ok(match value.frame_color_type {
             ColorType::Rgb8 => {
-                Self::ImageRgb8(create_image_buffer(&value.frame_format, &value.frame_mmap)?)
+                Self::ImageRgb8(create_image_buffer(&value.frame_format, &value.frame_data)?)
             }
             ColorType::Rgba8 => {
-                Self::ImageRgba8(create_image_buffer(&value.frame_format, &value.frame_mmap)?)
+                Self::ImageRgba8(create_image_buffer(&value.frame_format, &value.frame_data)?)
             }
             _ => return Err(Error::InvalidColor),
         })

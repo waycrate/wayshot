@@ -13,17 +13,19 @@ mod screencopy;
 
 use std::{
     collections::HashSet,
+    ffi::c_void,
     fs::File,
-    os::fd::AsFd,
+    os::fd::{AsFd, IntoRawFd, OwnedFd},
     sync::atomic::{AtomicBool, Ordering},
     thread,
 };
 
-use dispatch::LayerShellState;
+use dispatch::{DMABUFState, LayerShellState};
 use image::{imageops::replace, DynamicImage};
+use khronos_egl::{self as egl, Instance};
 use memmap2::MmapMut;
 use region::{EmbeddedRegion, RegionCapturer};
-use screencopy::FrameGuard;
+use screencopy::{DMAFrameFormat, DMAFrameGuard, EGLImageGuard, FrameData, FrameGuard};
 use tracing::debug;
 use wayland_client::{
     globals::{registry_queue_init, GlobalList},
@@ -32,10 +34,15 @@ use wayland_client::{
         wl_output::{Transform, WlOutput},
         wl_shm::{self, WlShm},
     },
-    Connection, EventQueue,
+    Connection, EventQueue, Proxy,
 };
-use wayland_protocols::xdg::xdg_output::zv1::client::{
-    zxdg_output_manager_v1::ZxdgOutputManagerV1, zxdg_output_v1::ZxdgOutputV1,
+use wayland_protocols::{
+    wp::linux_dmabuf::zv1::client::{
+        zwp_linux_buffer_params_v1, zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1,
+    },
+    xdg::xdg_output::zv1::client::{
+        zxdg_output_manager_v1::ZxdgOutputManagerV1, zxdg_output_v1::ZxdgOutputV1,
+    },
 };
 use wayland_protocols_wlr::{
     layer_shell::v1::client::{
@@ -62,6 +69,7 @@ pub mod reexport {
     use wayland_client::protocol::wl_output;
     pub use wl_output::{Transform, WlOutput};
 }
+use gbm::{BufferObject, BufferObjectFlags, Device as GBMDevice};
 
 /// Struct to store wayland connection and globals list.
 /// # Example usage
@@ -75,6 +83,7 @@ pub struct WayshotConnection {
     pub conn: Connection,
     pub globals: GlobalList,
     output_infos: Vec<OutputInfo>,
+    dmabuf_state: Option<DMABUFState>,
 }
 
 impl WayshotConnection {
@@ -92,6 +101,34 @@ impl WayshotConnection {
             conn,
             globals,
             output_infos: Vec::new(),
+            dmabuf_state: None,
+        };
+
+        initial_state.refresh_outputs()?;
+
+        Ok(initial_state)
+    }
+
+    ///Create a WayshotConnection struct having DMA-BUF support
+    /// Using this connection is required to make use of the dmabuf functions
+    ///# Parameters
+    /// - conn: a Wayland connection
+    /// - device_path: string pointing to the DRI device that is to be used for creating the DMA-BUFs on. For example: "/dev/dri/renderD128"
+    pub fn from_connection_with_dmabuf(conn: Connection, device_path: &str) -> Result<Self> {
+        let (globals, evq) = registry_queue_init::<WayshotState>(&conn)?;
+        let linux_dmabuf =
+            globals.bind(&evq.handle(), 4..=ZwpLinuxDmabufV1::interface().version, ())?;
+        let gpu = dispatch::Card::open(device_path);
+        // init a GBM device
+        let gbm = GBMDevice::new(gpu).unwrap();
+        let mut initial_state = Self {
+            conn,
+            globals,
+            output_infos: Vec::new(),
+            dmabuf_state: Some(DMABUFState {
+                linux_dmabuf,
+                gbmdev: gbm,
+            }),
         };
 
         initial_state.refresh_outputs()?;
@@ -166,14 +203,249 @@ impl WayshotConnection {
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(FrameFormat, FrameGuard)> {
         let (state, event_queue, frame, frame_format) =
-            self.capture_output_frame_get_state(cursor_overlay, output, capture_region)?;
+            self.capture_output_frame_get_state_shm(cursor_overlay, output, capture_region)?;
         let frame_guard =
             self.capture_output_frame_inner(state, event_queue, frame, frame_format, fd)?;
 
         Ok((frame_format, frame_guard))
     }
 
-    fn capture_output_frame_get_state(
+    fn capture_output_frame_shm_from_file(
+        &self,
+        cursor_overlay: bool,
+        output: &WlOutput,
+        file: &File,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<(FrameFormat, FrameGuard)> {
+        let (state, event_queue, frame, frame_format) =
+            self.capture_output_frame_get_state_shm(cursor_overlay as i32, output, capture_region)?;
+
+        file.set_len(frame_format.byte_size())?;
+
+        let frame_guard =
+            self.capture_output_frame_inner(state, event_queue, frame, frame_format, file)?;
+
+        Ok((frame_format, frame_guard))
+    }
+    /// Helper function/wrapper that uses the OpenGL extension OES_EGL_image to convert the EGLImage obtained from [`WayshotConnection::capture_output_frame_eglimage`]
+    /// into a OpenGL texture.
+    /// - The caller is supposed to setup everything required for the texture binding. An example call may look like:
+    /// ```
+    /// gl::BindTexture(gl::TEXTURE_2D, self.gl_texture);
+    /// gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+    /// wayshot_conn
+    ///     .bind_output_frame_to_gl_texture(
+    ///         true,
+    ///        &wayshot_conn.get_all_outputs()[0].wl_output,
+    ///        None)
+    ///```
+    /// # Parameters
+    /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
+    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
+    /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
+    /// # Returns
+    /// - If the function was found and called, an OK(()), note that this does not neccesarily mean that binding was successful, only that the function was called.
+    /// The caller may check for any OpenGL errors using the standard routes.
+    /// - If the function was not found, [`Error::EGLImageToTexProcNotFoundError`] is returned
+    pub unsafe fn bind_output_frame_to_gl_texture(
+        &self,
+        cursor_overlay: bool,
+        output: &WlOutput,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<()> {
+        let egl = khronos_egl::Instance::new(egl::Static);
+        let eglimage_guard =
+            self.capture_output_frame_eglimage(&egl, cursor_overlay, output, capture_region)?;
+        unsafe {
+            let gl_egl_image_texture_target_2d_oes: unsafe extern "system" fn(
+                target: gl::types::GLenum,
+                image: gl::types::GLeglImageOES,
+            ) -> () =
+                std::mem::transmute(match egl.get_proc_address("glEGLImageTargetTexture2DOES") {
+                    Some(f) => {
+                        tracing::debug!("glEGLImageTargetTexture2DOES found at address {:#?}", f);
+                        f
+                    }
+                    None => {
+                        tracing::error!("glEGLImageTargetTexture2DOES not found");
+                        return Err(Error::EGLImageToTexProcNotFoundError);
+                    }
+                });
+
+            gl_egl_image_texture_target_2d_oes(gl::TEXTURE_2D, eglimage_guard.image.as_ptr());
+            tracing::trace!("glEGLImageTargetTexture2DOES called");
+            Ok(())
+        }
+    }
+
+    /// Obtain a screencapture in the form of a EGLImage.
+    /// The display on which this image is created is obtained from the Wayland Connection.
+    /// Uses the dma-buf provisions of the wlr-screencopy copy protocol to avoid VRAM->RAM copies
+    /// It returns the captured frame as an `EGLImage`, wrapped in an `EGLImageGuard`
+    /// for safe handling and cleanup.
+    /// # Parameters
+    /// - `egl_instance`: Reference to an egl API instance obtained from the khronos_egl crate, which is used to create the `EGLImage`.
+    /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
+    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
+    /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
+    ///
+    /// # Returns
+    /// If successful, an EGLImageGuard which contains a pointer 'image' to the created EGLImage
+    /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
+    pub fn capture_output_frame_eglimage<'a, T: khronos_egl::api::EGL1_5>(
+        &self,
+        egl_instance: &'a Instance<T>,
+        cursor_overlay: bool,
+        output: &WlOutput,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<EGLImageGuard<'a, T>> {
+        let egl_display = unsafe {
+            match egl_instance.get_display(self.conn.display().id().as_ptr() as *mut c_void) {
+                Some(disp) => disp,
+                None => return Err(egl_instance.get_error().unwrap().into()),
+            }
+        };
+        tracing::trace!("eglDisplay obtained from Wayland connection's display");
+
+        egl_instance.initialize(egl_display)?;
+        self.capture_output_frame_eglimage_on_display(
+            &egl_instance,
+            egl_display,
+            cursor_overlay,
+            output,
+            capture_region,
+        )
+    }
+
+    /// Obtain a screencapture in the form of a EGLImage on the given EGLDisplay.
+    ///
+    /// Uses the dma-buf provisions of the wlr-screencopy copy protocol to avoid VRAM->RAM copies
+    /// It returns the captured frame as an `EGLImage`, wrapped in an `EGLImageGuard`
+    /// for safe handling and cleanup.
+    /// # Parameters
+    /// - `egl_instance`: Reference to an `EGL1_5` instance, which is used to create the `EGLImage`.
+    /// - `egl_display`: The `EGLDisplay` on which the image should be created.
+    /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
+    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
+    /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
+    ///
+    /// # Returns
+    /// If successful, an EGLImageGuard which contains a pointer 'image' to the created EGLImage
+    /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
+    pub fn capture_output_frame_eglimage_on_display<'a, T: khronos_egl::api::EGL1_5>(
+        &self,
+        egl_instance: &'a Instance<T>,
+        egl_display: egl::Display,
+        cursor_overlay: bool,
+        output: &WlOutput,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<EGLImageGuard<'a, T>> {
+        type Attrib = egl::Attrib;
+        let (frame_format, _guard, bo) =
+            self.capture_output_frame_dmabuf(cursor_overlay, output, capture_region)?;
+        let modifier: u64 = bo.modifier()?.into();
+        let image_attribs = [
+            egl::WIDTH as Attrib,
+            frame_format.size.width as Attrib,
+            egl::HEIGHT as Attrib,
+            frame_format.size.height as Attrib,
+            0x3271, //EGL_LINUX_DRM_FOURCC_EXT
+            bo.format().unwrap() as Attrib,
+            0x3272, //EGL_DMA_BUF_PLANE0_FD_EXT
+            bo.fd_for_plane(0).unwrap().into_raw_fd() as Attrib,
+            0x3273, //EGL_DMA_BUF_PLANE0_OFFSET_EXT
+            bo.offset(0).unwrap() as Attrib,
+            0x3274, //EGL_DMA_BUF_PLANE0_PITCH_EXT
+            bo.stride_for_plane(0).unwrap() as Attrib,
+            0x3443, //EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT
+            (modifier as u32) as Attrib,
+            0x3444, //EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT
+            (modifier >> 32) as Attrib,
+            egl::ATTRIB_NONE as Attrib,
+        ];
+        tracing::debug!(
+            "Calling eglCreateImage with attributes: {:#?}",
+            image_attribs
+        );
+        unsafe {
+            match egl_instance.create_image(
+                egl_display,
+                khronos_egl::Context::from_ptr(egl::NO_CONTEXT),
+                0x3270, // EGL_LINUX_DMA_BUF_EXT
+                khronos_egl::ClientBuffer::from_ptr(std::ptr::null_mut()), //NULL
+                &image_attribs,
+            ) {
+                Ok(image) => Ok(EGLImageGuard {
+                    image,
+                    egl_instance,
+                    egl_display,
+                }),
+                Err(e) => {
+                    tracing::error!("eglCreateImage call failed with error {e}");
+                    Err(e.into())
+                }
+            }
+        }
+    }
+
+    /// Obtain a screencapture in the form of a WlBuffer backed by a GBM Bufferobject on the GPU.
+    /// Uses the dma-buf provisions of the wlr-screencopy copy protocol to avoid VRAM->RAM copies
+    /// The captured frame is returned as a tuple containing the frame format, a guard to manage
+    /// the WlBuffer's cleanup on drop, and the underlying `BufferObject`.
+    /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
+    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
+    /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
+    ///# Returns
+    /// On success, returns a tuple containing the frame format,
+    ///   a guard to manage the frame's lifecycle, and the GPU-backed `BufferObject`.
+    /// # Errors
+    /// - Returns `NoDMAStateError` if the DMA-BUF state is not initialized a the time of initialization of this struct.
+    pub fn capture_output_frame_dmabuf(
+        &self,
+        cursor_overlay: bool,
+        output: &WlOutput,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<(DMAFrameFormat, DMAFrameGuard, BufferObject<()>)> {
+        match &self.dmabuf_state {
+            Some(dmabuf_state) => {
+                let (state, event_queue, frame, frame_format) = self
+                    .capture_output_frame_get_state_dmabuf(
+                        cursor_overlay as i32,
+                        output,
+                        capture_region,
+                    )?;
+                let gbm = &dmabuf_state.gbmdev;
+                let bo = gbm.create_buffer_object::<()>(
+                    frame_format.size.width,
+                    frame_format.size.height,
+                    gbm::Format::try_from(frame_format.format)?,
+                    BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR,
+                )?;
+
+                let stride = bo.stride()?;
+                let modifier: u64 = bo.modifier()?.into();
+                tracing::debug!(
+                    "Created GBM Buffer object with input frame format {:#?}, stride {:#?} and modifier {:#?} ",
+                    frame_format,
+                    stride,modifier
+                );
+                let frame_guard = self.capture_output_frame_inner_dmabuf(
+                    state,
+                    event_queue,
+                    frame,
+                    frame_format,
+                    stride,
+                    modifier,
+                    bo.fd_for_plane(0)?,
+                )?;
+
+                Ok((frame_format, frame_guard, bo))
+            }
+            None => Err(Error::NoDMAStateError),
+        }
+    }
+
+    fn capture_output_frame_get_state_shm(
         &self,
         cursor_overlay: i32,
         output: &WlOutput,
@@ -186,6 +458,7 @@ impl WayshotConnection {
     )> {
         let mut state = CaptureFrameState {
             formats: Vec::new(),
+            dmabuf_formats: Vec::new(),
             state: None,
             buffer_done: AtomicBool::new(false),
         };
@@ -208,7 +481,7 @@ impl WayshotConnection {
             }
         };
 
-        debug!("Capturing output...");
+        tracing::debug!("Capturing output(shm buffer)...");
         let frame = if let Some(embedded_region) = capture_region {
             screencopy_manager.capture_output_region(
                 cursor_overlay,
@@ -263,6 +536,144 @@ impl WayshotConnection {
         Ok((state, event_queue, frame, frame_format))
     }
 
+    fn capture_output_frame_get_state_dmabuf(
+        &self,
+        cursor_overlay: i32,
+        output: &WlOutput,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<(
+        CaptureFrameState,
+        EventQueue<CaptureFrameState>,
+        ZwlrScreencopyFrameV1,
+        DMAFrameFormat,
+    )> {
+        let mut state = CaptureFrameState {
+            formats: Vec::new(),
+            dmabuf_formats: Vec::new(),
+            state: None,
+            buffer_done: AtomicBool::new(false),
+        };
+        let mut event_queue = self.conn.new_event_queue::<CaptureFrameState>();
+        let qh = event_queue.handle();
+
+        // Instantiating screencopy manager.
+        let screencopy_manager = match self.globals.bind::<ZwlrScreencopyManagerV1, _, _>(
+            &qh,
+            3..=3,
+            (),
+        ) {
+            Ok(x) => x,
+            Err(e) => {
+                tracing::error!("Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?");
+                tracing::error!("err: {e}");
+                return Err(Error::ProtocolNotFound(
+                    "ZwlrScreencopy Manager not found".to_string(),
+                ));
+            }
+        };
+
+        tracing::debug!("Capturing output for DMA-BUF API...");
+        let frame = if let Some(embedded_region) = capture_region {
+            screencopy_manager.capture_output_region(
+                cursor_overlay,
+                output,
+                embedded_region.inner.position.x,
+                embedded_region.inner.position.y,
+                embedded_region.inner.size.width as i32,
+                embedded_region.inner.size.height as i32,
+                &qh,
+                (),
+            )
+        } else {
+            screencopy_manager.capture_output(cursor_overlay, output, &qh, ())
+        };
+
+        // Empty internal event buffer until buffer_done is set to true which is when the Buffer done
+        // event is fired, aka the capture from the compositor is succesful.
+        while !state.buffer_done.load(Ordering::SeqCst) {
+            event_queue.blocking_dispatch(&mut state)?;
+        }
+
+        tracing::trace!(
+            "Received compositor frame buffer formats: {:#?}",
+            state.formats
+        );
+        // TODO select appropriate format if there is more than one
+        let frame_format = state.dmabuf_formats[0];
+        tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
+
+        Ok((state, event_queue, frame, frame_format))
+    }
+
+    fn capture_output_frame_inner_dmabuf(
+        &self,
+        mut state: CaptureFrameState,
+        mut event_queue: EventQueue<CaptureFrameState>,
+        frame: ZwlrScreencopyFrameV1,
+        frame_format: DMAFrameFormat,
+        stride: u32,
+        modifier: u64,
+        fd: OwnedFd,
+    ) -> Result<DMAFrameGuard> {
+        match &self.dmabuf_state {
+            Some(dmabuf_state) => {
+                // Connecting to wayland environment.
+                let qh = event_queue.handle();
+
+                let linux_dmabuf = &dmabuf_state.linux_dmabuf;
+                let dma_width = frame_format.size.width;
+                let dma_height = frame_format.size.height;
+
+                let dma_params = linux_dmabuf.create_params(&qh, ());
+
+                dma_params.add(
+                    fd.as_fd(),
+                    0,
+                    0,
+                    stride,
+                    (modifier >> 32) as u32,
+                    (modifier & 0xffffffff) as u32,
+                );
+                tracing::trace!("Called  ZwpLinuxBufferParamsV1::create_params ");
+                let dmabuf_wlbuf = dma_params.create_immed(
+                    dma_width as i32,
+                    dma_height as i32,
+                    frame_format.format,
+                    zwp_linux_buffer_params_v1::Flags::empty(),
+                    &qh,
+                    (),
+                );
+                tracing::trace!("Called  ZwpLinuxBufferParamsV1::create_immed to create WlBuffer ");
+                // Copy the pixel data advertised by the compositor into the buffer we just created.
+                frame.copy(&dmabuf_wlbuf);
+                tracing::debug!("wlr-screencopy copy() with dmabuf complete");
+
+                // On copy the Ready / Failed events are fired by the frame object, so here we check for them.
+                loop {
+                    // Basically reads, if frame state is not None then...
+                    if let Some(state) = state.state {
+                        match state {
+                            FrameState::Failed => {
+                                tracing::error!("Frame copy failed");
+                                return Err(Error::FramecopyFailed);
+                            }
+                            FrameState::Finished => {
+                                tracing::trace!("Frame copy finished");
+
+                                return Ok(DMAFrameGuard {
+                                    buffer: dmabuf_wlbuf,
+                                });
+                            }
+                        }
+                    }
+
+                    event_queue.blocking_dispatch(&mut state)?;
+                }
+            }
+            None => Err(Error::NoDMAStateError),
+        }
+    }
+
     fn capture_output_frame_inner<T: AsFd>(
         &self,
         mut state: CaptureFrameState,
@@ -307,6 +718,7 @@ impl WayshotConnection {
                         return Err(Error::FramecopyFailed);
                     }
                     FrameState::Finished => {
+                        tracing::trace!("Frame copy finished");
                         return Ok(FrameGuard { buffer, shm_pool });
                     }
                 }
@@ -314,24 +726,6 @@ impl WayshotConnection {
 
             event_queue.blocking_dispatch(&mut state)?;
         }
-    }
-
-    fn capture_output_frame_shm_from_file(
-        &self,
-        cursor_overlay: bool,
-        output: &WlOutput,
-        file: &File,
-        capture_region: Option<EmbeddedRegion>,
-    ) -> Result<(FrameFormat, FrameGuard)> {
-        let (state, event_queue, frame, frame_format) =
-            self.capture_output_frame_get_state(cursor_overlay as i32, output, capture_region)?;
-
-        file.set_len(frame_format.byte_size())?;
-
-        let frame_guard =
-            self.capture_output_frame_inner(state, event_queue, frame, frame_format, file)?;
-
-        Ok((frame_format, frame_guard))
     }
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
@@ -375,7 +769,7 @@ impl WayshotConnection {
         let frame_copy = FrameCopy {
             frame_format,
             frame_color_type,
-            frame_mmap,
+            frame_data: FrameData::Mmap(frame_mmap),
             transform: output_info.transform,
             logical_region: capture_region
                 .map(|capture_region| capture_region.logical())
@@ -391,26 +785,13 @@ impl WayshotConnection {
         output_capture_regions: &[(OutputInfo, Option<EmbeddedRegion>)],
         cursor_overlay: bool,
     ) -> Result<Vec<(FrameCopy, FrameGuard, OutputInfo)>> {
-        let frame_copies = thread::scope(|scope| -> Result<_> {
-            let join_handles = output_capture_regions
-                .iter()
-                .map(|(output_info, capture_region)| {
-                    scope.spawn(move || {
-                        self.capture_frame_copy(cursor_overlay, output_info, *capture_region)
-                            .map(|(frame_copy, frame_guard)| {
-                                (frame_copy, frame_guard, output_info.clone())
-                            })
-                    })
-                })
-                .collect::<Vec<_>>();
-
-            join_handles
-                .into_iter()
-                .flat_map(|join_handle| join_handle.join())
-                .collect::<Result<_>>()
-        })?;
-
-        Ok(frame_copies)
+        output_capture_regions
+            .iter()
+            .map(|(output_info, capture_region)| {
+                self.capture_frame_copy(cursor_overlay, output_info, *capture_region)
+                    .map(|(frame_copy, frame_guard)| (frame_copy, frame_guard, output_info.clone()))
+            })
+            .collect()
     }
 
     /// Create a layer shell surface for each output,
