@@ -37,6 +37,10 @@ use wayland_protocols_wlr::screencopy::v1::client::{
     zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
 };
 
+use wayland_protocols::wp::viewporter::client::{
+    wp_viewport::WpViewport, wp_viewporter::WpViewporter,
+};
+
 use crate::{
     output::OutputInfo,
     region::{LogicalRegion, Position, Size},
@@ -299,6 +303,8 @@ delegate_noop!(LayerShellState: ignore WlShmPool);
 delegate_noop!(LayerShellState: ignore WlBuffer);
 delegate_noop!(LayerShellState: ignore ZwlrLayerShellV1);
 delegate_noop!(LayerShellState: ignore WlSurface);
+delegate_noop!(LayerShellState: ignore WpViewport);
+delegate_noop!(LayerShellState: ignore WpViewporter);
 
 impl wayland_client::Dispatch<ZwlrLayerSurfaceV1, WlOutput> for LayerShellState {
     // No need to instrument here, span from lib.rs is automatically used.
