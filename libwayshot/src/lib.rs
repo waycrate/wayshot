@@ -838,7 +838,7 @@ impl WayshotConnection {
         let viewporter = self.globals.bind::<WpViewporter, _, _>(&qh, 1..=1, ()).ok();
         if viewporter.is_none() {
             tracing::info!(
-                "Your wm does not support wp_viewporter, so the scale may come out with some problems"
+                "Compositor does not support wp_viewporter, display scaling may be inaccurate."
             );
         }
 
