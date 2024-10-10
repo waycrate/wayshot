@@ -37,8 +37,11 @@ use wayland_client::{
     Connection, EventQueue, Proxy,
 };
 use wayland_protocols::{
-    wp::linux_dmabuf::zv1::client::{
-        zwp_linux_buffer_params_v1, zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1,
+    wp::{
+        linux_dmabuf::zv1::client::{
+            zwp_linux_buffer_params_v1, zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1,
+        },
+        viewporter::client::wp_viewporter::WpViewporter,
     },
     xdg::xdg_output::zv1::client::{
         zxdg_output_manager_v1::ZxdgOutputManagerV1, zxdg_output_v1::ZxdgOutputV1,
@@ -832,6 +835,12 @@ impl WayshotConnection {
                 ));
             }
         };
+        let viewporter = self.globals.bind::<WpViewporter, _, _>(&qh, 1..=1, ()).ok();
+        if viewporter.is_none() {
+            tracing::info!(
+                "Compositor does not support wp_viewporter, display scaling may be inaccurate."
+            );
+        }
 
         let mut layer_shell_surfaces = Vec::with_capacity(frames.len());
 
@@ -871,6 +880,14 @@ impl WayshotConnection {
                 surface.set_buffer_transform(output_info.transform);
                 // surface.set_buffer_scale(output_info.scale());
                 surface.attach(Some(&frame_guard.buffer), 0, 0);
+
+                if let Some(viewporter) = viewporter.as_ref() {
+                    let viewport = viewporter.get_viewport(&surface, &qh, ());
+                    viewport.set_destination(
+                        output_info.logical_region.inner.size.width as i32,
+                        output_info.logical_region.inner.size.height as i32,
+                    );
+                }
 
                 debug!("Committing surface with attached buffer.");
                 surface.commit();
