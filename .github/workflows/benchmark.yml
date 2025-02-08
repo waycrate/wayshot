@@ -1,54 +1,16 @@
-name: Build Wayshot
+name: Benchmark Wayshot
 
-on: [push, pull_request]
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
 
-env:
-  CARGO_TERM_COLOR: always
+permissions:
+   pull-requests: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-    
-    - name: Install wayland dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends \
-          libwayland-dev \
-          libegl-dev \
-
-    - name: Build
-      run: |
-        rm Cargo.lock
-        cargo build --release
-
-  rustfmt:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-
-    - name: Check formatting
-      run: |
-        cargo fmt -- --check
-
-  documentation:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-
-    - name: Check docs
-      run: |
-        sudo apt update
-        sudo apt install --no-install-recommends scdoc
-        for file in $(find . -type f -iwholename "./docs/*.scd"); do scdoc < $file > /dev/null; done
-
   benchmark:
     runs-on: ubuntu-latest
 
@@ -90,13 +52,29 @@ jobs:
         export WAYLAND_DISPLAY="$wayland_display"
         sudo sh -c 'echo -1 >/proc/sys/kernel/perf_event_paranoid'
         cargo flamegraph --release -- --log-level debug - > /dev/null
-        hyperfine --export-json hyperfine.json "cargo run --release -- --log-level debug - > /dev/null"
+        hyperfine --export-markdown hyperfine.md --export-json hyperfine.json "cargo run --release -- --log-level debug - > /dev/null"
 
-    - name: Collect benchmark results
+    - name: Upload benchmark results
       uses: actions/upload-artifact@v4
+      id: upload-artifacts
       with:
         name: benchmark-results
         path: |
           flamegraph.svg
           perf.data
           hyperfine.json
+
+    - name: Generate PR comment
+      run: |
+        touch comment.txt
+        echo "Here are the benchmark results for this changeset:" >> comment.txt
+        echo "" >> comment.txt
+        cat hyperfine.md >> comment.txt
+        FLAMEGRAPH_ARTIFACT_URL=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/${{ steps.upload-artifacts.outputs.artifact-id }}
+        echo "" >> comment.txt
+        echo "You can download perf data and a flamegraph heatmap for this changeset [here]($FLAMEGRAPH_ARTIFACT_URL)." >> comment.txt
+
+    - name: Post comment with results on PR
+      uses: thollander/actions-comment-pull-request@v2
+      with:
+        filePath: ./comment.txt
