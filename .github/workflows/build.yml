@@ -12,6 +12,13 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v2
+    
+    - name: Install wayland dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          libwayland-dev \
+          libegl-dev \
 
     - name: Build
       run: |

@@ -8,6 +8,7 @@ MAN7_DIR := /usr/share/man/man7
 all: build
 
 build:
+	@cargo test
 	@cargo build $(BUILDFLAGS)
 
 run:

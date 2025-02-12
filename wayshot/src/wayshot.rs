@@ -1,18 +1,21 @@
 use std::{
-    error::Error,
     io::{stdout, BufWriter, Cursor, Write},
-    process::exit,
+    process::Command,
 };
 
-use libwayshot::WayshotConnection;
+use clap::Parser;
+use eyre::{bail, Result};
+use libwayshot::{region::LogicalRegion, WayshotConnection};
 
-mod clap;
+mod cli;
 mod utils;
 
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
-use tracing::Level;
+use utils::EncodingFormat;
 
-use crate::utils::EncodingFormat;
+use wl_clipboard_rs::copy::{MimeType, Options, Source};
+
+use rustix::runtime::{fork, Fork};
 
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where
@@ -29,104 +32,152 @@ where
     Some(selection)
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let args = clap::set_flags().get_matches();
-    let level = if args.get_flag("debug") {
-        Level::TRACE
-    } else {
-        Level::INFO
-    };
+fn main() -> Result<()> {
+    let cli = cli::Cli::parse();
     tracing_subscriber::fmt()
-        .with_max_level(level)
+        .with_max_level(cli.log_level)
         .with_writer(std::io::stderr)
         .init();
 
-    let extension = if let Some(extension) = args.get_one::<String>("extension") {
-        let ext = extension.trim().to_lowercase();
-        tracing::debug!("Using custom extension: {:#?}", ext);
+    let input_encoding = cli
+        .file
+        .as_ref()
+        .and_then(|pathbuf| pathbuf.try_into().ok());
+    let requested_encoding = cli
+        .encoding
+        .or(input_encoding)
+        .unwrap_or(EncodingFormat::default());
 
-        match ext.as_str() {
-            "jpeg" | "jpg" => EncodingFormat::Jpg,
-            "png" => EncodingFormat::Png,
-            "ppm" => EncodingFormat::Ppm,
-            "qoi" => EncodingFormat::Qoi,
-            _ => {
-                tracing::error!("Invalid extension provided.\nValid extensions:\n1) jpeg\n2) jpg\n3) png\n4) ppm\n5) qoi");
-                exit(1);
-            }
+    if let Some(input_encoding) = input_encoding {
+        if input_encoding != requested_encoding {
+            tracing::warn!(
+                "The encoding requested '{requested_encoding}' does not match the output file's encoding '{input_encoding}'. Still using the requested encoding however.",
+            );
         }
-    } else {
-        EncodingFormat::Png
-    };
-
-    let mut file_is_stdout: bool = false;
-    let mut file_path: Option<String> = None;
-
-    if args.get_flag("stdout") {
-        file_is_stdout = true;
-    } else if let Some(filepath) = args.get_one::<String>("file") {
-        file_path = Some(filepath.trim().to_string());
-    } else {
-        file_path = Some(utils::get_default_file_name(extension));
     }
 
     let wayshot_conn = WayshotConnection::new()?;
 
-    if args.get_flag("listoutputs") {
+    if cli.list_outputs {
         let valid_outputs = wayshot_conn.get_all_outputs();
         for output in valid_outputs {
             tracing::info!("{:#?}", output.name);
         }
-        exit(1);
+        return Ok(());
     }
 
-    let mut cursor_overlay = false;
-    if args.get_flag("cursor") {
-        cursor_overlay = true;
-    }
+    let image_buffer = if let Some(slurp_args) = cli.slurp {
+        let slurp_region = slurp_args.unwrap_or("".to_string());
+        wayshot_conn.screenshot_freeze(
+            Box::new(move || {
+                || -> Result<LogicalRegion> {
+                    let slurp_output = Command::new("slurp")
+                        .args(slurp_region.split(' '))
+                        .output()?
+                        .stdout;
 
-    let image_buffer = if let Some(slurp_region) = args.get_one::<String>("slurp") {
-        if let Some(region) = utils::parse_geometry(slurp_region) {
-            wayshot_conn.screenshot(region, cursor_overlay)?
-        } else {
-            tracing::error!("Invalid geometry specification");
-            exit(1);
-        }
-    } else if let Some(output_name) = args.get_one::<String>("output") {
+                    utils::parse_geometry(&String::from_utf8(slurp_output)?)
+                }()
+                .map_err(|_| libwayshot::Error::FreezeCallbackError)
+            }),
+            cli.cursor,
+        )?
+    } else if let Some(output_name) = cli.output {
         let outputs = wayshot_conn.get_all_outputs();
-        if let Some(output) = outputs.iter().find(|output| &output.name == output_name) {
-            wayshot_conn.screenshot_single_output(output, cursor_overlay)?
+        if let Some(output) = outputs.iter().find(|output| output.name == output_name) {
+            wayshot_conn.screenshot_single_output(output, cli.cursor)?
         } else {
-            tracing::error!("No output found!\n");
-            exit(1);
+            bail!("No output found!");
         }
-    } else if args.get_flag("chooseoutput") {
+    } else if cli.choose_output {
         let outputs = wayshot_conn.get_all_outputs();
-        let output_names: Vec<String> = outputs
+        let output_names: Vec<&str> = outputs
             .iter()
-            .map(|display| display.name.to_string())
+            .map(|display| display.name.as_str())
             .collect();
         if let Some(index) = select_ouput(&output_names) {
-            wayshot_conn.screenshot_single_output(&outputs[index], cursor_overlay)?
+            wayshot_conn.screenshot_single_output(&outputs[index], cli.cursor)?
         } else {
-            tracing::error!("No output found!\n");
-            exit(1);
+            bail!("No output found!");
         }
     } else {
-        wayshot_conn.screenshot_all(cursor_overlay)?
+        wayshot_conn.screenshot_all(cli.cursor)?
     };
 
-    if file_is_stdout {
-        let stdout = stdout();
+    let mut stdout_print = false;
+    let file = match cli.file {
+        Some(mut pathbuf) => {
+            if pathbuf.to_string_lossy() == "-" {
+                stdout_print = true;
+                None
+            } else {
+                if pathbuf.is_dir() {
+                    pathbuf.push(utils::get_default_file_name(requested_encoding));
+                }
+                Some(pathbuf)
+            }
+        }
+        None => {
+            if cli.clipboard {
+                None
+            } else {
+                Some(utils::get_default_file_name(requested_encoding))
+            }
+        }
+    };
+
+    let mut image_buf: Option<Cursor<Vec<u8>>> = None;
+    if let Some(file) = file {
+        image_buffer.save(file)?;
+    } else if stdout_print {
         let mut buffer = Cursor::new(Vec::new());
-
+        image_buffer.write_to(&mut buffer, requested_encoding)?;
+        let stdout = stdout();
         let mut writer = BufWriter::new(stdout.lock());
-        image_buffer.write_to(&mut buffer, extension)?;
-
         writer.write_all(buffer.get_ref())?;
-    } else {
-        image_buffer.save(file_path.unwrap())?;
+        image_buf = Some(buffer);
     }
 
+    if cli.clipboard {
+        clipboard_daemonize(match image_buf {
+            Some(buf) => buf,
+            None => {
+                let mut buffer = Cursor::new(Vec::new());
+                image_buffer.write_to(&mut buffer, requested_encoding)?;
+                buffer
+            }
+        })?;
+    }
+
+    Ok(())
+}
+
+/// Daemonize and copy the given buffer containing the encoded image to the clipboard
+fn clipboard_daemonize(buffer: Cursor<Vec<u8>>) -> Result<()> {
+    let mut opts = Options::new();
+    match unsafe { fork() } {
+        // Having the image persistently available on the clipboard requires a wayshot process to be alive.
+        // Fork the process with a child detached from the main process and have the parent exit
+        Ok(Fork::Parent(_)) => {
+            return Ok(());
+        }
+        Ok(Fork::Child(_)) => {
+            opts.foreground(true); // Offer the image till something else is available on the clipboard
+            opts.copy(
+                Source::Bytes(buffer.into_inner().into()),
+                MimeType::Autodetect,
+            )?;
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Fork failed with error: {e}, couldn't offer image on the clipboard persistently.
+                 Use a clipboard manager to record screenshot."
+            );
+            opts.copy(
+                Source::Bytes(buffer.into_inner().into()),
+                MimeType::Autodetect,
+            )?;
+        }
+    }
     Ok(())
 }
