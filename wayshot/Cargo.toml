@@ -11,8 +11,8 @@ license.workspace = true
 repository.workspace = true
 
 [build-dependencies]
-flate2 = "1.0.27"
-eyre = "0.6.8"
+flate2 = "1.0.35"
+eyre = "0.6.12"
 
 
 [dependencies]
@@ -20,8 +20,8 @@ tracing.workspace = true
 
 libwayshot.workspace = true
 
-clap = { version = "4.4.18", features = ["derive"] }
-tracing-subscriber = "0.3.17"
+clap = { version = "4.5.30", features = ["derive"] }
+tracing-subscriber = "0.3.19"
 
 image = { version = "0.24", default-features = false, features = [
 	"jpeg",
@@ -32,10 +32,10 @@ image = { version = "0.24", default-features = false, features = [
 ] }
 
 dialoguer = { version = "0.11.0", features = ["fuzzy-select"] }
-eyre = "0.6.8"
-chrono = "0.4.35"
+eyre = "0.6.12"
+chrono = "0.4.39"
 
-wl-clipboard-rs = "0.8.0"
+wl-clipboard-rs = "0.9.1"
 rustix = { version = "0.38", features = ["process", "runtime"] }
 
 [[bin]]
