@@ -10,7 +10,7 @@ edition.workspace = true
 
 [dependencies]
 tracing.workspace = true
-image = { version = "0.24", default-features = false }
+image = { version = "0.25", default-features = false }
 memmap2 = "0.9.5"
 rustix = { version = "0.38", features = ["fs", "shm"] }
 thiserror = "2"
