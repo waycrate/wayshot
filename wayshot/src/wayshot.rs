@@ -17,6 +17,9 @@ use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
 use rustix::runtime::{fork, Fork};
 
+use clap_complete::generate; // <-- Add this import
+use clap::CommandFactory;    // <-- Add this import
+
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where
     T: ToString,
@@ -34,6 +37,15 @@ where
 
 fn main() -> Result<()> {
     let cli = cli::Cli::parse();
+
+    // Handle --generate-completions
+    if let Some(shell) = cli.generate_completions {
+        let mut cmd = cli::Cli::command();
+        eprintln!("Generating completions for {:?}...", shell);
+        generate(shell, &mut cmd, "wayshot", &mut stdout());
+        return Ok(());
+    }
+
     tracing_subscriber::fmt()
         .with_max_level(cli.log_level)
         .with_writer(std::io::stderr)
