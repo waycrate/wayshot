@@ -129,7 +129,7 @@ fn main() -> Result<()> {
                 Some(pathbuf)
             }
         }
-        None => {
+        _none => {
             if cli.clipboard {
                 None
             } else {
