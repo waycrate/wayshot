@@ -1,42 +1,50 @@
 # shell.nix
 
-with (import <nixpkgs> {});
+with (import <nixpkgs> { });
 
 let
-    libPath = with pkgs; lib.makeLibraryPath [
-    libgbm
-    wayland
-    # load external libraries that you need in your rust project here
+  libPath =
+    with pkgs;
+    lib.makeLibraryPath [
+      libgbm
+      wayland
+      # You can load external libraries that you need in your rust project here
     ];
   moz_overlay = import /home/Kihsir/Git_Clone/nixpkgs-mozilla/rust-overlay.nix;
+  # Here I have used pkgs-mozilla overlays for my use case however you can use any other method you prefer!!
   rust_src_overlay = import /home/Kihsir/Git_Clone/nixpkgs-mozilla/rust-src-overlay.nix;
-  # Import nixpkgs with both overlays included
-  nixpkgs = import <nixpkgs> { overlays = [ moz_overlay rust_src_overlay ]; };
+  # You may have to add rust-src manually depending on how you installed,
+  # if you used the basic rust installation via nixpkgs
+  # or anyother simpler manner ignore the above!!
+
+  nixpkgs = import <nixpkgs> {
+    overlays = [
+      moz_overlay
+      rust_src_overlay
+    ];
+  };
 
 in
-  mkShell {
-    name = "moz_overlay_shell";
-    buildInputs = [
-      libGL.dev
-      pkg-config
-      libgbm
-      wayland.dev
-      nixpkgs.latest.rustChannels.nightly.rust
-    ];
-  LD_LIBRARY_PATH = libPath ;
+mkShell {
+  name = "moz_overlay_shell";
+  buildInputs = [
+    libGL.dev
+    libgbm
+	pkg-config
+    wayland.dev
+    nixpkgs.latest.rustChannels.nightly.rust
+  ];
+  LD_LIBRARY_PATH = libPath;
   RUST_BACKTRACE = 1;
   shellHook = ''
-    # Set the RUST_SRC_PATH environment variable to the rust-src location
+    # Set the RUST_SRC_PATH environment variable to the rust-src location if required
     export RUST_SRC_PATH="${nixpkgs.latest.rustChannels.nightly.rust-src}/lib/rustlib/src/rust/library"
-    export LD_LIBRARY_PATH=${pkgs.wayland.dev}/lib:$LD_LIBRARY_PATH
   '';
-  BINDGEN_EXTRA_CLANG_ARGS = (builtins.map (a: ''-I"${a}/include"'') [
-    wayland.dev
-    # Add include paths for other libraries here
-  ])
-  ++ [
-    # Special directories
-  ];
-  }
-
-
+  BINDGEN_EXTRA_CLANG_ARGS =
+    (builtins.map (a: ''-I"${a}/include"'') [
+      # Add include paths for other libraries here
+    ])
+    ++ [
+      # Special directories
+    ];
+}
