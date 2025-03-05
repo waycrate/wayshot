@@ -10,17 +10,12 @@ let
       wayland
       # You can load external libraries that you need in your rust project here
     ];
-  moz_overlay = import /home/Kihsir/Git_Clone/nixpkgs-mozilla/rust-overlay.nix;
+  moz_overlay = import (builtins.fetchTarball "https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz");
   # Here I have used pkgs-mozilla overlays for my use case however you can use any other method you prefer!!
-  rust_src_overlay = import /home/Kihsir/Git_Clone/nixpkgs-mozilla/rust-src-overlay.nix;
-  # You may have to add rust-src manually depending on how you installed,
-  # if you used the basic rust installation via nixpkgs
-  # or anyother simpler manner ignore the above!!
 
   nixpkgs = import <nixpkgs> {
     overlays = [
       moz_overlay
-      rust_src_overlay
     ];
   };
 
