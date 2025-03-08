@@ -3,50 +3,62 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    moz-overlay.url = "github:mozilla/nixpkgs-mozilla";
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, moz-overlay }:
-    let
-      # Define the system architecture (e.g., "x86_64-linux")
-      system = "x86_64-linux";
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
 
-      # Import nixpkgs with the Mozilla overlay
-      pkgs = import nixpkgs {
-        inherit system;
-        overlays = [ moz-overlay.overlay ];
-      };
-
-      # Define the library path
-      libPath = with pkgs; lib.makeLibraryPath [
-        libgbm
-        wayland
-      ];
-
-    in {
-      devShells.${system}.default = pkgs.mkShell {
-        name = "wayshot-dev-shell";
-
-        buildInputs = [
-          pkgs.libGL.dev
-          pkgs.libgbm
-          pkgs.pkg-config
-          pkgs.wayland.dev
-          pkgs.latest.rustChannels.nightly.rust
+        # Define the library path
+        libPath = with pkgs; lib.makeLibraryPath [
+          libgbm
+          wayland
+          # Add other libraries your project depends on here
         ];
+      in
+      {
+        devShells.default = pkgs.mkShell rec {
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = with pkgs; [
+            clang
+            llvmPackages.bintools
+            rustc
+            cargo
+            libGL.dev
+            libgbm
+            wayland.dev
+          ];
 
-        LD_LIBRARY_PATH = libPath;
-        RUST_BACKTRACE = "1";
+          # Set up environment variables for Rust
+          LIBCLANG_PATH = pkgs.lib.makeLibraryPath [ pkgs.llvmPackages_latest.libclang.lib ];
+          LD_LIBRARY_PATH = libPath;
+          RUST_BACKTRACE = "1";
 
-        shellHook = ''
-          export RUST_SRC_PATH="${pkgs.latest.rustChannels.nightly.rust-src}/lib/rustlib/src/rust/library"
-        '';
+          shellHook = ''
+            export PATH=$PATH:''${CARGO_HOME:-~/.cargo}/bin
+          '';
 
-        BINDGEN_EXTRA_CLANG_ARGS = (builtins.map (a: ''-I"${a}/include"'') [
-          # Add include paths for other libraries here
-        ]) ++ [
-          # Special directories
-        ];
-      };
-    };
+          # Add precompiled libraries to rustc search path
+          RUSTFLAGS = (builtins.map (a: ''-L ${a}/lib'') [
+            # Add libraries here (e.g., pkgs.libvmi)
+          ]);
+
+          # Add headers to bindgen search path
+          BINDGEN_EXTRA_CLANG_ARGS =
+            # Includes normal include path
+            (builtins.map (a: ''-I"${a}/include"'') [
+              pkgs.glibc.dev
+              # Add dev libraries here (e.g., pkgs.libvmi.dev)
+            ])
+            # Includes with special directory paths
+            ++ [
+              ''-I"${pkgs.llvmPackages_latest.libclang.lib}/lib/clang/${pkgs.llvmPackages_latest.libclang.version}/include"''
+              ''-I"${pkgs.glib.dev}/include/glib-2.0"''
+              ''-I${pkgs.glib.out}/lib/glib-2.0/include/''
+            ];
+        };
+      }
+    );
 }
