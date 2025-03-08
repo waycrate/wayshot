@@ -347,20 +347,20 @@ impl WayshotConnection {
         type Attrib = egl::Attrib;
         let (frame_format, _guard, bo) =
             self.capture_output_frame_dmabuf(cursor_overlay, output, capture_region)?;
-        let modifier: u64 = bo.modifier()?.into();
+        let modifier: u64 = bo.modifier().into();
         let image_attribs = [
             egl::WIDTH as Attrib,
             frame_format.size.width as Attrib,
             egl::HEIGHT as Attrib,
             frame_format.size.height as Attrib,
             0x3271, //EGL_LINUX_DRM_FOURCC_EXT
-            bo.format().unwrap() as Attrib,
+            bo.format() as Attrib,
             0x3272, //EGL_DMA_BUF_PLANE0_FD_EXT
             bo.fd_for_plane(0).unwrap().into_raw_fd() as Attrib,
             0x3273, //EGL_DMA_BUF_PLANE0_OFFSET_EXT
-            bo.offset(0).unwrap() as Attrib,
+            bo.offset(0) as Attrib,
             0x3274, //EGL_DMA_BUF_PLANE0_PITCH_EXT
-            bo.stride_for_plane(0).unwrap() as Attrib,
+            bo.stride_for_plane(0) as Attrib,
             0x3443, //EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT
             (modifier as u32) as Attrib,
             0x3444, //EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT
@@ -426,8 +426,8 @@ impl WayshotConnection {
                     BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR,
                 )?;
 
-                let stride = bo.stride()?;
-                let modifier: u64 = bo.modifier()?.into();
+                let stride = bo.stride();
+                let modifier: u64 = bo.modifier().into();
                 tracing::debug!(
                     "Created GBM Buffer object with input frame format {:#?}, stride {:#?} and modifier {:#?} ",
                     frame_format,
@@ -440,7 +440,7 @@ impl WayshotConnection {
                     frame_format,
                     stride,
                     modifier,
-                    bo.fd_for_plane(0)?,
+                    bo.fd_for_plane(0).unwrap(),
                 )?;
 
                 Ok((frame_format, frame_guard, bo))
