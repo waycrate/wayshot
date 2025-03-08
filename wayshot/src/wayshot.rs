@@ -17,7 +17,7 @@ use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
 use rustix::runtime::{fork, Fork};
 
-use clap_complete::{generate,Shell}; // <-- Add this import
+use clap_complete::{generate, Shell}; // <-- Add this import
 use clap::CommandFactory;    // <-- Add this import
 
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
@@ -35,52 +35,99 @@ where
     Some(selection)
 }
 
+fn install_completions(shell: &str) -> Result<()> {
+    let mut cmd = cli::Cli::command();
+
+    // Detect the user's shell
+    let user_shell = std::env::var("SHELL")
+        .unwrap_or_else(|_| "bash".to_string()) // Default to bash if SHELL is not set
+        .to_lowercase();
+
+    // Extract the shell name (e.g., "bash" from "/bin/bash")
+    let shell_name = user_shell
+        .split('/')
+        .last()
+        .unwrap_or("bash")
+        .trim_end_matches("-");
+
+    // Check if completions are already installed
+    let completion_path = match shell_name {
+        "bash" => {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            format!("{}/.bash_completion.d/wayshot", home)
+        }
+        "zsh" => {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            format!("{}/.zsh/completions/_wayshot", home)
+        }
+        "fish" => {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            format!("{}/.config/fish/completions/wayshot.fish", home)
+        }
+        _ => {
+            eprintln!("Unsupported shell: {}", shell_name);
+            return Ok(());
+        }
+    };
+
+    // Create the directory if it doesn't exist
+    if let Some(parent) = std::path::Path::new(&completion_path).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    // Write the completions to the file
+    let mut file = std::fs::File::create(&completion_path)?;
+    generate(
+        shell.parse::<Shell>().expect("Invalid shell type"), // <-- Fix here
+        &mut cmd,
+        "wayshot",
+        &mut file,
+    );
+    eprintln!("Completions installed to: {}", completion_path);
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = cli::Cli::parse();
 
-    // Handle --generate-completions
-    if let Some(shell) = cli.generate_completions {
-        let mut cmd = cli::Cli::command();
-        eprintln!("Generating completions for {:?}...", shell);
+    // Detect the user's shell
+    let user_shell = std::env::var("SHELL")
+        .unwrap_or_else(|_| "bash".to_string()) // Default to bash if SHELL is not set
+        .to_lowercase();
 
-        // Get the user's shell from the environment
-        let user_shell = std::env::var("SHELL")
-            .unwrap_or_else(|_| "bash".to_string()) // Default to bash if SHELL is not set
-            .to_lowercase();
+    // Extract the shell name (e.g., "bash" from "/bin/bash")
+    let shell_name = user_shell
+        .split('/')
+        .last()
+        .unwrap_or("bash")
+        .trim_end_matches("-");
 
-        // Map the shell to the appropriate completion file path
-        let completion_path = match user_shell {
-            s if s.contains("bash") => {
-                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-                format!("{}/.bash_completion.d/wayshot", home)
-            }
-            s if s.contains("zsh") => {
-                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-                format!("{}/.zsh/completions/_wayshot", home)
-            }
-            s if s.contains("fish") => {
-                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-                format!("{}/.config/fish/completions/wayshot.fish", home)
-            }
-            _ => {
-                eprintln!("Unsupported shell: {}", user_shell);
-                return Ok(());
-            }
-        };
-
-        // Create the directory if it doesn't exist
-        if let Some(parent) = std::path::Path::new(&completion_path).parent() {
-            std::fs::create_dir_all(parent)?;
+    // Check if completions are already installed
+    let completion_path = match shell_name {
+        "bash" => {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            format!("{}/.bash_completion.d/wayshot", home)
         }
+        "zsh" => {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            format!("{}/.zsh/completions/_wayshot", home)
+        }
+        "fish" => {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            format!("{}/.config/fish/completions/wayshot.fish", home)
+        }
+        _ => {
+            eprintln!("Unsupported shell: {}", shell_name);
+            return Ok(());
+        }
+    };
 
-        // Write the completions to the file
-        let mut file = std::fs::File::create(&completion_path)?;
-        generate(shell, &mut cmd, "wayshot", &mut file);
-        eprintln!("Completions installed to: {}", completion_path);
-
-        return Ok(());
+    // If completions are not installed, install them
+    if !std::path::Path::new(&completion_path).exists() {
+        eprintln!("Completions not found. Installing for {}...", shell_name);
+        install_completions(shell_name)?;
     }
-
 
     tracing_subscriber::fmt()
         .with_max_level(cli.log_level)
