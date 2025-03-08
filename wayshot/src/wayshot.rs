@@ -17,7 +17,7 @@ use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
 use rustix::runtime::{fork, Fork};
 
-use clap_complete::generate; // <-- Add this import
+use clap_complete::{generate,Shell}; // <-- Add this import
 use clap::CommandFactory;    // <-- Add this import
 
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
@@ -42,7 +42,54 @@ fn main() -> Result<()> {
     if let Some(shell) = cli.generate_completions {
         let mut cmd = cli::Cli::command();
         eprintln!("Generating completions for {:?}...", shell);
-        generate(shell, &mut cmd, "wayshot", &mut stdout());
+
+        // Get the current executable's directory
+        let exe_path = std::env::current_exe()?;
+        let exe_dir = exe_path.parent()
+            .ok_or_else(|| eyre::eyre!("Failed to get executable directory"))?;
+
+        // Create the completions directory
+        let completions_dir = exe_dir.join("completions");
+        std::fs::create_dir_all(&completions_dir)?;
+
+        // Map the shell to the appropriate completion file name
+        let completion_file = match shell {
+            Shell::Bash => "wayshot.bash",
+            Shell::Zsh => "_wayshot",
+            Shell::Fish => "wayshot.fish",
+            Shell::PowerShell => "wayshot.ps1",
+            Shell::Elvish => "wayshot.elv",
+            _ => {
+                eprintln!("Unsupported shell: {:?}", shell);
+                return Ok(());
+            }
+        };
+
+        // Write the completions to the file
+        let completion_path = completions_dir.join(completion_file);
+        let mut file = std::fs::File::create(&completion_path)?;
+        generate(shell, &mut cmd, "wayshot", &mut file);
+
+        eprintln!("Completions saved to: {}", completion_path.display());
+        eprintln!("\nTo enable completions, run:");
+
+        // Print instructions for sourcing the completion script
+        match shell {
+            Shell::Bash => {
+                eprintln!("  source {}", completion_path.display());
+            }
+            Shell::Zsh => {
+                eprintln!("  fpath=({} $fpath)", completions_dir.display());
+                eprintln!("  autoload -Uz compinit && compinit");
+            }
+            Shell::Fish => {
+                eprintln!("  source {}", completion_path.display());
+            }
+            _ => {
+                eprintln!("  Follow the instructions for your shell to install the completions.");
+            }
+        }
+
         return Ok(());
     }
 
