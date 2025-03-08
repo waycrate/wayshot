@@ -17,8 +17,8 @@ use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
 use rustix::runtime::{fork, Fork};
 
-use clap_complete::{generate, Shell}; // <-- Add this import
-use clap::CommandFactory;    // <-- Add this import
+use clap_complete::{generate, Shell};
+use clap::CommandFactory;
 
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where
@@ -38,19 +38,19 @@ where
 fn install_completions(shell: &str) -> Result<()> {
     let mut cmd = cli::Cli::command();
 
-    // Detect the user's shell
+    //Detect the user's shell
     let user_shell = std::env::var("SHELL")
-        .unwrap_or_else(|_| "bash".to_string()) // Default to bash if SHELL is not set
+        .unwrap_or_else(|_| "bash".to_string()) //Default to bash if SHELL is not set
         .to_lowercase();
 
-    // Extract the shell name (e.g., "bash" from "/bin/bash")
+    //Extract the shell name (Example: "bash" from "/bin/bash")
     let shell_name = user_shell
         .split('/')
         .last()
         .unwrap_or("bash")
         .trim_end_matches("-");
 
-    // Check if completions are already installed
+    //This Checks if completions are already installed
     let completion_path = match shell_name {
         "bash" => {
             let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
@@ -70,20 +70,37 @@ fn install_completions(shell: &str) -> Result<()> {
         }
     };
 
-    // Create the directory if it doesn't exist
+    //It Creates the directory if it doesn't exist
     if let Some(parent) = std::path::Path::new(&completion_path).parent() {
         std::fs::create_dir_all(parent)?;
     }
 
-    // Write the completions to the file
+    //Writes the completions to the file
     let mut file = std::fs::File::create(&completion_path)?;
     generate(
-        shell.parse::<Shell>().expect("Invalid shell type"), // <-- Fix here
+        shell.parse::<Shell>().expect("Invalid shell type"),
         &mut cmd,
         "wayshot",
         &mut file,
     );
     eprintln!("Completions installed to: {}", completion_path);
+
+    //For Bash, ensure the completion script is sourced
+    if shell == "bash" {
+        let bashrc_path = format!("{}/.bashrc", std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
+        let source_line = format!("source {}", completion_path);
+
+        //Checks if the source line already exists in ~/.bashrc
+        let bashrc_content = std::fs::read_to_string(&bashrc_path).unwrap_or_default();
+        if !bashrc_content.contains(&source_line) {
+            //Appends the source line to ~/.bashrc
+            let mut bashrc_file = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&bashrc_path)?;
+            writeln!(bashrc_file, "\n{}", source_line)?;
+            eprintln!("Added sourcing line to ~/.bashrc. Please restart your shell or run 'source ~/.bashrc'.");
+        }
+    }
 
     Ok(())
 }
@@ -91,19 +108,19 @@ fn install_completions(shell: &str) -> Result<()> {
 fn main() -> Result<()> {
     let cli = cli::Cli::parse();
 
-    // Detect the user's shell
+    //Detect the user's shell
     let user_shell = std::env::var("SHELL")
-        .unwrap_or_else(|_| "bash".to_string()) // Default to bash if SHELL is not set
+        .unwrap_or_else(|_| "bash".to_string()) //Default to bash if SHELL is not set
         .to_lowercase();
 
-    // Extract the shell name (e.g., "bash" from "/bin/bash")
+    //Extract the shell name (Example: "bash" from "/bin/bash")
     let shell_name = user_shell
         .split('/')
         .last()
         .unwrap_or("bash")
         .trim_end_matches("-");
 
-    // Check if completions are already installed
+    //This Checks if completions are already installed
     let completion_path = match shell_name {
         "bash" => {
             let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
@@ -123,7 +140,7 @@ fn main() -> Result<()> {
         }
     };
 
-    // If completions are not installed, install them
+    // If completions are not installed, installs them
     if !std::path::Path::new(&completion_path).exists() {
         eprintln!("Completions not found. Installing for {}...", shell_name);
         install_completions(shell_name)?;
