@@ -18,7 +18,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@stable
     - name: Install wayland dependencies
       run: |
-        pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel
+        pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa
 
     - name: Build
       run: |

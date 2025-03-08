@@ -68,14 +68,14 @@ impl Default for EncodingFormat {
     }
 }
 
-impl From<EncodingFormat> for image::ImageOutputFormat {
+impl From<EncodingFormat> for image::ImageFormat {
     fn from(format: EncodingFormat) -> Self {
         match format {
-            EncodingFormat::Jpg => image::ImageFormat::Jpeg.into(),
-            EncodingFormat::Png => image::ImageFormat::Png.into(),
-            EncodingFormat::Ppm => image::ImageFormat::Pnm.into(),
-            EncodingFormat::Qoi => image::ImageFormat::Qoi.into(),
-            EncodingFormat::Webp => image::ImageFormat::WebP.into(),
+            EncodingFormat::Jpg => image::ImageFormat::Jpeg,
+            EncodingFormat::Png => image::ImageFormat::Png,
+            EncodingFormat::Ppm => image::ImageFormat::Pnm,
+            EncodingFormat::Qoi => image::ImageFormat::Qoi,
+            EncodingFormat::Webp => image::ImageFormat::WebP,
         }
     }
 }
