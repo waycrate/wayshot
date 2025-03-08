@@ -8,17 +8,17 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
 
     steps:
     - name: Checkout
       uses: actions/checkout@v2
-    
+
+    - uses: dtolnay/rust-toolchain@stable
     - name: Install wayland dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends \
-          libwayland-dev \
-          libegl-dev \
+        pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa
 
     - name: Build
       run: |
