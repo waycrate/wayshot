@@ -93,6 +93,11 @@ fn install_completions(shell: &str) -> Result<()> {
         //Checks if the source line already exists in ~/.bashrc
         let bashrc_content = std::fs::read_to_string(&bashrc_path).unwrap_or_default();
         if !bashrc_content.contains(&source_line) {
+
+            //Create ~/.bashrc if it doesn't exist
+            if !std::path::Path::new(&bashrc_path).exists() {
+                std::fs::File::create(&bashrc_path)?;
+            }
             //Appends the source line to ~/.bashrc
             let mut bashrc_file = std::fs::OpenOptions::new()
                 .append(true)
