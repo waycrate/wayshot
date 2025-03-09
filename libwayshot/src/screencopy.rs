@@ -160,7 +160,7 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
     // Only try memfd on linux and freebsd.
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     loop {
-        // Create a file that closes on succesful execution and seal it's operations.
+        // Create a file that closes on successful execution and seal it's operations.
         match fs::memfd_create(
             CString::new("libwayshot")?.as_c_str(),
             fs::MemfdFlags::CLOEXEC | fs::MemfdFlags::ALLOW_SEALING,
@@ -185,7 +185,7 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
             // O_CREAT = Create file if does not exist.
             // O_EXCL = Error if create and file exists.
             // O_RDWR = Open for reading and writing.
-            // O_CLOEXEC = Close on succesful execution.
+            // O_CLOEXEC = Close on successful execution.
             // S_IRUSR = Set user read permission bit .
             // S_IWUSR = Set user write permission bit.
             mem_file_handle.as_str(),
