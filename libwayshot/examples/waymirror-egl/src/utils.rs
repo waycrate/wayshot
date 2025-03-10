@@ -21,7 +21,7 @@ pub fn load_shader(shader_type: GLenum, src: String) -> Result<GLuint> {
         gl::GetShaderiv(shader, gl::COMPILE_STATUS, &mut status as *mut i32);
 
         if status > 0 {
-            tracing::event!(tracing::Level::INFO, "Shader compile successfull!",);
+            tracing::event!(tracing::Level::INFO, "Shader compile successful!",);
         } else {
             return Err(WaylandEGLStateError::GLShaderCompileFailed);
         }
