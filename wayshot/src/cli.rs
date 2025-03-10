@@ -7,6 +7,7 @@ use eyre::WrapErr;
 
 use crate::utils::EncodingFormat;
 use clap::builder::TypedValueParser;
+use clap_complete::Shell; // <-- Add this import
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -51,4 +52,8 @@ pub struct Cli {
     /// Present a fuzzy selector for output/display selection
     #[arg(long, alias = "chooseoutput", conflicts_with_all = ["slurp", "output"])]
     pub choose_output: bool,
+
+    /// Generate shell completions for the specified shell (e.g., bash, zsh, fish)
+    #[arg(long, value_enum, help = "This Command helps you generate autocomplete in your desired Shell environment")]
+    pub generate_completions: Option<Shell>, // <-- Add this field
 }
