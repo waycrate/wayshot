@@ -3,12 +3,8 @@ use std::path::PathBuf;
 use clap::{
     arg,
     builder::{
-        styling::{
-            AnsiColor,
-            Effects
-        },
-        Styles,
-        TypedValueParser
+        styling::{AnsiColor, Effects},
+        Styles, TypedValueParser,
     },
     Parser,
 };
