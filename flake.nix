@@ -1,44 +1,17 @@
 {
-  description = "Wayshot devel";
+  description = "Development environment for wayshot";
 
-  inputs = { nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable"; };
+  inputs = {
+    flake-utils.url = "github:numtide/flake-utils";
+  };
 
-  outputs = { self, nixpkgs, ... }:
-    let
-      pkgsFor = system:
-        import nixpkgs {
-          inherit system;
-          overlays = [ ];
-        };
-
-      targetSystems = [ "aarch64-linux" "x86_64-linux" ];
-    in {
-      devShells = nixpkgs.lib.genAttrs targetSystems (system:
-        let pkgs = pkgsFor system;
-        in {
-          default = pkgs.mkShell {
-            name = "Wayshot-devel";
-            nativeBuildInputs = with pkgs; [
-              # Compilers
-              cargo
-              rustc
-              scdoc
-
-              # Libs
-              wayland-protocols
-              wayland
-
-              # Tools
-              wayland-scanner
-              clippy
-              gdb
-              gnumake
-              rust-analyzer
-              rustfmt
-              strace
-              valgrind
-            ];
-          };
-        });
-    };
+  outputs =
+    {
+      flake-utils,
+      ...
+    }:
+    flake-utils.lib.eachDefaultSystem (system:
+    {
+      devShells.default = import ./shell.nix;
+    });
 }
