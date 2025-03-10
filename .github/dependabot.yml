@@ -7,7 +7,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
 
   # Rust projects
   - package-ecosystem: "cargo"
@@ -17,4 +17,4 @@ updates:
       - "/libwayshot"
       - "/libwayshot/examples/waymirror-egl"
     schedule:
-      interval: "daily"
+      interval: "weekly"
