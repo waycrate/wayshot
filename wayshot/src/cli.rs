@@ -2,15 +2,30 @@ use std::path::PathBuf;
 
 use clap::{
     arg,
-    builder::TypedValueParser,
+    builder::{
+        styling::{
+            AnsiColor,
+            Effects
+        },
+        Styles,
+        TypedValueParser
+    },
     Parser,
 };
 use eyre::WrapErr;
 
 use crate::utils::EncodingFormat;
 
+fn get_styles() -> Styles {
+    Styles::styled()
+        .header(AnsiColor::Yellow.on_default() | Effects::BOLD)
+        .usage(AnsiColor::Green.on_default() | Effects::BOLD)
+        .literal(AnsiColor::Blue.on_default() | Effects::BOLD)
+        .placeholder(AnsiColor::Green.on_default())
+}
+
 #[derive(Parser)]
-#[command(version, about)]
+#[command(version, about, styles=get_styles())]
 pub struct Cli {
     /// Custom screenshot file path can be of the following types:
     ///     1. Directory (Default naming scheme is used for the screenshot file).
