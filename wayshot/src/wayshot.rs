@@ -107,6 +107,28 @@ fn install_completions(shell: &str) -> Result<()> {
         }
     }
 
+    // For Zsh, ensure the completion script is sourced
+    if shell == "zsh" {
+        let zshrc_path = format!("{}/.zshrc", std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
+        let source_line = format!("fpath=({}/.zsh/completions $fpath)", std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
+
+        // Check if the source line already exists in ~/.zshrc
+        let zshrc_content = std::fs::read_to_string(&zshrc_path).unwrap_or_default();
+        if !zshrc_content.contains(&source_line) {
+            // Create ~/.zshrc if it doesn't exist
+            if !std::path::Path::new(&zshrc_path).exists() {
+                std::fs::File::create(&zshrc_path)?;
+            }
+
+            // Append the source line to ~/.zshrc
+            let mut zshrc_file = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&zshrc_path)?;
+            writeln!(zshrc_file, "\n{}", source_line)?;
+            eprintln!("Added sourcing line to ~/.zshrc. Please restart your shell or run 'source ~/.zshrc'.");
+        }
+    }
+
     Ok(())
 }
 
