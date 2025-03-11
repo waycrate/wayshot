@@ -17,8 +17,8 @@ use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
 use rustix::runtime::{fork, Fork};
 
-use clap_complete::{generate, Shell};
 use clap::CommandFactory;
+use clap_complete::{generate, Shell};
 
 fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
 where
@@ -87,13 +87,15 @@ fn install_completions(shell: &str) -> Result<()> {
 
     //For Bash, ensure the completion script is sourced
     if shell == "bash" {
-        let bashrc_path = format!("{}/.bashrc", std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
+        let bashrc_path = format!(
+            "{}/.bashrc",
+            std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+        );
         let source_line = format!("source {}", completion_path);
 
         //Checks if the source line already exists in ~/.bashrc
         let bashrc_content = std::fs::read_to_string(&bashrc_path).unwrap_or_default();
         if !bashrc_content.contains(&source_line) {
-
             //Create ~/.bashrc if it doesn't exist
             if !std::path::Path::new(&bashrc_path).exists() {
                 std::fs::File::create(&bashrc_path)?;
@@ -109,16 +111,17 @@ fn install_completions(shell: &str) -> Result<()> {
 
     //For Zsh, ensure the completion script is sourced
     if shell == "zsh" {
-        let zshrc_path = format!("{}/.zshrc", std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
+        let zshrc_path = format!(
+            "{}/.zshrc",
+            std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+        );
         let source_line = format!("source {}", completion_path);
 
         //Check if the source line already exists in ~/.zshrc
         let zshrc_content = std::fs::read_to_string(&zshrc_path).unwrap_or_default();
         if !zshrc_content.contains(&source_line) {
             //Append the source line to ~/.zshrc
-            let mut zshrc_file = std::fs::OpenOptions::new()
-                .append(true)
-                .open(&zshrc_path)?;
+            let mut zshrc_file = std::fs::OpenOptions::new().append(true).open(&zshrc_path)?;
             writeln!(zshrc_file, "\n{}", source_line)?;
             eprintln!("Added sourcing line to ~/.zshrc. Please restart your shell or run 'source ~/.zshrc'.");
         }
@@ -126,7 +129,10 @@ fn install_completions(shell: &str) -> Result<()> {
 
     //For Fish, ensure the completion script is sourced
     if shell == "fish" {
-        let fish_config_path = format!("{}/.config/fish/config.fish", std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
+        let fish_config_path = format!(
+            "{}/.config/fish/config.fish",
+            std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+        );
         let source_line = format!("source {}", completion_path);
 
         //Check if the source line already exists in ~/.config/fish/config.fish
@@ -143,7 +149,9 @@ fn install_completions(shell: &str) -> Result<()> {
                 .append(true)
                 .open(&fish_config_path)?;
             writeln!(fish_config_file, "\n{}", source_line)?;
-            eprintln!("Added sourcing line to ~/.config/fish/config.fish. Please restart your shell.");
+            eprintln!(
+                "Added sourcing line to ~/.config/fish/config.fish. Please restart your shell."
+            );
         }
     }
 

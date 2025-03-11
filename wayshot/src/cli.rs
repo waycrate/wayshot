@@ -54,6 +54,10 @@ pub struct Cli {
     pub choose_output: bool,
 
     ///Generate shell completions for the specified shell (Example: bash, zsh, fish)
-    #[arg(long, value_enum, help = "This Command helps you generate autocomplete in your desired Shell environment")]
+    #[arg(
+        long,
+        value_enum,
+        help = "This Command helps you generate autocomplete in your desired Shell environment"
+    )]
     pub generate_completions: Option<Shell>,
 }
