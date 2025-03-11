@@ -123,6 +123,30 @@ fn install_completions(shell: &str) -> Result<()> {
             eprintln!("Added sourcing line to ~/.zshrc. Please restart your shell or run 'source ~/.zshrc'.");
         }
     }
+
+    //For Fish, ensure the completion script is sourced
+    if shell == "fish" {
+        let fish_config_path = format!("{}/.config/fish/config.fish", std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
+        let source_line = format!("source {}", completion_path);
+
+        //Check if the source line already exists in ~/.config/fish/config.fish
+        let fish_config_content = std::fs::read_to_string(&fish_config_path).unwrap_or_default();
+        if !fish_config_content.contains(&source_line) {
+            //Create ~/.config/fish/config.fish if it doesn't exist
+            if !std::path::Path::new(&fish_config_path).exists() {
+                std::fs::create_dir_all(std::path::Path::new(&fish_config_path).parent().unwrap())?;
+                std::fs::File::create(&fish_config_path)?;
+            }
+
+            //Append the source line to ~/.config/fish/config.fish
+            let mut fish_config_file = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&fish_config_path)?;
+            writeln!(fish_config_file, "\n{}", source_line)?;
+            eprintln!("Added sourcing line to ~/.config/fish/config.fish. Please restart your shell.");
+        }
+    }
+
     Ok(())
 }
 
@@ -161,7 +185,7 @@ fn main() -> Result<()> {
         }
     };
 
-    // If completions are not installed, installs them
+    //If completions are not installed, installs them
     if !std::path::Path::new(&completion_path).exists() {
         eprintln!("Completions not found. Installing for {}...", shell_name);
         install_completions(shell_name)?;
