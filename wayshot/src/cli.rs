@@ -51,4 +51,8 @@ pub struct Cli {
     /// Present a fuzzy selector for output/display selection
     #[arg(long, alias = "chooseoutput", conflicts_with_all = ["slurp", "output"])]
     pub choose_output: bool,
+
+    ///Number of seconds to wait before taking the screenshot
+    #[arg(long, short, default_value = "0", value_name = "SECONDS")]
+    pub delay: u64,
 }

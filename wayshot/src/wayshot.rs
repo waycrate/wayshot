@@ -1,5 +1,5 @@
 use std::{
-    io::{stdout, BufWriter, Cursor, Write},
+    io::{self, stdout, BufWriter, Cursor, Write},
     process::Command,
 };
 
@@ -38,6 +38,13 @@ fn main() -> Result<()> {
         .with_max_level(cli.log_level)
         .with_writer(std::io::stderr)
         .init();
+
+    if cli.delay > 0 {
+        print!("Waiting {} seconds before capture...", cli.delay);
+        io::stdout().flush().ok();
+        std::thread::sleep(std::time::Duration::from_secs(cli.delay));
+        println!("Done!");
+    }
 
     let input_encoding = cli
         .file
