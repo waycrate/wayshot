@@ -20,6 +20,7 @@ tracing.workspace = true
 libwayshot.workspace = true
 
 clap = { version = "4.5.30", features = ["derive"] }
+clap_complete = "4.5.46"
 tracing-subscriber = "0.3.19"
 
 image = { version = "0.25", default-features = false, features = [
