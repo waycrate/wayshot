@@ -813,7 +813,7 @@ impl WayshotConnection {
             Ok(x) => x,
             Err(e) => {
                 tracing::error!(
-                    "Failed to create compositor Does your compositor implement WlCompositor?"
+                    "Failed to create compositor. Does your compositor implement WlCompositor?"
                 );
                 tracing::error!("err: {e}");
                 return Err(Error::ProtocolNotFound(
@@ -1062,7 +1062,8 @@ impl WayshotConnection {
     ) -> Result<DynamicImage> {
         self.screenshot_region_capturer(RegionCapturer::Freeze(callback), cursor_overlay)
     }
-    /// shot one ouput
+
+    /// Take a screenshot from one output
     pub fn screenshot_single_output(
         &self,
         output_info: &OutputInfo,
