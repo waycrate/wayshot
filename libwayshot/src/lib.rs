@@ -526,17 +526,14 @@ impl WayshotConnection {
                         | wl_shm::Format::Bgr888
                 )
             })
-            .copied();
+            .copied()
+            // Check if frame format exists.
+            .ok_or_else(|| {
+                tracing::error!("No suitable frame format found");
+                Error::NoSupportedBufferFormat
+            })?;
         tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
 
-        // Check if frame format exists.
-        let frame_format = match frame_format {
-            Some(format) => format,
-            None => {
-                tracing::error!("No suitable frame format found");
-                return Err(Error::NoSupportedBufferFormat);
-            }
-        };
         Ok((state, event_queue, frame, frame_format))
     }
 
