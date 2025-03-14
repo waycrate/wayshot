@@ -28,7 +28,8 @@ image = { version = "0.25", default-features = false, features = [
 	"png",
 	"pnm",
 	"qoi",
-	"webp"
+	"webp",
+	"avif",
 ] }
 
 dialoguer = { version = "0.11.0", features = ["fuzzy-select"] }
