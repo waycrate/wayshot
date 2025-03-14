@@ -751,13 +751,13 @@ impl WayshotConnection {
 
         let mut frame_mmap = unsafe { MmapMut::map_mut(&mem_file)? };
         let data = &mut *frame_mmap;
-        let frame_color_type = if let Some(converter) = create_converter(frame_format.format) {
+        let frame_color_type = match create_converter(frame_format.format) { Some(converter) => {
             converter.convert_inplace(data)
-        } else {
+        } _ => {
             tracing::error!("Unsupported buffer format: {:?}", frame_format.format);
             tracing::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
             return Err(Error::NoSupportedBufferFormat);
-        };
+        }};
         let rotated_physical_size = match output_info.transform {
             Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270 => {
                 Size {
