@@ -102,12 +102,12 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
         _: &QueueHandle<Self>,
     ) {
         let output: &mut OutputInfo =
-            if let Some(output) = state.outputs.iter_mut().find(|x| x.wl_output == *wl_output) {
+            match state.outputs.iter_mut().find(|x| x.wl_output == *wl_output) { Some(output) => {
                 output
-            } else {
+            } _ => {
                 tracing::error!("Received event for an output that is not registered: {event:#?}");
                 return;
-            };
+            }};
 
         match event {
             wl_output::Event::Name { name } => {
@@ -147,14 +147,14 @@ impl Dispatch<ZxdgOutputV1, usize> for OutputCaptureState {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        let output_info = if let Some(output_info) = state.outputs.get_mut(*index) {
+        let output_info = match state.outputs.get_mut(*index) { Some(output_info) => {
             output_info
-        } else {
+        } _ => {
             tracing::error!(
                 "Received event for output index {index} that is not registered: {event:#?}"
             );
             return;
-        };
+        }};
 
         match event {
             zxdg_output_v1::Event::LogicalPosition { x, y } => {

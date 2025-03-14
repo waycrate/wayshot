@@ -181,17 +181,18 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
     // Fallback to using shm_open.
     let mut mem_file_handle = get_mem_file_handle();
     loop {
-        match shm::open(
-            // O_CREAT = Create file if does not exist.
-            // O_EXCL = Error if create and file exists.
-            // O_RDWR = Open for reading and writing.
-            // O_CLOEXEC = Close on succesful execution.
-            // S_IRUSR = Set user read permission bit .
-            // S_IWUSR = Set user write permission bit.
+        let open_result = shm::open(
             mem_file_handle.as_str(),
             shm::OFlags::CREATE | shm::OFlags::EXCL | shm::OFlags::RDWR,
             fs::Mode::RUSR | fs::Mode::WUSR,
-        ) {
+        );
+        // O_CREAT = Create file if does not exist.
+        // O_EXCL = Error if create and file exists.
+        // O_RDWR = Open for reading and writing.
+        // O_CLOEXEC = Close on succesful execution.
+        // S_IRUSR = Set user read permission bit .
+        // S_IWUSR = Set user write permission bit.
+        match open_result {
             Ok(fd) => match shm::unlink(mem_file_handle.as_str()) {
                 Ok(_) => return Ok(fd),
                 Err(errno) => return Err(std::io::Error::from(errno)),
