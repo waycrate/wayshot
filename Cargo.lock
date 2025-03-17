@@ -1807,16 +1807,16 @@ dependencies = [
 
 [[package]]
 name = "wl-clipboard-rs"
-version = "0.9.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a083daad7e8a4b8805ad73947ccadabe62afe37ce0e9787a56ff373d34762c7"
+checksum = "8e5ff8d0e60065f549fafd9d6cb626203ea64a798186c80d8e7df4f8af56baeb"
 dependencies = [
  "libc",
  "log",
  "os_pipe",
  "rustix 0.38.44",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tree_magic_mini",
  "wayland-backend",
  "wayland-client",
