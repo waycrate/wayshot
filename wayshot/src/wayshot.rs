@@ -64,6 +64,14 @@ fn install_completions(shell: &str) -> Result<()> {
             let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
             format!("{}/.config/fish/completions/wayshot.fish", home)
         }
+        "elvish" => {
+            // Save to the current working directory
+            "wayshot.elv".to_string()
+        }
+        "powershell" => {
+            // Save to the current working directory
+            "wayshot.ps1".to_string()
+        }
         _ => {
             eprintln!("Unsupported shell: {}", shell_name);
             return Ok(());
