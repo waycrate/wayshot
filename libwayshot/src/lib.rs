@@ -313,7 +313,7 @@ impl WayshotConnection {
 
         egl_instance.initialize(egl_display)?;
         self.capture_output_frame_eglimage_on_display(
-            &egl_instance,
+            egl_instance,
             egl_display,
             cursor_overlay,
             output,
