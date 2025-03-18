@@ -7,8 +7,8 @@ use gl::types::GLuint;
 use khronos_egl::{self as egl};
 use std::{ffi::c_void, rc::Rc};
 use wayland_client::{
-    protocol::{wl_compositor, wl_display::WlDisplay, wl_surface::WlSurface},
     ConnectError, Connection, Proxy,
+    protocol::{wl_compositor, wl_display::WlDisplay, wl_surface::WlSurface},
 };
 use wayland_egl::WlEglSurface;
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
@@ -272,7 +272,12 @@ impl WaylandEGLState {
             // gl::DeleteTextures(1, &mut self.gl_texture);
 
             gl::UseProgram(self.gl_program);
-            gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null::<c_void>());
+            gl::DrawElements(
+                gl::TRIANGLES,
+                6,
+                gl::UNSIGNED_INT,
+                std::ptr::null::<c_void>(),
+            );
         }
     }
 

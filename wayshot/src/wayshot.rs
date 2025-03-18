@@ -1,16 +1,16 @@
 use std::{
-    io::{stdout, BufWriter, Cursor, Write},
+    io::{BufWriter, Cursor, Write, stdout},
     process::Command,
 };
 
 use clap::Parser;
-use eyre::{bail, Result};
-use libwayshot::{region::LogicalRegion, WayshotConnection};
+use eyre::{Result, bail};
+use libwayshot::{WayshotConnection, region::LogicalRegion};
 
 mod cli;
 mod utils;
 
-use dialoguer::{theme::ColorfulTheme, FuzzySelect};
+use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use utils::EncodingFormat;
 
 use wl_clipboard_rs::copy::{MimeType, Options, Source};

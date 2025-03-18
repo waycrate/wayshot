@@ -16,8 +16,8 @@ use wayland_client::protocol::{
 };
 
 use crate::{
-    region::{LogicalRegion, Size},
     Error, Result,
+    region::{LogicalRegion, Size},
 };
 
 pub struct FrameGuard {

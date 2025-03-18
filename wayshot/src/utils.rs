@@ -1,5 +1,5 @@
 use clap::ValueEnum;
-use eyre::{bail, ContextCompat, Error, Result};
+use eyre::{ContextCompat, Error, Result, bail};
 
 use std::{fmt::Display, path::PathBuf, str::FromStr};
 

@@ -4,6 +4,8 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 use wayland_client::{
+    Connection, Dispatch, QueueHandle,
+    WEnum::{self, Value},
     delegate_noop,
     globals::GlobalListContents,
     protocol::{
@@ -15,30 +17,29 @@ use wayland_client::{
         wl_shm_pool::WlShmPool,
         wl_surface::WlSurface,
     },
-    Connection, Dispatch, QueueHandle,
-    WEnum::{self, Value},
 };
 use wayland_protocols::{
-    wp::linux_dmabuf::zv1::client::{
-        zwp_linux_buffer_params_v1::{self, ZwpLinuxBufferParamsV1},
-        zwp_linux_dmabuf_v1::{self, ZwpLinuxDmabufV1},
+    wp::{
+        linux_dmabuf::zv1::client::{
+            zwp_linux_buffer_params_v1::{self, ZwpLinuxBufferParamsV1},
+            zwp_linux_dmabuf_v1::{self, ZwpLinuxDmabufV1},
+        },
+        viewporter::client::{wp_viewport::WpViewport, wp_viewporter::WpViewporter},
     },
     xdg::xdg_output::zv1::client::{
         zxdg_output_manager_v1::ZxdgOutputManagerV1,
         zxdg_output_v1::{self, ZxdgOutputV1},
     },
 };
-use wayland_protocols_wlr::layer_shell::v1::client::{
-    zwlr_layer_shell_v1::ZwlrLayerShellV1,
-    zwlr_layer_surface_v1::{self, ZwlrLayerSurfaceV1},
-};
-use wayland_protocols_wlr::screencopy::v1::client::{
-    zwlr_screencopy_frame_v1, zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
-    zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
-};
-
-use wayland_protocols::wp::viewporter::client::{
-    wp_viewport::WpViewport, wp_viewporter::WpViewporter,
+use wayland_protocols_wlr::{
+    layer_shell::v1::client::{
+        zwlr_layer_shell_v1::ZwlrLayerShellV1,
+        zwlr_layer_surface_v1::{self, ZwlrLayerSurfaceV1},
+    },
+    screencopy::v1::client::{
+        zwlr_screencopy_frame_v1::{self, ZwlrScreencopyFrameV1},
+        zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
+    },
 };
 
 use crate::{
@@ -102,12 +103,15 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
         _: &QueueHandle<Self>,
     ) {
         let output: &mut OutputInfo =
-            match state.outputs.iter_mut().find(|x| x.wl_output == *wl_output) { Some(output) => {
-                output
-            } _ => {
-                tracing::error!("Received event for an output that is not registered: {event:#?}");
-                return;
-            }};
+            match state.outputs.iter_mut().find(|x| x.wl_output == *wl_output) {
+                Some(output) => output,
+                _ => {
+                    tracing::error!(
+                        "Received event for an output that is not registered: {event:#?}"
+                    );
+                    return;
+                }
+            };
 
         match event {
             wl_output::Event::Name { name } => {
@@ -147,14 +151,15 @@ impl Dispatch<ZxdgOutputV1, usize> for OutputCaptureState {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        let output_info = match state.outputs.get_mut(*index) { Some(output_info) => {
-            output_info
-        } _ => {
-            tracing::error!(
-                "Received event for output index {index} that is not registered: {event:#?}"
-            );
-            return;
-        }};
+        let output_info = match state.outputs.get_mut(*index) {
+            Some(output_info) => output_info,
+            _ => {
+                tracing::error!(
+                    "Received event for output index {index} that is not registered: {event:#?}"
+                );
+                return;
+            }
+        };
 
         match event {
             zxdg_output_v1::Event::LogicalPosition { x, y } => {
