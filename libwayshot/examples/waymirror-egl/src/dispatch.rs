@@ -1,8 +1,7 @@
 use crate::state::WaylandEGLState;
 use wayland_client::{
-    delegate_noop,
+    Connection, Dispatch, QueueHandle, delegate_noop,
     protocol::{wl_compositor, wl_registry, wl_surface},
-    Connection, Dispatch, QueueHandle,
 };
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
 

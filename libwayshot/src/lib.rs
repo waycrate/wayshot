@@ -21,20 +21,20 @@ use std::{
 };
 
 use dispatch::{DMABUFState, LayerShellState};
-use image::{imageops::replace, DynamicImage};
+use image::{DynamicImage, imageops::replace};
 use khronos_egl::{self as egl, Instance};
 use memmap2::MmapMut;
 use region::{EmbeddedRegion, RegionCapturer};
 use screencopy::{DMAFrameFormat, DMAFrameGuard, EGLImageGuard, FrameData, FrameGuard};
 use tracing::debug;
 use wayland_client::{
-    globals::{registry_queue_init, GlobalList},
+    Connection, EventQueue, Proxy,
+    globals::{GlobalList, registry_queue_init},
     protocol::{
         wl_compositor::WlCompositor,
         wl_output::{Transform, WlOutput},
         wl_shm::{self, WlShm},
     },
-    Connection, EventQueue, Proxy,
 };
 use wayland_protocols::{
     wp::{
@@ -63,7 +63,7 @@ use crate::{
     dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState},
     output::OutputInfo,
     region::{LogicalRegion, Size},
-    screencopy::{create_shm_fd, FrameCopy, FrameFormat},
+    screencopy::{FrameCopy, FrameFormat, create_shm_fd},
 };
 
 pub use crate::error::{Error, Result};
@@ -162,7 +162,9 @@ impl WayshotConnection {
         ) {
             Ok(x) => x,
             Err(e) => {
-                tracing::error!("Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?");
+                tracing::error!(
+                    "Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?"
+                );
                 panic!("{:#?}", e);
             }
         };
@@ -431,7 +433,8 @@ impl WayshotConnection {
                 tracing::debug!(
                     "Created GBM Buffer object with input frame format {:#?}, stride {:#?} and modifier {:#?} ",
                     frame_format,
-                    stride,modifier
+                    stride,
+                    modifier
                 );
                 let frame_guard = self.capture_output_frame_inner_dmabuf(
                     state,
@@ -477,7 +480,9 @@ impl WayshotConnection {
         ) {
             Ok(x) => x,
             Err(e) => {
-                tracing::error!("Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?");
+                tracing::error!(
+                    "Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?"
+                );
                 tracing::error!("err: {e}");
                 return Err(Error::ProtocolNotFound(
                     "ZwlrScreencopy Manager not found".to_string(),
@@ -565,7 +570,9 @@ impl WayshotConnection {
         ) {
             Ok(x) => x,
             Err(e) => {
-                tracing::error!("Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?");
+                tracing::error!(
+                    "Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?"
+                );
                 tracing::error!("err: {e}");
                 return Err(Error::ProtocolNotFound(
                     "ZwlrScreencopy Manager not found".to_string(),
@@ -751,13 +758,16 @@ impl WayshotConnection {
 
         let mut frame_mmap = unsafe { MmapMut::map_mut(&mem_file)? };
         let data = &mut *frame_mmap;
-        let frame_color_type = match create_converter(frame_format.format) { Some(converter) => {
-            converter.convert_inplace(data)
-        } _ => {
-            tracing::error!("Unsupported buffer format: {:?}", frame_format.format);
-            tracing::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
-            return Err(Error::NoSupportedBufferFormat);
-        }};
+        let frame_color_type = match create_converter(frame_format.format) {
+            Some(converter) => converter.convert_inplace(data),
+            _ => {
+                tracing::error!("Unsupported buffer format: {:?}", frame_format.format);
+                tracing::error!(
+                    "You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot."
+                );
+                return Err(Error::NoSupportedBufferFormat);
+            }
+        };
         let rotated_physical_size = match output_info.transform {
             Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270 => {
                 Size {
