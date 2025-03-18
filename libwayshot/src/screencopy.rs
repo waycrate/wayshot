@@ -47,7 +47,7 @@ pub struct EGLImageGuard<'a, T: khronos_egl::api::EGL1_5> {
     pub(crate) egl_display: khronos_egl::Display,
 }
 
-impl<'a, T: khronos_egl::api::EGL1_5> Drop for EGLImageGuard<'a, T> {
+impl<T: khronos_egl::api::EGL1_5> Drop for EGLImageGuard<'_, T> {
     fn drop(&mut self) {
         self.egl_instance
             .destroy_image(self.egl_display, self.image)

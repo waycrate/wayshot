@@ -247,7 +247,7 @@ impl WaylandEGLState {
                 gl::FLOAT,
                 gl::FALSE,
                 5 * std::mem::size_of::<gl::types::GLfloat>() as gl::types::GLint,
-                0 as *const c_void,
+                std::ptr::null::<c_void>(),
             );
             gl::EnableVertexAttribArray(0);
 
@@ -272,7 +272,7 @@ impl WaylandEGLState {
             // gl::DeleteTextures(1, &mut self.gl_texture);
 
             gl::UseProgram(self.gl_program);
-            gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, 0 as *const c_void);
+            gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null::<c_void>());
         }
     }
 
