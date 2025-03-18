@@ -141,7 +141,7 @@ impl FromStr for EncodingFormat {
 
 pub fn get_default_file_name(extension: EncodingFormat) -> PathBuf {
     let current_datetime: DateTime<Local> = Local::now();
-    let formated_time = format!("{}", current_datetime.format("%Y_%m_%d-%H_%M_%S"));
+    let formatted_time = format!("{}", current_datetime.format("%Y_%m_%d-%H_%M_%S"));
 
-    format!("wayshot-{formated_time}.{extension}").into()
+    format!("wayshot-{formatted_time}.{extension}").into()
 }
