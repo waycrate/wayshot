@@ -46,16 +46,23 @@ fn main() -> Result<()> {
         .and_then(|pathbuf| pathbuf.try_into().ok());
     let requested_encoding = cli
         .encoding
-        .or(input_encoding)
-        .unwrap_or(EncodingFormat::default());
+        .or(input_encoding);
+    let encoding = match requested_encoding {
+        Some(re) => {
+            if let Some(ie) = input_encoding {
+                if ie.ne(&re) {
+                    tracing::warn!(
+                        "The encoding requested '{re}' does not match the output file's encoding '{ie}'. Still using the requested encoding however.",
+                    );
+                }
 
-    if let Some(input_encoding) = input_encoding {
-        if input_encoding != requested_encoding {
-            tracing::warn!(
-                "The encoding requested '{requested_encoding}' does not match the output file's encoding '{input_encoding}'. Still using the requested encoding however.",
-            );
+                ie
+            } else {
+                re
+            }
         }
-    }
+        _ => EncodingFormat::default(),
+    };
 
     let file_name_format = cli
         .file_name_format
@@ -70,7 +77,7 @@ fn main() -> Result<()> {
                 Some(utils::get_full_file_name(
                     &pathbuf,
                     &file_name_format,
-                    requested_encoding,
+                    encoding,
                 ))
             }
         }
@@ -82,7 +89,7 @@ fn main() -> Result<()> {
                 Some(utils::get_full_file_name(
                     &current_dir,
                     &file_name_format,
-                    requested_encoding,
+                    encoding,
                 ))
             }
         }
@@ -141,7 +148,7 @@ fn main() -> Result<()> {
         image_buffer.save(f)?;
     } else if stdout_print {
         let mut buffer = Cursor::new(Vec::new());
-        image_buffer.write_to(&mut buffer, requested_encoding.into())?;
+        image_buffer.write_to(&mut buffer, encoding.into())?;
         let stdout = stdout();
         let mut writer = BufWriter::new(stdout.lock());
         writer.write_all(buffer.get_ref())?;
@@ -153,7 +160,7 @@ fn main() -> Result<()> {
             Some(buf) => buf,
             None => {
                 let mut buffer = Cursor::new(Vec::new());
-                image_buffer.write_to(&mut buffer, requested_encoding.into())?;
+                image_buffer.write_to(&mut buffer, encoding.into())?;
                 buffer
             }
         })?;
