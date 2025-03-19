@@ -1,7 +1,9 @@
 use std::cmp;
 
-use crate::error::{Error, Result};
-use crate::output::OutputInfo;
+use crate::{
+    error::{Error, Result},
+    output::OutputInfo,
+};
 
 /// Ways to say how a region for a screenshot should be captured.
 pub enum RegionCapturer {

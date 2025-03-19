@@ -10,7 +10,7 @@ keywords = ["screenshot", "wayland", "wlroots", "wayshot"]
 license = "BSD-2-Clause"
 repository = "https://git.sr.ht/~shinyzenith/wayshot"
 version = "1.3.2-dev"
-edition = "2021"
+edition = "2024"
 
 [workspace.dependencies]
 libwayshot = { version = "0.3.2-dev", path = "./libwayshot" }

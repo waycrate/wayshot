@@ -4,27 +4,27 @@ use std::{
 };
 
 use clap::Parser;
-use eyre::{bail, Result};
-use libwayshot::{region::LogicalRegion, WayshotConnection};
+use eyre::{Result, bail};
+use libwayshot::{WayshotConnection, region::LogicalRegion};
 
 mod cli;
 mod utils;
 
-use dialoguer::{theme::ColorfulTheme, FuzzySelect};
+use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use utils::EncodingFormat;
 
 use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
-use rustix::runtime::{fork, Fork};
+use rustix::runtime::{self, Fork};
 
-fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
+fn select_output<T>(outputs: &[T]) -> Option<usize>
 where
     T: ToString,
 {
     let Ok(selection) = FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Choose Screen")
         .default(0)
-        .items(ouputs)
+        .items(outputs)
         .interact()
     else {
         return None;
@@ -101,7 +101,7 @@ fn main() -> Result<()> {
             .iter()
             .map(|display| display.name.as_str())
             .collect();
-        if let Some(index) = select_ouput(&output_names) {
+        if let Some(index) = select_output(&output_names) {
             wayshot_conn.screenshot_single_output(&outputs[index], cli.cursor)?
         } else {
             bail!("No output found!");
@@ -159,10 +159,10 @@ fn main() -> Result<()> {
 /// Daemonize and copy the given buffer containing the encoded image to the clipboard
 fn clipboard_daemonize(buffer: Cursor<Vec<u8>>) -> Result<()> {
     let mut opts = Options::new();
-    match unsafe { fork() } {
+    match unsafe { runtime::kernel_fork() } {
         // Having the image persistently available on the clipboard requires a wayshot process to be alive.
         // Fork the process with a child detached from the main process and have the parent exit
-        Ok(Fork::Parent(_)) => {
+        Ok(Fork::ParentOf(_)) => {
             return Ok(());
         }
         Ok(Fork::Child(_)) => {
