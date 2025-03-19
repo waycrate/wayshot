@@ -16,8 +16,8 @@ use wayland_client::protocol::{
 };
 
 use crate::{
-    region::{LogicalRegion, Size},
     Error, Result,
+    region::{LogicalRegion, Size},
 };
 
 pub struct FrameGuard {
@@ -47,7 +47,7 @@ pub struct EGLImageGuard<'a, T: khronos_egl::api::EGL1_5> {
     pub(crate) egl_display: khronos_egl::Display,
 }
 
-impl<'a, T: khronos_egl::api::EGL1_5> Drop for EGLImageGuard<'a, T> {
+impl<T: khronos_egl::api::EGL1_5> Drop for EGLImageGuard<'_, T> {
     fn drop(&mut self) {
         self.egl_instance
             .destroy_image(self.egl_display, self.image)
@@ -160,7 +160,7 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
     // Only try memfd on linux and freebsd.
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     loop {
-        // Create a file that closes on succesful execution and seal it's operations.
+        // Create a file that closes on successful execution and seal it's operations.
         match fs::memfd_create(
             CString::new("libwayshot")?.as_c_str(),
             fs::MemfdFlags::CLOEXEC | fs::MemfdFlags::ALLOW_SEALING,
@@ -181,18 +181,19 @@ pub fn create_shm_fd() -> std::io::Result<OwnedFd> {
     // Fallback to using shm_open.
     let mut mem_file_handle = get_mem_file_handle();
     loop {
-        match shm::shm_open(
-            // O_CREAT = Create file if does not exist.
-            // O_EXCL = Error if create and file exists.
-            // O_RDWR = Open for reading and writing.
-            // O_CLOEXEC = Close on succesful execution.
-            // S_IRUSR = Set user read permission bit .
-            // S_IWUSR = Set user write permission bit.
+        let open_result = shm::open(
             mem_file_handle.as_str(),
-            shm::ShmOFlags::CREATE | shm::ShmOFlags::EXCL | shm::ShmOFlags::RDWR,
+            shm::OFlags::CREATE | shm::OFlags::EXCL | shm::OFlags::RDWR,
             fs::Mode::RUSR | fs::Mode::WUSR,
-        ) {
-            Ok(fd) => match shm::shm_unlink(mem_file_handle.as_str()) {
+        );
+        // O_CREAT = Create file if does not exist.
+        // O_EXCL = Error if create and file exists.
+        // O_RDWR = Open for reading and writing.
+        // O_CLOEXEC = Close on successful execution.
+        // S_IRUSR = Set user read permission bit .
+        // S_IWUSR = Set user write permission bit.
+        match open_result {
+            Ok(fd) => match shm::unlink(mem_file_handle.as_str()) {
                 Ok(_) => return Ok(fd),
                 Err(errno) => return Err(std::io::Error::from(errno)),
             },

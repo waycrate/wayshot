@@ -21,20 +21,20 @@ use std::{
 };
 
 use dispatch::{DMABUFState, LayerShellState};
-use image::{imageops::replace, DynamicImage};
+use image::{DynamicImage, imageops::replace};
 use khronos_egl::{self as egl, Instance};
 use memmap2::MmapMut;
 use region::{EmbeddedRegion, RegionCapturer};
 use screencopy::{DMAFrameFormat, DMAFrameGuard, EGLImageGuard, FrameData, FrameGuard};
 use tracing::debug;
 use wayland_client::{
-    globals::{registry_queue_init, GlobalList},
+    Connection, EventQueue, Proxy,
+    globals::{GlobalList, registry_queue_init},
     protocol::{
         wl_compositor::WlCompositor,
         wl_output::{Transform, WlOutput},
         wl_shm::{self, WlShm},
     },
-    Connection, EventQueue, Proxy,
 };
 use wayland_protocols::{
     wp::{
@@ -63,7 +63,7 @@ use crate::{
     dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState},
     output::OutputInfo,
     region::{LogicalRegion, Size},
-    screencopy::{create_shm_fd, FrameCopy, FrameFormat},
+    screencopy::{FrameCopy, FrameFormat, create_shm_fd},
 };
 
 pub use crate::error::{Error, Result};
@@ -162,7 +162,9 @@ impl WayshotConnection {
         ) {
             Ok(x) => x,
             Err(e) => {
-                tracing::error!("Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?");
+                tracing::error!(
+                    "Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?"
+                );
                 panic!("{:#?}", e);
             }
         };
@@ -248,7 +250,7 @@ impl WayshotConnection {
     /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
     /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
     /// # Returns
-    /// - If the function was found and called, an OK(()), note that this does not neccesarily mean that binding was successful, only that the function was called.
+    /// - If the function was found and called, an OK(()), note that this does not necessarily mean that binding was successful, only that the function was called.
     /// The caller may check for any OpenGL errors using the standard routes.
     /// - If the function was not found, [`Error::EGLImageToTexProcNotFoundError`] is returned
     pub unsafe fn bind_output_frame_to_gl_texture(
@@ -313,7 +315,7 @@ impl WayshotConnection {
 
         egl_instance.initialize(egl_display)?;
         self.capture_output_frame_eglimage_on_display(
-            &egl_instance,
+            egl_instance,
             egl_display,
             cursor_overlay,
             output,
@@ -431,7 +433,8 @@ impl WayshotConnection {
                 tracing::debug!(
                     "Created GBM Buffer object with input frame format {:#?}, stride {:#?} and modifier {:#?} ",
                     frame_format,
-                    stride,modifier
+                    stride,
+                    modifier
                 );
                 let frame_guard = self.capture_output_frame_inner_dmabuf(
                     state,
@@ -477,7 +480,9 @@ impl WayshotConnection {
         ) {
             Ok(x) => x,
             Err(e) => {
-                tracing::error!("Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?");
+                tracing::error!(
+                    "Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?"
+                );
                 tracing::error!("err: {e}");
                 return Err(Error::ProtocolNotFound(
                     "ZwlrScreencopy Manager not found".to_string(),
@@ -502,7 +507,7 @@ impl WayshotConnection {
         };
 
         // Empty internal event buffer until buffer_done is set to true which is when the Buffer done
-        // event is fired, aka the capture from the compositor is succesful.
+        // event is fired, aka the capture from the compositor is successful.
         while !state.buffer_done.load(Ordering::SeqCst) {
             event_queue.blocking_dispatch(&mut state)?;
         }
@@ -526,17 +531,14 @@ impl WayshotConnection {
                         | wl_shm::Format::Bgr888
                 )
             })
-            .copied();
+            .copied()
+            // Check if frame format exists.
+            .ok_or_else(|| {
+                tracing::error!("No suitable frame format found");
+                Error::NoSupportedBufferFormat
+            })?;
         tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
 
-        // Check if frame format exists.
-        let frame_format = match frame_format {
-            Some(format) => format,
-            None => {
-                tracing::error!("No suitable frame format found");
-                return Err(Error::NoSupportedBufferFormat);
-            }
-        };
         Ok((state, event_queue, frame, frame_format))
     }
 
@@ -568,7 +570,9 @@ impl WayshotConnection {
         ) {
             Ok(x) => x,
             Err(e) => {
-                tracing::error!("Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?");
+                tracing::error!(
+                    "Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?"
+                );
                 tracing::error!("err: {e}");
                 return Err(Error::ProtocolNotFound(
                     "ZwlrScreencopy Manager not found".to_string(),
@@ -593,7 +597,7 @@ impl WayshotConnection {
         };
 
         // Empty internal event buffer until buffer_done is set to true which is when the Buffer done
-        // event is fired, aka the capture from the compositor is succesful.
+        // event is fired, aka the capture from the compositor is successful.
         while !state.buffer_done.load(Ordering::SeqCst) {
             event_queue.blocking_dispatch(&mut state)?;
         }
@@ -754,12 +758,15 @@ impl WayshotConnection {
 
         let mut frame_mmap = unsafe { MmapMut::map_mut(&mem_file)? };
         let data = &mut *frame_mmap;
-        let frame_color_type = if let Some(converter) = create_converter(frame_format.format) {
-            converter.convert_inplace(data)
-        } else {
-            tracing::error!("Unsupported buffer format: {:?}", frame_format.format);
-            tracing::error!("You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot.");
-            return Err(Error::NoSupportedBufferFormat);
+        let frame_color_type = match create_converter(frame_format.format) {
+            Some(converter) => converter.convert_inplace(data),
+            _ => {
+                tracing::error!("Unsupported buffer format: {:?}", frame_format.format);
+                tracing::error!(
+                    "You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot."
+                );
+                return Err(Error::NoSupportedBufferFormat);
+            }
         };
         let rotated_physical_size = match output_info.transform {
             Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270 => {
@@ -816,7 +823,7 @@ impl WayshotConnection {
             Ok(x) => x,
             Err(e) => {
                 tracing::error!(
-                    "Failed to create compositor Does your compositor implement WlCompositor?"
+                    "Failed to create compositor. Does your compositor implement WlCompositor?"
                 );
                 tracing::error!("err: {e}");
                 return Err(Error::ProtocolNotFound(
@@ -1065,7 +1072,8 @@ impl WayshotConnection {
     ) -> Result<DynamicImage> {
         self.screenshot_region_capturer(RegionCapturer::Freeze(callback), cursor_overlay)
     }
-    /// shot one ouput
+
+    /// Take a screenshot from one output
     pub fn screenshot_single_output(
         &self,
         output_info: &OutputInfo,
