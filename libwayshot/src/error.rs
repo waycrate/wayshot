@@ -3,8 +3,8 @@ use std::{io, result};
 use drm::buffer::UnrecognizedFourcc;
 use thiserror::Error;
 use wayland_client::{
-    globals::{BindError, GlobalError},
     ConnectError, DispatchError,
+    globals::{BindError, GlobalError},
 };
 
 pub type Result<T, E = Error> = result::Result<T, E>;
@@ -35,7 +35,9 @@ pub enum Error {
     ProtocolNotFound(String),
     #[error("error occurred in freeze callback")]
     FreezeCallbackError,
-    #[error("dmabuf configuration not initialized. Did you not use Wayshot::from_connection_with_dmabuf()?")]
+    #[error(
+        "dmabuf configuration not initialized. Did you not use Wayshot::from_connection_with_dmabuf()?"
+    )]
     NoDMAStateError,
     #[error("dmabuf color format provided by compositor is invalid")]
     UnrecognizedColorCode(#[from] UnrecognizedFourcc),

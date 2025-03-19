@@ -1,5 +1,5 @@
 use clap::ValueEnum;
-use eyre::{bail, ContextCompat, Error, Result};
+use eyre::{ContextCompat, Error, Result, bail};
 
 use std::{fmt::Display, path::PathBuf, str::FromStr};
 
@@ -60,6 +60,8 @@ pub enum EncodingFormat {
     Qoi,
     /// WebP encoder,
     Webp,
+    /// Avif encoder,
+    Avif,
 }
 
 impl Default for EncodingFormat {
@@ -76,6 +78,7 @@ impl From<EncodingFormat> for image::ImageFormat {
             EncodingFormat::Ppm => image::ImageFormat::Pnm,
             EncodingFormat::Qoi => image::ImageFormat::Qoi,
             EncodingFormat::Webp => image::ImageFormat::WebP,
+            EncodingFormat::Avif => image::ImageFormat::Avif,
         }
     }
 }
@@ -115,6 +118,7 @@ impl From<EncodingFormat> for &str {
             EncodingFormat::Ppm => "ppm",
             EncodingFormat::Qoi => "qoi",
             EncodingFormat::Webp => "webp",
+            EncodingFormat::Avif => "avif",
         }
     }
 }
@@ -129,6 +133,7 @@ impl FromStr for EncodingFormat {
             "ppm" => Self::Ppm,
             "qoi" => Self::Qoi,
             "webp" => Self::Webp,
+            "avif" => Self::Avif,
             _ => bail!("unsupported extension '{s}'"),
         })
     }
@@ -136,7 +141,7 @@ impl FromStr for EncodingFormat {
 
 pub fn get_default_file_name(extension: EncodingFormat) -> PathBuf {
     let current_datetime: DateTime<Local> = Local::now();
-    let formated_time = format!("{}", current_datetime.format("%Y_%m_%d-%H_%M_%S"));
+    let formatted_time = format!("{}", current_datetime.format("%Y_%m_%d-%H_%M_%S"));
 
-    format!("wayshot-{formated_time}.{extension}").into()
+    format!("wayshot-{formatted_time}.{extension}").into()
 }

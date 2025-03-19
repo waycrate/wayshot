@@ -1,8 +1,7 @@
 use std::path::PathBuf;
 
-use clap::arg;
+use clap::{Parser, arg, builder::TypedValueParser};
 
-use clap::Parser;
 use eyre::WrapErr;
 
 use crate::utils::EncodingFormat;
