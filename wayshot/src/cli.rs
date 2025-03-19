@@ -5,7 +5,6 @@ use clap::{Parser, arg, builder::TypedValueParser};
 use eyre::WrapErr;
 
 use crate::utils::EncodingFormat;
-use clap::builder::TypedValueParser;
 use clap_complete::Shell;
 
 #[derive(Parser)]
