@@ -44,9 +44,7 @@ fn main() -> Result<()> {
         .file
         .as_ref()
         .and_then(|pathbuf| pathbuf.try_into().ok());
-    let requested_encoding = cli
-        .encoding
-        .or(input_encoding);
+    let requested_encoding = cli.encoding.or(input_encoding);
     let encoding = match requested_encoding {
         Some(re) => {
             if let Some(ie) = input_encoding {
