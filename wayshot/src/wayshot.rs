@@ -1,4 +1,5 @@
 use std::{
+    env,
     io::{BufWriter, Cursor, Write, stdout},
     process::Command,
 };
@@ -56,6 +57,37 @@ fn main() -> Result<()> {
         }
     }
 
+    let file_name_format = cli
+        .file_name_format
+        .unwrap_or("wayshot-%Y_%m_%d-%H_%M_%S".to_string());
+    let mut stdout_print = false;
+    let file = match cli.file {
+        Some(pathbuf) => {
+            if pathbuf.to_string_lossy() == "-" {
+                stdout_print = true;
+                None
+            } else {
+                Some(utils::get_full_file_name(
+                    &pathbuf,
+                    &file_name_format,
+                    requested_encoding,
+                ))
+            }
+        }
+        None => {
+            if cli.clipboard {
+                None
+            } else {
+                let current_dir = env::current_dir().unwrap_or_default();
+                Some(utils::get_full_file_name(
+                    &current_dir,
+                    &file_name_format,
+                    requested_encoding,
+                ))
+            }
+        }
+    };
+
     let wayshot_conn = WayshotConnection::new()?;
 
     if cli.list_outputs {
@@ -104,31 +136,9 @@ fn main() -> Result<()> {
         wayshot_conn.screenshot_all(cli.cursor)?
     };
 
-    let mut stdout_print = false;
-    let file = match cli.file {
-        Some(mut pathbuf) => {
-            if pathbuf.to_string_lossy() == "-" {
-                stdout_print = true;
-                None
-            } else {
-                if pathbuf.is_dir() {
-                    pathbuf.push(utils::get_default_file_name(requested_encoding));
-                }
-                Some(pathbuf)
-            }
-        }
-        None => {
-            if cli.clipboard {
-                None
-            } else {
-                Some(utils::get_default_file_name(requested_encoding))
-            }
-        }
-    };
-
     let mut image_buf: Option<Cursor<Vec<u8>>> = None;
-    if let Some(file) = file {
-        image_buffer.save(file)?;
+    if let Some(f) = file {
+        image_buffer.save(f)?;
     } else if stdout_print {
         let mut buffer = Cursor::new(Vec::new());
         image_buffer.write_to(&mut buffer, requested_encoding.into())?;
