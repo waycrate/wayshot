@@ -18,14 +18,14 @@ use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
 use rustix::runtime::{self, Fork};
 
-fn select_ouput<T>(ouputs: &[T]) -> Option<usize>
+fn select_output<T>(outputs: &[T]) -> Option<usize>
 where
     T: ToString,
 {
     let Ok(selection) = FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Choose Screen")
         .default(0)
-        .items(ouputs)
+        .items(outputs)
         .interact()
     else {
         return None;
@@ -132,7 +132,7 @@ fn main() -> Result<()> {
             .iter()
             .map(|display| display.name.as_str())
             .collect();
-        if let Some(index) = select_ouput(&output_names) {
+        if let Some(index) = select_output(&output_names) {
             wayshot_conn.screenshot_single_output(&outputs[index], cli.cursor)?
         } else {
             bail!("No output found!");
