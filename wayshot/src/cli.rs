@@ -1,12 +1,11 @@
 use std::path::PathBuf;
 
 use clap::{
-    arg,
+    Parser, arg,
     builder::{
-        styling::{AnsiColor, Effects},
         Styles, TypedValueParser,
+        styling::{AnsiColor, Effects},
     },
-    Parser,
 };
 use eyre::WrapErr;
 
