@@ -49,4 +49,9 @@ pub struct Cli {
     /// Present a fuzzy selector for output/display selection
     #[arg(long, alias = "chooseoutput", conflicts_with_all = ["slurp", "output"])]
     pub choose_output: bool,
+
+    /// Output file name's formatting.
+    /// Defaults to config value (`wayshot-%Y_%m_%d-%H_%M_%S`)
+    #[arg(long, verbatim_doc_comment)]
+    pub file_name_format: Option<String>,
 }
