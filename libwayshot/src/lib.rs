@@ -250,7 +250,7 @@ impl WayshotConnection {
     /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
     /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
     /// # Returns
-    /// - If the function was found and called, an OK(()), note that this does not neccesarily mean that binding was successful, only that the function was called.
+    /// - If the function was found and called, an OK(()), note that this does not necessarily mean that binding was successful, only that the function was called.
     /// The caller may check for any OpenGL errors using the standard routes.
     /// - If the function was not found, [`Error::EGLImageToTexProcNotFoundError`] is returned
     pub unsafe fn bind_output_frame_to_gl_texture(
@@ -507,7 +507,7 @@ impl WayshotConnection {
         };
 
         // Empty internal event buffer until buffer_done is set to true which is when the Buffer done
-        // event is fired, aka the capture from the compositor is succesful.
+        // event is fired, aka the capture from the compositor is successful.
         while !state.buffer_done.load(Ordering::SeqCst) {
             event_queue.blocking_dispatch(&mut state)?;
         }
@@ -597,7 +597,7 @@ impl WayshotConnection {
         };
 
         // Empty internal event buffer until buffer_done is set to true which is when the Buffer done
-        // event is fired, aka the capture from the compositor is succesful.
+        // event is fired, aka the capture from the compositor is successful.
         while !state.buffer_done.load(Ordering::SeqCst) {
             event_queue.blocking_dispatch(&mut state)?;
         }
