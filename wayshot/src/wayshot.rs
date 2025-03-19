@@ -1,5 +1,5 @@
 use std::{
-    io::{BufWriter, Cursor, Write, stdout},
+    io::{self, BufWriter, Cursor, Write},
     process::Command,
 };
 
@@ -36,7 +36,7 @@ fn main() -> Result<()> {
     let cli = cli::Cli::parse();
     tracing_subscriber::fmt()
         .with_max_level(cli.log_level)
-        .with_writer(std::io::stderr)
+        .with_writer(io::stderr)
         .init();
 
     let input_encoding = cli
@@ -58,11 +58,17 @@ fn main() -> Result<()> {
 
     let wayshot_conn = WayshotConnection::new()?;
 
+    let stdout = io::stdout();
+    let mut writer = BufWriter::new(stdout.lock());
+
     if cli.list_outputs {
         let valid_outputs = wayshot_conn.get_all_outputs();
         for output in valid_outputs {
-            tracing::info!("{:#?}", output.name);
+            writeln!(writer, "{}", output.name)?;
         }
+
+        writer.flush()?;
+
         return Ok(());
     }
 
@@ -132,8 +138,6 @@ fn main() -> Result<()> {
     } else if stdout_print {
         let mut buffer = Cursor::new(Vec::new());
         image_buffer.write_to(&mut buffer, requested_encoding.into())?;
-        let stdout = stdout();
-        let mut writer = BufWriter::new(stdout.lock());
         writer.write_all(buffer.get_ref())?;
         image_buf = Some(buffer);
     }
