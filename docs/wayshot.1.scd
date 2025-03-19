@@ -71,6 +71,13 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 	*wayshot -s="-b 11223377"*
 	- This takes a screenshot then calls slurp with "-b 11223377" as an argument for cropping the screenshot.
 
+*--file-name-format**
+	Output file name's formatting. Refer to chrono formatiing rules: https://docs.rs/chrono/latest/chrono/format/strftime/index.html.
+
+	Example: --file-name-format "%Y_%m_%d-%H_%M_%S"
+
+	Default: wayshot-%Y_%m_%d-%H_%M_%S
+
 # SEE ALSO
 	- wayshot(7)
 
