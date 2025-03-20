@@ -1,7 +1,7 @@
 use crate::state::WaylandEGLState;
 use wayland_client::{
-    Connection, Dispatch, QueueHandle, delegate_noop,
-    protocol::{wl_compositor, wl_registry, wl_surface},
+    Connection, Dispatch, QueueHandle, WEnum, delegate_noop,
+    protocol::{wl_compositor, wl_keyboard, wl_registry, wl_seat, wl_surface},
 };
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
 
@@ -29,6 +29,9 @@ impl Dispatch<wl_registry::WlRegistry, ()> for WaylandEGLState {
                         queue_handle,
                         (),
                     ));
+                }
+                "wl_seat" => {
+                    registry.bind::<wl_seat::WlSeat, _, _>(name, 1, queue_handle, ());
                 }
                 "wl_compositor" => {
                     state.wl_compositor = Some(registry.bind::<wl_compositor::WlCompositor, _, _>(
@@ -127,4 +130,43 @@ impl Dispatch<wl_surface::WlSurface, ()> for WaylandEGLState {
     ) {
     }
 }
+
+impl Dispatch<wl_seat::WlSeat, ()> for WaylandEGLState {
+    fn event(
+        _: &mut Self,
+        seat: &wl_seat::WlSeat,
+        event: wl_seat::Event,
+        _: &(),
+        _: &Connection,
+        qh: &QueueHandle<Self>,
+    ) {
+        if let wl_seat::Event::Capabilities {
+            capabilities: WEnum::Value(capabilities),
+        } = event
+        {
+            if capabilities.contains(wl_seat::Capability::Keyboard) {
+                seat.get_keyboard(qh, ());
+            }
+        }
+    }
+}
+
+impl Dispatch<wl_keyboard::WlKeyboard, ()> for WaylandEGLState {
+    fn event(
+        state: &mut Self,
+        _: &wl_keyboard::WlKeyboard,
+        event: wl_keyboard::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        if let wl_keyboard::Event::Key { key, .. } = event {
+            if key == 1 {
+                // ESC key
+                state.running = false;
+            }
+        }
+    }
+}
+
 delegate_noop!(WaylandEGLState: wl_compositor::WlCompositor);
