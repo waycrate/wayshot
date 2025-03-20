@@ -53,7 +53,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         event_queue.dispatch_pending(&mut state)?;
         state.draw();
         state
-            .egl
+            .egl_instance
             .swap_buffers(state.egl_display.unwrap(), state.egl_surface.unwrap())?;
 
         tracing::trace!("eglSwapBuffers called");
