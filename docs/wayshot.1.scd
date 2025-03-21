@@ -53,6 +53,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 		- ppm
 		- qoi
 		- webp
+		- avif
 
 *-l*, *--list-outputs*
 	List all valid output names. This flag is generally used in combination with *-o* flag.
