@@ -1,0 +1,44 @@
+
+use builtin;
+use str;
+
+set edit:completion:arg-completer[wayshot] = {|@words|
+    fn spaces {|n|
+        builtin:repeat $n ' ' | str:join ''
+    }
+    fn cand {|text desc|
+        edit:complex-candidate $text &display=$text' '(spaces (- 14 (wcswidth $text)))$desc
+    }
+    var command = 'wayshot'
+    for word $words[1..-1] {
+        if (str:has-prefix $word '-') {
+            break
+        }
+        set command = $command';'$word
+    }
+    var completions = [
+        &'wayshot'= {
+            cand --log-level 'Log level to be used for printing to stderr'
+            cand -s 'Arguments to call slurp with for selecting a region'
+            cand --slurp 'Arguments to call slurp with for selecting a region'
+            cand --encoding 'Set image encoder, by default uses the file extension from the OUTPUT positional argument. Otherwise defaults to png.'
+            cand --extension 'Set image encoder, by default uses the file extension from the OUTPUT positional argument. Otherwise defaults to png.'
+            cand --format 'Set image encoder, by default uses the file extension from the OUTPUT positional argument. Otherwise defaults to png.'
+            cand --output-format 'Set image encoder, by default uses the file extension from the OUTPUT positional argument. Otherwise defaults to png.'
+            cand -o 'Choose a particular output/display to screenshot'
+            cand --output 'Choose a particular output/display to screenshot'
+            cand --generate-completions 'This Command helps you generate autocomplete in your desired Shell environment'
+            cand --clipboard 'Copy image to clipboard. Can be used simultaneously with [OUTPUT] or stdout. Wayshot persists in the background offering the image till the clipboard is overwritten.'
+            cand -c 'Enable cursor in screenshots'
+            cand --cursor 'Enable cursor in screenshots'
+            cand -l 'List all valid outputs'
+            cand --list-outputs 'List all valid outputs'
+            cand --choose-output 'Present a fuzzy selector for output/display selection'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+    ]
+    $completions[$command]
+}

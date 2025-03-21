@@ -1,0 +1,50 @@
+
+using namespace System.Management.Automation
+using namespace System.Management.Automation.Language
+
+Register-ArgumentCompleter -Native -CommandName 'wayshot' -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+
+    $commandElements = $commandAst.CommandElements
+    $command = @(
+        'wayshot'
+        for ($i = 1; $i -lt $commandElements.Count; $i++) {
+            $element = $commandElements[$i]
+            if ($element -isnot [StringConstantExpressionAst] -or
+                $element.StringConstantType -ne [StringConstantType]::BareWord -or
+                $element.Value.StartsWith('-') -or
+                $element.Value -eq $wordToComplete) {
+                break
+        }
+        $element.Value
+    }) -join ';'
+
+    $completions = @(switch ($command) {
+        'wayshot' {
+            [CompletionResult]::new('--log-level', 'log-level', [CompletionResultType]::ParameterName, 'Log level to be used for printing to stderr')
+            [CompletionResult]::new('-s', 's', [CompletionResultType]::ParameterName, 'Arguments to call slurp with for selecting a region')
+            [CompletionResult]::new('--slurp', 'slurp', [CompletionResultType]::ParameterName, 'Arguments to call slurp with for selecting a region')
+            [CompletionResult]::new('--encoding', 'encoding', [CompletionResultType]::ParameterName, 'Set image encoder, by default uses the file extension from the OUTPUT positional argument. Otherwise defaults to png.')
+            [CompletionResult]::new('--extension', 'extension', [CompletionResultType]::ParameterName, 'Set image encoder, by default uses the file extension from the OUTPUT positional argument. Otherwise defaults to png.')
+            [CompletionResult]::new('--format', 'format', [CompletionResultType]::ParameterName, 'Set image encoder, by default uses the file extension from the OUTPUT positional argument. Otherwise defaults to png.')
+            [CompletionResult]::new('--output-format', 'output-format', [CompletionResultType]::ParameterName, 'Set image encoder, by default uses the file extension from the OUTPUT positional argument. Otherwise defaults to png.')
+            [CompletionResult]::new('-o', 'o', [CompletionResultType]::ParameterName, 'Choose a particular output/display to screenshot')
+            [CompletionResult]::new('--output', 'output', [CompletionResultType]::ParameterName, 'Choose a particular output/display to screenshot')
+            [CompletionResult]::new('--generate-completions', 'generate-completions', [CompletionResultType]::ParameterName, 'This Command helps you generate autocomplete in your desired Shell environment')
+            [CompletionResult]::new('--clipboard', 'clipboard', [CompletionResultType]::ParameterName, 'Copy image to clipboard. Can be used simultaneously with [OUTPUT] or stdout. Wayshot persists in the background offering the image till the clipboard is overwritten.')
+            [CompletionResult]::new('-c', 'c', [CompletionResultType]::ParameterName, 'Enable cursor in screenshots')
+            [CompletionResult]::new('--cursor', 'cursor', [CompletionResultType]::ParameterName, 'Enable cursor in screenshots')
+            [CompletionResult]::new('-l', 'l', [CompletionResultType]::ParameterName, 'List all valid outputs')
+            [CompletionResult]::new('--list-outputs', 'list-outputs', [CompletionResultType]::ParameterName, 'List all valid outputs')
+            [CompletionResult]::new('--choose-output', 'choose-output', [CompletionResultType]::ParameterName, 'Present a fuzzy selector for output/display selection')
+            [CompletionResult]::new('-h', 'h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', 'help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', 'V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', 'version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+    })
+
+    $completions.Where{ $_.CompletionText -like "$wordToComplete*" } |
+        Sort-Object -Property ListItemText
+}

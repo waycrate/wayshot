@@ -14,13 +14,13 @@ repository.workspace = true
 flate2 = "1.0.35"
 eyre = "0.6.12"
 
-
 [dependencies]
 tracing.workspace = true
 
 libwayshot.workspace = true
 
 clap = { version = "4.5.32", features = ["derive"] }
+clap_complete = "4.5.46"
 tracing-subscriber = "0.3.19"
 
 image = { version = "0.25", default-features = false, features = [
