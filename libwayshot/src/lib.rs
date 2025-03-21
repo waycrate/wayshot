@@ -233,10 +233,12 @@ impl WayshotConnection {
 
         Ok((frame_format, frame_guard))
     }
+    /// # Safety
+    ///
     /// Helper function/wrapper that uses the OpenGL extension OES_EGL_image to convert the EGLImage obtained from [`WayshotConnection::capture_output_frame_eglimage`]
     /// into a OpenGL texture.
     /// - The caller is supposed to setup everything required for the texture binding. An example call may look like:
-    /// ```
+    /// ```no_run, ignore
     /// gl::BindTexture(gl::TEXTURE_2D, self.gl_texture);
     /// gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
     /// wayshot_conn
@@ -251,7 +253,7 @@ impl WayshotConnection {
     /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
     /// # Returns
     /// - If the function was found and called, an OK(()), note that this does not necessarily mean that binding was successful, only that the function was called.
-    /// The caller may check for any OpenGL errors using the standard routes.
+    ///   The caller may check for any OpenGL errors using the standard routes.
     /// - If the function was not found, [`Error::EGLImageToTexProcNotFoundError`] is returned
     pub unsafe fn bind_output_frame_to_gl_texture(
         &self,
@@ -613,6 +615,7 @@ impl WayshotConnection {
         Ok((state, event_queue, frame, frame_format))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn capture_output_frame_inner_dmabuf(
         &self,
         mut state: CaptureFrameState,
