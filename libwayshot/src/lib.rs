@@ -452,7 +452,11 @@ impl WayshotConnection {
         }
     }
 
-    fn capture_output_frame_get_state_shm(
+    /// We expose this api to let user can get the information of the wm. For example, when enable
+    /// the feature of vulkan on wlroots, the format will change, then if we use pipewire to get
+    /// stream, without knowing the current showing format, the color will become strange
+    /// This function just try to do a try screenshot, then get the information of screen
+    pub fn capture_output_frame_get_state_shm(
         &self,
         cursor_overlay: i32,
         output: &WlOutput,
