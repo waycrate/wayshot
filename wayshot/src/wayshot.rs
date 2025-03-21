@@ -44,23 +44,18 @@ fn main() -> Result<()> {
         .file
         .as_ref()
         .and_then(|pathbuf| pathbuf.try_into().ok());
-    let requested_encoding = cli.encoding.or(input_encoding);
-    let encoding = match requested_encoding {
-        Some(re) => {
-            if let Some(ie) = input_encoding {
-                if ie.ne(&re) {
-                    tracing::warn!(
-                        "The encoding requested '{re}' does not match the output file's encoding '{ie}'. Still using the requested encoding however.",
-                    );
-                }
+    let encoding = cli
+        .encoding
+        .or(input_encoding)
+        .unwrap_or(EncodingFormat::default());
 
-                ie
-            } else {
-                re
-            }
+    if let Some(ie) = input_encoding {
+        if ie != encoding {
+            tracing::warn!(
+                "The encoding requested '{encoding}' does not match the output file's encoding '{ie}'. Still using the requested encoding however.",
+            );
         }
-        _ => EncodingFormat::default(),
-    };
+    }
 
     let file_name_format = cli
         .file_name_format
