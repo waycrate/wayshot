@@ -452,10 +452,11 @@ impl WayshotConnection {
         }
     }
 
-    /// We expose this api to let user can get the information of the wm. For example, when enable
-    /// the feature of vulkan on wlroots, the format will change, then if we use pipewire to get
-    /// stream, without knowing the current showing format, the color will become strange
-    /// This function just try to do a try screenshot, then get the information of screen
+    // This API is exposed to provide users with access to window manager (WM)
+    // information. For instance, enabling Vulkan in wlroots alters the display
+    // format. Consequently, using PipeWire to capture streams without knowing
+    // the current format can lead to color distortion. This function attempts
+    // a trial screenshot to determine the screen's properties.
     pub fn capture_output_frame_get_state_shm(
         &self,
         cursor_overlay: i32,
