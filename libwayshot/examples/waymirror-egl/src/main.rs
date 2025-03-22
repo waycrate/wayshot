@@ -49,11 +49,14 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     state.wl_surface.clone().unwrap().commit();
 
     state.init_egl()?;
+
+    println!("Starting the example EGL-enabled wayshot dmabuf demo app, press <ESC> to quit.");
+
     while state.running {
         event_queue.dispatch_pending(&mut state)?;
         state.draw();
         state
-            .egl
+            .egl_instance
             .swap_buffers(state.egl_display.unwrap(), state.egl_surface.unwrap())?;
 
         tracing::trace!("eglSwapBuffers called");
