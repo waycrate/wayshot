@@ -1065,12 +1065,11 @@ impl WayshotConnection {
 
     /// Take a screenshot, overlay the screenshot, run the callback, and then
     /// unfreeze the screenshot and return the selected region.
-    pub fn screenshot_freeze(
-        &self,
-        callback: Box<dyn Fn() -> Result<LogicalRegion>>,
-        cursor_overlay: bool,
-    ) -> Result<DynamicImage> {
-        self.screenshot_region_capturer(RegionCapturer::Freeze(callback), cursor_overlay)
+    pub fn screenshot_freeze<F>(&self, callback: F, cursor_overlay: bool) -> Result<DynamicImage>
+    where
+        F: Fn() -> Result<LogicalRegion> + 'static,
+    {
+        self.screenshot_region_capturer(RegionCapturer::Freeze(Box::new(callback)), cursor_overlay)
     }
 
     /// Take a screenshot from one output

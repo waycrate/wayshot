@@ -75,7 +75,7 @@ fn main() -> Result<()> {
     let image_buffer = if let Some(slurp_args) = cli.slurp {
         let slurp_region = slurp_args.unwrap_or("".to_string());
         wayshot_conn.screenshot_freeze(
-            Box::new(move || {
+            move || {
                 || -> Result<LogicalRegion> {
                     let slurp_output = Command::new("slurp")
                         .args(slurp_region.split(' '))
@@ -85,7 +85,7 @@ fn main() -> Result<()> {
                     utils::parse_geometry(&String::from_utf8(slurp_output)?)
                 }()
                 .map_err(|_| libwayshot::Error::FreezeCallbackError)
-            }),
+            },
             cli.cursor,
         )?
     } else if let Some(output_name) = cli.output {
