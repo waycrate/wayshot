@@ -1,9 +1,14 @@
 use clap::ValueEnum;
 use eyre::{ContextCompat, Error, Result, bail};
 
-use std::{fmt::Display, path::PathBuf, str::FromStr};
+use std::{
+    env,
+    fmt::Display,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
-use chrono::{DateTime, Local};
+use chrono::Local;
 use libwayshot::region::{LogicalRegion, Position, Region, Size};
 
 pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
@@ -139,9 +144,44 @@ impl FromStr for EncodingFormat {
     }
 }
 
-pub fn get_default_file_name(extension: EncodingFormat) -> PathBuf {
-    let current_datetime: DateTime<Local> = Local::now();
-    let formatted_time = format!("{}", current_datetime.format("%Y_%m_%d-%H_%M_%S"));
+pub fn get_absolute_path(path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir().unwrap_or_default().join(path)
+    }
+}
 
-    format!("wayshot-{formatted_time}.{extension}").into()
+pub fn get_expanded_path(path: &Path) -> PathBuf {
+    let path_str = path.to_string_lossy();
+
+    match shellexpand::full(&path_str) {
+        Ok(expanded) => PathBuf::from(expanded.into_owned()),
+        Err(_) => env::current_dir().unwrap_or_default(),
+    }
+}
+
+pub fn get_default_file_name(filename_format: &str, encoding: EncodingFormat) -> PathBuf {
+    let format = Local::now().format(filename_format);
+
+    PathBuf::from(format!("{}.{}", format, encoding))
+}
+
+pub fn get_full_file_name(path: &Path, filename_format: &str, encoding: EncodingFormat) -> PathBuf {
+    let expanded_path = get_expanded_path(path);
+    let absolute_path = get_absolute_path(&expanded_path);
+
+    if absolute_path.is_dir() {
+        absolute_path.join(get_default_file_name(filename_format, encoding))
+    } else {
+        let base_dir = absolute_path
+            .parent()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| env::current_dir().unwrap_or_default());
+        let stem = absolute_path
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy();
+        base_dir.join(format!("{}.{}", stem, encoding))
+    }
 }
