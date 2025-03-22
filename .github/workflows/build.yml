@@ -16,6 +16,8 @@ jobs:
       uses: actions/checkout@v4
 
     - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy rustfmt
     - name: Install wayland dependencies
       run: |
         pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa
@@ -24,6 +26,12 @@ jobs:
       run: |
         rm Cargo.lock
         cargo build --release
+    - name: Clippy check
+      run:
+        cargo clippy -- -D warnings
+    - name: Check test
+      run: |
+        cargo test --verbose
 
   rustfmt:
     runs-on: ubuntu-latest
