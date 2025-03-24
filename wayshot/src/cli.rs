@@ -3,11 +3,11 @@ use std::path::PathBuf;
 use clap::{
     Parser, arg,
     builder::{
-        Styles, TypedValueParser,
+        Styles,
         styling::{AnsiColor, Effects},
     },
 };
-use eyre::WrapErr;
+use tracing::Level;
 
 use crate::utils::EncodingFormat;
 
@@ -35,8 +35,8 @@ pub struct Cli {
     pub clipboard: bool,
 
     /// Log level to be used for printing to stderr
-    #[arg(long, default_value = "info", value_parser = clap::builder::PossibleValuesParser::new(["trace", "debug", "info", "warn", "error"]).map(|s| -> tracing::Level{ s.parse().wrap_err_with(|| format!("Failed to parse log level: {}", s)).unwrap()}))]
-    pub log_level: tracing::Level,
+    #[arg(long, verbatim_doc_comment)]
+    pub log_level: Option<Level>,
 
     /// Arguments to call slurp with for selecting a region
     #[arg(short, long, value_name = "SLURP_ARGS")]
@@ -67,4 +67,12 @@ pub struct Cli {
     /// Defaults to config value (`wayshot-%Y_%m_%d-%H_%M_%S`)
     #[arg(long, verbatim_doc_comment)]
     pub file_name_format: Option<String>,
+
+    /// Path to your config file.
+    /// Defaults to:
+    ///     1. `$XDG_CONFIG_HOME/wayshot/config.toml`
+    ///     2. `$HOME/wayshot/config.toml` -- if `$XDG_CONFIG_HOME` variable doesn't exist
+    ///     3. `None` -- if the config isn't found, the `Config::default()` will be used
+    #[arg(long, verbatim_doc_comment)]
+    pub config: Option<PathBuf>,
 }
