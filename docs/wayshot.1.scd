@@ -79,6 +79,16 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 
 	Default: wayshot-%Y_%m_%d-%H_%M_%S
 
+*--config*
+	Path to your config file. Defaults to:
+
+	- *$XDG_CONFIG_HOME/wayshot/config.toml*
+	- *$HOME/wayshot/config.toml* if *$XDG_CONFIG_HOME* variable doesn't exist
+	- *None* if config isn't found, the default values will be used
+
+	Example: *wayshot --config config.toml*
+
+
 # SEE ALSO
 	- wayshot(7)
 
