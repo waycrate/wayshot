@@ -1,5 +1,5 @@
 use clap::ValueEnum;
-use eyre::{ContextCompat, Error, Result, bail};
+use eyre::{ContextCompat, Error, bail};
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -10,46 +10,25 @@ use std::{
 };
 
 use chrono::Local;
+use libwayshot::Result;
 use libwayshot::region::{LogicalRegion, Position, Region, Size};
 
-pub fn parse_geometry(g: &str) -> Result<LogicalRegion> {
-    let tail = g.trim();
-    let x_coordinate: i32;
-    let y_coordinate: i32;
-    let width: u32;
-    let height: u32;
-
-    let validation_error =
-        "Invalid geometry provided.\nValid geometries:\n1) %d,%d %dx%d\n2) %d %d %d %d";
-
-    if tail.contains(',') {
-        // this accepts: "%d,%d %dx%d"
-        let (head, tail) = tail.split_once(',').wrap_err(validation_error)?;
-        x_coordinate = head.parse::<i32>()?;
-        let (head, tail) = tail.split_once(' ').wrap_err(validation_error)?;
-        y_coordinate = head.parse::<i32>()?;
-        let (head, tail) = tail.split_once('x').wrap_err(validation_error)?;
-        width = head.parse::<u32>()?;
-        height = tail.parse::<u32>()?;
-    } else {
-        // this accepts: "%d %d %d %d"
-        let (head, tail) = tail.split_once(' ').wrap_err(validation_error)?;
-        x_coordinate = head.parse::<i32>()?;
-        let (head, tail) = tail.split_once(' ').wrap_err(validation_error)?;
-        y_coordinate = head.parse::<i32>()?;
-        let (head, tail) = tail.split_once(' ').wrap_err(validation_error)?;
-        width = head.parse::<u32>()?;
-        height = tail.parse::<u32>()?;
-    }
+pub fn waysip_to_region(size: libwaysip::Size, point: libwaysip::Point) -> Result<LogicalRegion> {
+    let size: Size = Size {
+        width: size.width.try_into().map_err(|_| {
+            libwayshot::Error::FreezeCallbackError("width cannot be negative".to_string())
+        })?,
+        height: size.height.try_into().map_err(|_| {
+            libwayshot::Error::FreezeCallbackError("height cannot be negative".to_string())
+        })?,
+    };
+    let position: Position = Position {
+        x: point.x,
+        y: point.y,
+    };
 
     Ok(LogicalRegion {
-        inner: Region {
-            position: Position {
-                x: x_coordinate,
-                y: y_coordinate,
-            },
-            size: Size { width, height },
-        },
+        inner: Region { position, size },
     })
 }
 

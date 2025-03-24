@@ -815,11 +815,14 @@ impl WayshotConnection {
 
     /// Create a layer shell surface for each output,
     /// render the screen captures on them and use the callback to select a region from them
-    fn overlay_frames_and_select_region(
+    fn overlay_frames_and_select_region<F>(
         &self,
         frames: &[(FrameCopy, FrameGuard, OutputInfo)],
-        callback: Box<dyn Fn() -> Result<LogicalRegion, Error>>,
-    ) -> Result<LogicalRegion> {
+        callback: F,
+    ) -> Result<LogicalRegion>
+    where
+        F: Fn(&WayshotConnection) -> Result<LogicalRegion, Error>,
+    {
         let mut state = LayerShellState {
             configured_outputs: HashSet::new(),
         };
@@ -914,7 +917,7 @@ impl WayshotConnection {
             })?;
         }
 
-        let callback_result = callback();
+        let callback_result = callback(self);
 
         debug!("Unmapping and destroying layer shell surfaces.");
         for (surface, layer_shell_surface) in layer_shell_surfaces.iter() {
@@ -1075,7 +1078,7 @@ impl WayshotConnection {
     /// unfreeze the screenshot and return the selected region.
     pub fn screenshot_freeze<F>(&self, callback: F, cursor_overlay: bool) -> Result<DynamicImage>
     where
-        F: Fn() -> Result<LogicalRegion> + 'static,
+        F: Fn(&WayshotConnection) -> Result<LogicalRegion> + 'static,
     {
         self.screenshot_region_capturer(RegionCapturer::Freeze(Box::new(callback)), cursor_overlay)
     }

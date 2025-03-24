@@ -20,7 +20,7 @@ jobs:
         components: clippy rustfmt
     - name: Install wayland dependencies
       run: |
-        pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa
+        pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo
 
     - name: Build
       run: |
