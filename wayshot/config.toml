@@ -1,0 +1,21 @@
+[base]
+# output to take screenshot
+# output = "HDMI-A-1"
+# should contain cursor?
+cursor = false
+# should copy screenshot to clipborad?
+clipboard = false
+# should write screenshot as file in filesystem?
+file = true
+# should write screenshot in stdout?
+stdout = false
+# max logging level
+log_level = "info"
+
+[file]
+# screenshots directory (not a file)
+# path = "$HOME/images/screenshots"
+# screenshot file name format
+name_format = "wayshot-%Y_%m_%d-%H_%M_%S"
+# screenshot file encoding
+encoding = "png"
