@@ -78,21 +78,30 @@ fn main() -> Result<()> {
             .unwrap_or("wayshot-%Y_%m_%d-%H_%M_%S".to_string()),
     );
     let mut stdout_print = base.stdout.unwrap_or_default();
-    let file = cli.file.and_then(|pathbuf| {
-        if pathbuf.to_string_lossy() == "-" {
-            stdout_print = true;
-            None
-        } else {
-            Some(utils::get_full_file_name(&pathbuf, &file_name_format, encoding))
-        }
-    }).or_else(|| {
-        if base.file.unwrap_or_default() {
-            let dir = file.path.unwrap_or_else(|| env::current_dir().unwrap_or_default());
-            Some(utils::get_full_file_name(&dir, &file_name_format, encoding))
-        } else {
-            None
-        }
-    });
+    let file = cli
+        .file
+        .and_then(|pathbuf| {
+            if pathbuf.to_string_lossy() == "-" {
+                stdout_print = true;
+                None
+            } else {
+                Some(utils::get_full_file_name(
+                    &pathbuf,
+                    &file_name_format,
+                    encoding,
+                ))
+            }
+        })
+        .or_else(|| {
+            if base.file.unwrap_or_default() {
+                let dir = file
+                    .path
+                    .unwrap_or_else(|| env::current_dir().unwrap_or_default());
+                Some(utils::get_full_file_name(&dir, &file_name_format, encoding))
+            } else {
+                None
+            }
+        });
 
     let output = cli.output.or(base.output);
 
