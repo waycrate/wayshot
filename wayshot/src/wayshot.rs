@@ -121,7 +121,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let image_buffer = if cli.slurp {
+    let image_buffer = if cli.geometry {
         wayshot_conn.screenshot_freeze(
             |w_conn| {
                 let info = libwaysip::get_area(
