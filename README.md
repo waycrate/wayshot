@@ -17,16 +17,19 @@
 
 [xdg-desktop-portal-luminous](https://github.com/waycrate/xdg-desktop-portal-luminous) is a xdg-desktop-portal backend for wlroots based compositors, providing screenshot and screencast capabilities.
 
+
 # Some usage examples:
 
 NOTE: Read `man 7 wayshot` for more examples.
+
+NOTE: Read `man 5 wayshot` for [config file](./config.toml) information.
 
 NOTE: Read `man wayshot` for flag information.
 
 Screenshot and Crop Region:
 
 ```bash
-wayshot -s 
+wayshot -s
 ```
 
 Fullscreen:
