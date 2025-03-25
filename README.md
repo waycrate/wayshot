@@ -22,7 +22,7 @@
 
 NOTE: Read `man 7 wayshot` for more examples.
 
-NOTE: Read `man 5 wayshot` for [./config.toml](config file) information.
+NOTE: Read `man 5 wayshot` for [config file](./config.toml) information.
 
 NOTE: Read `man wayshot` for flag information.
 
