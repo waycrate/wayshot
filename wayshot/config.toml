@@ -10,12 +10,15 @@ file = true
 # should write screenshot in stdout?
 stdout = false
 # max logging level
+# possible values: info, trace, debug, warn, error
 log_level = "info"
 
 [file]
-# screenshots directory (not a file)
+# screenshots directory (not a file!)
 # path = "$HOME/images/screenshots"
 # screenshot file name format
+# refer to chrono formatting rules: https://docs.rs/chrono/latest/chrono/format/strftime/index.html
 name_format = "wayshot-%Y_%m_%d-%H_%M_%S"
 # screenshot file encoding
+# possible values: jpg, png, ppm, qui, webp, avif
 encoding = "png"

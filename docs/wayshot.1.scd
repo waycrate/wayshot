@@ -90,6 +90,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 
 
 # SEE ALSO
+	- wayshot(5)
 	- wayshot(7)
 
 # AUTHORS
