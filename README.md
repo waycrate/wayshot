@@ -29,7 +29,7 @@ NOTE: Read `man wayshot` for flag information.
 Screenshot and Crop Region:
 
 ```bash
-wayshot -s
+wayshot -g
 ```
 
 Fullscreen:
@@ -47,7 +47,7 @@ wayshot --clipboard
 Pick a hex color code, using ImageMagick:
 
 ```bash
-wayshot -s - | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
+wayshot -g - | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
 ```
 
 # Installation

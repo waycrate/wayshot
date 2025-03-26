@@ -2,18 +2,18 @@ use config::Config;
 use std::{
     env,
     io::{self, BufWriter, Cursor, Write},
-    process::Command,
 };
 
 use clap::Parser;
 use eyre::{Result, bail};
-use libwayshot::{WayshotConnection, region::LogicalRegion};
+use libwayshot::WayshotConnection;
 
 mod cli;
 mod config;
 mod utils;
 
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
+use utils::waysip_to_region;
 
 use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
@@ -121,19 +121,21 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let image_buffer = if let Some(slurp_args) = cli.slurp {
-        let slurp_region = slurp_args.unwrap_or("".to_string());
+    let image_buffer = if cli.geometry {
         wayshot_conn.screenshot_freeze(
-            move || {
-                || -> Result<LogicalRegion> {
-                    let slurp_output = Command::new("slurp")
-                        .args(slurp_region.split(' '))
-                        .output()?
-                        .stdout;
-
-                    utils::parse_geometry(&String::from_utf8(slurp_output)?)
-                }()
-                .map_err(|_| libwayshot::Error::FreezeCallbackError)
+            |w_conn| {
+                let info = libwaysip::get_area(
+                    Some(libwaysip::WaysipConnection {
+                        connection: &w_conn.conn,
+                        globals: &w_conn.globals,
+                    }),
+                    libwaysip::SelectionType::Area,
+                )
+                .map_err(|e| libwayshot::Error::FreezeCallbackError(e.to_string()))?
+                .ok_or(libwayshot::Error::FreezeCallbackError(
+                    "Failed to capture the area".to_string(),
+                ))?;
+                waysip_to_region(info.size(), info.left_top_point())
             },
             cursor,
         )?

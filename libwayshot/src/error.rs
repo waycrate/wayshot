@@ -34,7 +34,7 @@ pub enum Error {
     #[error("Cannot find required wayland protocol")]
     ProtocolNotFound(String),
     #[error("error occurred in freeze callback")]
-    FreezeCallbackError,
+    FreezeCallbackError(String),
     #[error(
         "dmabuf configuration not initialized. Did you not use Wayshot::from_connection_with_dmabuf()?"
     )]

@@ -1,9 +1,12 @@
 use std::cmp;
 
 use crate::{
+    WayshotConnection,
     error::{Error, Result},
     output::OutputInfo,
 };
+
+pub type FreezeCallback = Box<dyn Fn(&WayshotConnection) -> Result<LogicalRegion>>;
 
 /// Ways to say how a region for a screenshot should be captured.
 pub enum RegionCapturer {
@@ -14,7 +17,7 @@ pub enum RegionCapturer {
     /// The outputs will be "frozen" to the user at which point the given
     /// callback is called to get the region to capture. This callback is often
     /// a user interaction to let the user select a region.
-    Freeze(Box<dyn Fn() -> Result<LogicalRegion>>),
+    Freeze(FreezeCallback),
 }
 
 /// `Region` where the coordinate system is the logical coordinate system used

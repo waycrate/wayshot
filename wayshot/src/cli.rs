@@ -38,9 +38,9 @@ pub struct Cli {
     #[arg(long, verbatim_doc_comment)]
     pub log_level: Option<Level>,
 
-    /// Arguments to call slurp with for selecting a region
-    #[arg(short, long, value_name = "SLURP_ARGS")]
-    pub slurp: Option<Option<String>>,
+    /// Region aware screenshotting
+    #[arg(short, long)]
+    pub geometry: bool,
 
     /// Enable cursor in screenshots
     #[arg(short, long)]
@@ -56,11 +56,11 @@ pub struct Cli {
     pub list_outputs: bool,
 
     /// Choose a particular output/display to screenshot
-    #[arg(short, long, conflicts_with = "slurp")]
+    #[arg(short, long, conflicts_with = "geometry")]
     pub output: Option<String>,
 
     /// Present a fuzzy selector for output/display selection
-    #[arg(long, alias = "choose-output", conflicts_with_all = ["slurp", "output"])]
+    #[arg(long, alias = "choose-output", conflicts_with_all = ["geometry", "output"])]
     pub choose_output: bool,
 
     /// Output file name's formatting.
