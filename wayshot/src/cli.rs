@@ -10,6 +10,7 @@ use clap::{
 use tracing::Level;
 
 use crate::utils::EncodingFormat;
+use clap_complete::Shell;
 
 fn get_styles() -> Styles {
     Styles::styled()
@@ -75,4 +76,12 @@ pub struct Cli {
     ///     3. `None` -- if the config isn't found, the `Config::default()` will be used
     #[arg(long, verbatim_doc_comment)]
     pub config: Option<PathBuf>,
+  
+      ///Generate shell completions for the specified shell (Example: bash, zsh, fish)
+    #[arg(
+        long,
+        value_enum,
+        help = "This Command helps you generate autocomplete in your desired Shell environment"
+    )]
+    pub generate_completions: Option<Shell>,
 }
