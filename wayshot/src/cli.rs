@@ -1,57 +1,83 @@
 use std::path::PathBuf;
 
-use clap::{Parser, arg, builder::TypedValueParser};
-
-use eyre::WrapErr;
+use clap::{
+    Parser, arg,
+    builder::{
+        Styles,
+        styling::{AnsiColor, Effects},
+    },
+};
+use tracing::Level;
 
 use crate::utils::EncodingFormat;
 use clap_complete::Shell;
 
+fn get_styles() -> Styles {
+    Styles::styled()
+        .header(AnsiColor::Yellow.on_default() | Effects::BOLD)
+        .usage(AnsiColor::Green.on_default() | Effects::BOLD)
+        .literal(AnsiColor::Blue.on_default() | Effects::BOLD)
+        .placeholder(AnsiColor::Green.on_default())
+}
+
 #[derive(Parser)]
-#[command(version, about)]
+#[command(version, about, styles=get_styles())]
 pub struct Cli {
-    /// Custom output path can be of the following types:
-    ///     1. Directory (Default naming scheme is used for the image output).
+    /// Custom screenshot file path can be of the following types:
+    ///     1. Directory (Default naming scheme is used for the screenshot file).
     ///     2. Path (Encoding is automatically inferred from the extension).
     ///     3. `-` (Indicates writing to terminal [stdout]).
-    #[arg(value_name = "OUTPUT", verbatim_doc_comment)]
+    #[arg(value_name = "FILE", verbatim_doc_comment)]
     pub file: Option<PathBuf>,
 
-    /// Copy image to clipboard. Can be used simultaneously with [OUTPUT] or stdout.
+    /// Copy image to clipboard. Can be used simultaneously with [FILE].
     /// Wayshot persists in the background offering the image till the clipboard is overwritten.
     #[arg(long, verbatim_doc_comment)]
     pub clipboard: bool,
 
     /// Log level to be used for printing to stderr
-    #[arg(long, default_value = "info", value_parser = clap::builder::PossibleValuesParser::new(["trace", "debug", "info", "warn", "error"]).map(|s| -> tracing::Level{ s.parse().wrap_err_with(|| format!("Failed to parse log level: {}", s)).unwrap()}))]
-    pub log_level: tracing::Level,
+    #[arg(long, verbatim_doc_comment)]
+    pub log_level: Option<Level>,
 
-    /// Arguments to call slurp with for selecting a region
-    #[arg(short, long, value_name = "SLURP_ARGS")]
-    pub slurp: Option<Option<String>>,
+    /// Region aware screenshotting
+    #[arg(short, long)]
+    pub geometry: bool,
 
     /// Enable cursor in screenshots
     #[arg(short, long)]
     pub cursor: bool,
 
-    /// Set image encoder, by default uses the file extension from the OUTPUT
+    /// Set image encoder, by default uses the file extension from the FILE
     /// positional argument. Otherwise defaults to png.
-    #[arg(long, verbatim_doc_comment, visible_aliases = ["extension", "format", "output-format"], value_name = "FILE_EXTENSION")]
+    #[arg(long, verbatim_doc_comment, visible_aliases = ["extension", "format", "file-format"], value_name = "FILE_EXTENSION")]
     pub encoding: Option<EncodingFormat>,
 
     /// List all valid outputs
-    #[arg(short, long, alias = "listoutputs")]
+    #[arg(short, long, alias = "list-outputs")]
     pub list_outputs: bool,
 
     /// Choose a particular output/display to screenshot
-    #[arg(short, long, conflicts_with = "slurp")]
+    #[arg(short, long, conflicts_with = "geometry")]
     pub output: Option<String>,
 
     /// Present a fuzzy selector for output/display selection
-    #[arg(long, alias = "chooseoutput", conflicts_with_all = ["slurp", "output"])]
+    #[arg(long, alias = "choose-output", conflicts_with_all = ["geometry", "output"])]
     pub choose_output: bool,
 
-    ///Generate shell completions for the specified shell (Example: bash, zsh, fish)
+    /// Output file name's formatting.
+    /// Defaults to config value (`wayshot-%Y_%m_%d-%H_%M_%S`)
+    #[arg(long, verbatim_doc_comment)]
+    pub file_name_format: Option<String>,
+
+    /// Path to your config file.
+    /// Defaults to:
+    ///     1. `$XDG_CONFIG_HOME/wayshot/config.toml`
+    ///     2. `$HOME/wayshot/config.toml` -- if `$XDG_CONFIG_HOME` variable doesn't exist
+    ///     3. `None` -- if the config isn't found, the `Config::default()` will be used
+    #[arg(long, verbatim_doc_comment)]
+    pub config: Option<PathBuf>,
+  
+      ///Generate shell completions for the specified shell (Example: bash, zsh, fish)
     #[arg(
         long,
         value_enum,

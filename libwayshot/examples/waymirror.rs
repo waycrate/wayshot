@@ -100,7 +100,7 @@ impl State {
 
         let xdg_surface = wm_base.get_xdg_surface(base_surface, qh, ());
         let toplevel = xdg_surface.get_toplevel(qh, ());
-        toplevel.set_title("DMABuf+wlr-screencpy example!".into());
+        toplevel.set_title("DMABuf+wlr-screencopy example!".into());
 
         base_surface.commit();
 

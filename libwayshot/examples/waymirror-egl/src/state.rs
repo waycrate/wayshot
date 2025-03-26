@@ -24,7 +24,7 @@ pub struct WaylandEGLState {
     pub wl_display: WlDisplay,
     pub wl_surface: Option<WlSurface>,
 
-    pub egl: egl::Instance<egl::Static>,
+    pub egl_instance: egl::Instance<egl::Static>,
     pub egl_window: Option<Rc<WlEglSurface>>,
     pub egl_display: Option<egl::Display>,
     pub egl_surface: Option<egl::Surface>,
@@ -56,7 +56,7 @@ impl WaylandEGLState {
             wl_display: server_connection.display(),
             wl_surface: None,
 
-            egl: khronos_egl::Instance::new(egl::Static),
+            egl_instance: egl::Instance::new(egl::Static),
             egl_window: None,
             egl_display: None,
             egl_surface: None,
@@ -81,9 +81,9 @@ impl WaylandEGLState {
             gl::DeleteProgram(self.gl_program);
         }
 
-        self.egl
+        self.egl_instance
             .destroy_surface(self.egl_display.unwrap(), self.egl_surface.unwrap())?;
-        self.egl
+        self.egl_instance
             .destroy_context(self.egl_display.unwrap(), self.egl_context.unwrap())?;
 
         self.xdg_surface.clone().unwrap().destroy();
@@ -105,13 +105,13 @@ impl WaylandEGLState {
 
         self.egl_display = Some(
             unsafe {
-                self.egl
+                self.egl_instance
                     .get_display(self.wl_display.id().as_ptr() as *mut c_void)
             }
             .unwrap(),
         );
 
-        self.egl.initialize(self.egl_display.unwrap())?;
+        self.egl_instance.initialize(self.egl_display.unwrap())?;
 
         let attributes = [
             egl::SURFACE_TYPE,
@@ -128,11 +128,11 @@ impl WaylandEGLState {
         ];
 
         let config = self
-            .egl
+            .egl_instance
             .choose_first_config(self.egl_display.unwrap(), &attributes)?
             .expect("unable to find an appropriate EGL configuration");
         self.egl_surface = Some(unsafe {
-            self.egl.create_window_surface(
+            self.egl_instance.create_window_surface(
                 self.egl_display.unwrap(),
                 config,
                 self.egl_window.clone().unwrap().ptr() as egl::NativeWindowType,
@@ -141,14 +141,14 @@ impl WaylandEGLState {
         });
 
         let context_attributes = [egl::CONTEXT_CLIENT_VERSION, 2, egl::NONE];
-        self.egl_context = Some(self.egl.create_context(
+        self.egl_context = Some(self.egl_instance.create_context(
             self.egl_display.unwrap(),
             config,
             None,
             &context_attributes,
         )?);
 
-        self.egl.make_current(
+        self.egl_instance.make_current(
             self.egl_display.unwrap(),
             self.egl_surface,
             self.egl_surface,

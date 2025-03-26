@@ -18,7 +18,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 
 		3. '-' which sends the screenshot to stdout.
 
-	The *--clipboard* option can also be used simultaneously with any of the above to copy the image to the clipboard too. 
+	The *--clipboard* option can also be used simultaneously with any of the above to copy the image to the clipboard too.
 
 # OPTIONS
 
@@ -32,7 +32,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 	Print version information.
 
 *--log-level <LOG_LEVEL>*
-	Log level to be used for printing to stderr  
+	Log level to be used for printing to stderr
 	Possible values: trace, debug, info, warn, error
 
 	Default value: info
@@ -41,18 +41,19 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 	Enable cursor visibility in screenshots.
 
 *--clipboard*
-	Copy image contents to clipboard also. 
+	Copy image contents to clipboard also.
 	Using this flag will cause the wayshot process to fork and persist in the background offering the image
 	on the wayland clipboard until some other program overwrites the clipboard.
 
 *-e*, *--extension*
-	Set the image encoder. Without this option, encoding is either inferred from the *output* filename or defaults to png.  
+	Set the image encoder. Without this option, encoding is either inferred from the *output* filename or defaults to png.
 	Valid arguments:
 		- jpg
 		- png (Default encoder)
 		- ppm
 		- qoi
 		- webp
+		- avif
 
 *-l*, *--list-outputs*
 	List all valid output names. This flag is generally used in combination with *-o* flag.
@@ -63,15 +64,29 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 *-o*, *--output*
 	Choose a particular display (wl_output) to screenshot.
 
-*-s*, *--slurp*=<SLURP_ARGS>
-	If this option is passed, wayshot takes a screenshot first and then uses the *slurp* program to select a portion of that screenshot
-	https://github.com/emersion/slurp . SLURP_ARGS are any arguments that need to be passed to *slurp*, see *slurp(1)* for more information.
-	
-	Example:
-	*wayshot -s="-b 11223377"*
-	- This takes a screenshot then calls slurp with "-b 11223377" as an argument for cropping the screenshot.
+*-g*, *--geometry*
+	If this option is passed, wayshot takes a screenshot first and then uses
+	libwaysip (https://github.com/waycrate/waysip) to select a portion of that screenshot.
+
+*--file-name-format*
+	Output file name's formatting. Refer to chrono formatting rules: https://docs.rs/chrono/latest/chrono/format/strftime/index.html.
+
+	Example: --file-name-format "%Y_%m_%d-%H_%M_%S"
+
+	Default: wayshot-%Y_%m_%d-%H_%M_%S
+
+*--config*
+	Path to your config file. Defaults to:
+
+	- *$XDG_CONFIG_HOME/wayshot/config.toml*
+	- *$HOME/wayshot/config.toml* if *$XDG_CONFIG_HOME* variable doesn't exist
+	- *None* if config isn't found, the default values will be used
+
+	Example: *wayshot --config config.toml*
+
 
 # SEE ALSO
+	- wayshot(5)
 	- wayshot(7)
 
 # AUTHORS

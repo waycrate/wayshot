@@ -9,7 +9,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 *wayshot* [_options_] [_output_]
 
 # REGION SELECTION
-wayshot -s
+wayshot -g
 
 # CAPTURE FULLSCREEN
 
@@ -30,15 +30,15 @@ wayshot -o eDP-1
 
 # PICK A HEX COLOR CODE, USING IMAGEMAGICk
 
-wayshot -s - | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
+wayshot -g - | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
 
 # PICK A HEX COLOR CODE WITHOUT USING IMAGEMAGICK
 
-wayshot -s - --encoding ppm | tail -c 3 | od -An -tuC | xargs printf '#%02X%02X%02X\n'
+wayshot -g - --encoding ppm | tail -c 3 | od -An -tuC | xargs printf '#%02X%02X%02X\n'
 
 # PICK A COLOR, USING IMAGEMAGICK
 
-wayshot -s - | convert - -format '%[pixel:p{0,0}]' txt:-
+wayshot -g - | convert - -format '%[pixel:p{0,0}]' txt:-
 
 # AUTHORS
 
