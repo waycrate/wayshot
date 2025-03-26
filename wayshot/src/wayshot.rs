@@ -13,7 +13,7 @@ mod config;
 mod utils;
 
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
-use utils::{EncodingFormat, waysip_to_region};
+use utils::waysip_to_region;
 
 use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
