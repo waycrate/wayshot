@@ -7,6 +7,7 @@ use std::{
 use clap::Parser;
 use eyre::{Result, bail};
 use libwayshot::WayshotConnection;
+use notify_rust::Notification;
 
 mod cli;
 mod config;
@@ -162,6 +163,9 @@ fn main() -> Result<()> {
     };
 
     let mut image_buf: Option<Cursor<Vec<u8>>> = None;
+
+    let file_path_clone_notif = file.clone();
+
     if let Some(f) = file {
         image_buffer.save(f)?;
     }
@@ -183,7 +187,11 @@ fn main() -> Result<()> {
             }
         })?;
     }
-
+    Notification::new()
+        .summary("Screenshot saved")
+        .body(&format!("Successfully saved to {:?}", file_path_clone_notif))
+        .show()
+        .map_err(|e| eyre::eyre!("Notification failed: {}", e))?;
     Ok(())
 }
 
