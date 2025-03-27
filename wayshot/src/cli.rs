@@ -75,4 +75,13 @@ pub struct Cli {
     ///     3. `None` -- if the config isn't found, the `Config::default()` will be used
     #[arg(long, verbatim_doc_comment)]
     pub config: Option<PathBuf>,
+
+    #[arg(long,verbatim_doc_comment, help = "Sets the default screenshot saving path in the config file")]
+    pub set_default_path: Option<PathBuf>,
+
+    #[arg(long, verbatim_doc_comment, help = "Set default cursor visibility (true/false)")]
+    pub set_cursor: Option<bool>,
+
+    #[arg(long,verbatim_doc_comment,help = "Set default clipboard behavior (true/false)")]
+    pub set_clipboard: Option<bool>,
 }

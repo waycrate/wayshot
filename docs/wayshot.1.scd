@@ -84,7 +84,20 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 
 	Example: *wayshot --config config.toml*
 
+*--set-default-path <SET_DEFAULT_PATH>*
+	Sets the default screenshot saving path in the config file.
+	
+	Example: *wayshot --set-default-path "/home/user/screenshots"*
 
+*--set-cursor <SET_CURSOR>*
+	Sets the default cursor visibility when taking screenshots.
+	
+	Example: *wayshot --set-cursor true*
+	
+*--set-clipboard <SET_CLIPBOARD>*
+	Sets the default behavior for copying screenshots to the clipboard.
+	
+	Example: *wayshot --set-clipboard true*
 # SEE ALSO
 	- wayshot(5)
 	- wayshot(7)
