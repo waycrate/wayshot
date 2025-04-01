@@ -32,6 +32,18 @@ impl Config {
             .map(|path| path.join("wayshot").join("config.toml"))
             .unwrap_or_default()
     }
+    pub fn save(&self, path: &PathBuf) -> Result<(), eyre::Error> {
+        let toml = toml::to_string(self)?;  
+        // Create parent directories if needed
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| eyre::eyre!("Failed to create config directory: {}", e))?;
+        }
+        
+        std::fs::write(path, toml)
+            .map_err(|e| eyre::eyre!("Failed to write config file: {}", e))?;
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

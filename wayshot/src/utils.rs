@@ -8,6 +8,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
+use crate::config::{Config,File, Base};
 
 use chrono::Local;
 use libwayshot::Result;
@@ -165,4 +166,43 @@ pub fn get_full_file_name(path: &Path, filename_format: &str, encoding: Encoding
             .to_string_lossy();
         base_dir.join(format!("{}.{}", stem, encoding))
     }
+}
+
+pub fn update_config(
+    config_path: &PathBuf,
+    new_path: Option<PathBuf>,
+    cursor: Option<bool>,
+    clipboard: Option<bool>,
+) -> eyre::Result<()> {
+    let mut config = Config::load(config_path).unwrap_or_default();
+
+    if let Some(path) = new_path {
+        let expanded_path = get_expanded_path(&path);
+         
+        if !expanded_path.is_dir() {
+            return Err(eyre::eyre!(
+                "Path '{}' is not a directory", 
+                expanded_path.display()
+            ));
+        }
+        // addinng/updating path
+        let file = config.file.get_or_insert(File::default());
+        file.path = Some(expanded_path);
+        //updating 
+        let base = config.base.get_or_insert(Base::default());
+        base.file = Some(true);
+    }
+
+    if let Some(cursor_val) = cursor {
+        let base = config.base.get_or_insert(Base::default());
+        base.cursor = Some(cursor_val);
+    }
+
+    if let Some(clipboard_val) = clipboard {
+        let base = config.base.get_or_insert(Base::default());
+        base.clipboard = Some(clipboard_val);
+    }
+
+    config.save(config_path)?;
+    Ok(())
 }

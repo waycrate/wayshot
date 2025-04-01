@@ -37,6 +37,19 @@ where
 fn main() -> Result<()> {
     let cli = cli::Cli::parse();
     let config_path = cli.config.unwrap_or(Config::get_default_path());
+
+    if cli.set_default_path.is_some() || cli.set_cursor.is_some() || cli.set_clipboard.is_some() {
+
+        utils::update_config(
+            &config_path,
+            cli.set_default_path,
+            cli.set_cursor,
+            cli.set_clipboard,
+        )?;
+        return Ok(());
+    }
+
+    
     let config = Config::load(&config_path).unwrap_or_default();
     let base = config.base.unwrap_or_default();
     let file = config.file.unwrap_or_default();
