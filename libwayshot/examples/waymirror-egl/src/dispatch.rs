@@ -111,7 +111,7 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for WaylandEGLState {
                     state.wl_surface.clone().unwrap().commit();
                 }
             }
-            xdg_toplevel::Event::Close {} => {
+            xdg_toplevel::Event::Close => {
                 state.running = false;
             }
             _ => {}
