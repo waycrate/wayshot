@@ -26,7 +26,7 @@ thiserror = "2"
 wayland-client = "0.31.8"
 wayland-protocols = { version = "0.32.6", features = ["client", "unstable"] }
 wayland-protocols-wlr = { version = "0.3.6", features = ["client"] }
-wayland-backend = { version = "0.3.8", features = ["client_system"] }
+wayland-backend = { version = "0.3.10", features = ["client_system"] }
 
 gbm = "0.18.0"
 drm = "0.14.1"
