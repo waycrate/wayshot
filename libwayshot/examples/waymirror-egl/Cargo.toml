@@ -10,7 +10,7 @@ khronos-egl = { version = "6.0.0",features = ["static"]  }
 thiserror = "2"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
-wayland-backend = { version = "0.3.8", features = ["client_system"] }
+wayland-backend = { version = "0.3.10", features = ["client_system"] }
 wayland-client = { version = "0.31.8" }
 wayland-egl = { version = "0.32.5" }
 wayland-protocols = { version = "0.32.6", features = ["client"] }
