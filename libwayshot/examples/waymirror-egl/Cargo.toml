@@ -15,4 +15,4 @@ wayland-client = { version = "0.31.8" }
 wayland-egl = { version = "0.32.5" }
 wayland-protocols = { version = "0.32.6", features = ["client"] }
 libwayshot = { path="../.." }
-libloading = "0.8.6"
+libloading = "0.8.8"
