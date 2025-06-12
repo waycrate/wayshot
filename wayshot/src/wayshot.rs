@@ -6,11 +6,15 @@ use std::{
 
 use clap::Parser;
 use eyre::{Result, bail};
-use libwayshot::WayshotConnection;
+pub use libwayshot::WayshotConnection;
+use libwayshot::ext_image_protocols::HaruhiShotState;
 
 mod cli;
 mod config;
+mod ext_wayshot;
 mod utils;
+
+use ext_wayshot::*;
 
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use utils::waysip_to_region;
@@ -46,6 +50,50 @@ fn main() -> Result<()> {
         .with_max_level(log_level)
         .with_writer(io::stderr)
         .init();
+
+    if cli.experimental {
+        let mut state =
+            HaruhiShotState::new().expect("Your wm needs to support Image Copy Capture protocol");
+        println!("Hello, world!");
+        // WayshotConnection::capture_output(&mut wayshot_conn_testing, Some("eDP-1".into()), stdout_testing, cursor);
+        // Prompt for output name
+        print!("Enter output name: ");
+        io::stdout().flush().unwrap();
+        let mut output = String::new();
+        io::stdin().read_line(&mut output).unwrap();
+        let output = output.trim();
+
+        print!("Enter stdout (0 or 1): ");
+        io::stdout().flush().unwrap();
+        let mut stdout_input = String::new();
+        io::stdin().read_line(&mut stdout_input).unwrap();
+        let stdout: bool = matches!(stdout_input.trim(), "1");
+
+        // Prompt for cursor pointer (0 or 1)
+        print!("Enter cursor pointer (0 or 1): ");
+        io::stdout().flush().unwrap();
+        let mut pointer_input = String::new();
+        io::stdin().read_line(&mut pointer_input).unwrap();
+        let pointer: bool = matches!(pointer_input.trim(), "1");
+
+        let mut area_input = String::new();
+        print!("Area? (0 for false, 1 for true) [default: 0]: ");
+        io::stdout().flush().unwrap();
+        io::stdin().read_line(&mut area_input).unwrap();
+        let area = matches!(area_input.trim(), "1");
+
+        if area {
+            notify_result(ext_capture_area(&mut state, stdout, pointer));
+        } else {
+            notify_result(ext_capture_output(
+                &mut state,
+                Some(output.to_string()),
+                stdout,
+                pointer,
+            ));
+        }
+        return Ok(());
+    }
 
     let cursor = match cli.cursor {
         true => cli.cursor,
@@ -120,6 +168,11 @@ fn main() -> Result<()> {
 
         return Ok(());
     }
+
+	if cli.list_outputs_info {
+		wayshot_conn.print_displays_info();
+		return Ok(());
+	}
 
     let image_buffer = if cli.geometry {
         wayshot_conn.screenshot_freeze(

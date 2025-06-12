@@ -145,6 +145,26 @@ impl WayshotConnection {
         self.output_infos.as_slice()
     }
 
+	/// print the displays' info
+	pub fn print_displays_info(&self) {
+		for OutputInfo {
+			physical_size: Size { width, height },
+			logical_region: LogicalRegion {inner: region::Region { position: region::Position {x,y}, size: Size {width: logical_width,height: logical_height}}},
+			name,
+			description,
+			// scale,
+			..
+		} in self.get_all_outputs()
+		{
+			println!("{name}");
+			println!("description: {description}");
+			println!("    Size: {width},{height}");
+			println!("    LogicSize: {logical_width}, {logical_height}");
+			println!("    Position: {x}, {y}");
+			// println!("    Scale: {scale}");
+		}
+	}
+
     /// refresh the outputs, to get new outputs
     pub fn refresh_outputs(&mut self) -> Result<()> {
         // Connecting to wayland environment.
@@ -1111,3 +1131,5 @@ impl WayshotConnection {
         self.screenshot_outputs(self.get_all_outputs(), cursor_overlay)
     }
 }
+
+pub mod ext_image_protocols;

@@ -42,7 +42,15 @@ pub struct Cli {
     #[arg(short, long)]
     pub geometry: bool,
 
-    /// Enable cursor in screenshots
+    /// For ext-image-protocols
+    #[arg(short, long)]
+    pub experimental: bool,
+
+	/// list all details of valid outouts
+	#[arg(long, alias = "list-outputs-info")]
+	pub list_outputs_info: bool,
+
+	/// Enable cursor in screenshots
     #[arg(short, long)]
     pub cursor: bool,
 
