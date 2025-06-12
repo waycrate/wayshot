@@ -863,7 +863,7 @@ impl WayshotConnection {
 
         let mut layer_shell_surfaces = Vec::with_capacity(frames.len());
 
-        for (frame_copy, frame_guard, output_info) in frames {
+        for (_, frame_guard, output_info) in frames {
             tracing::span!(
                 tracing::Level::DEBUG,
                 "overlay_frames::surface",
@@ -882,11 +882,8 @@ impl WayshotConnection {
                 );
 
                 layer_surface.set_exclusive_zone(-1);
-                layer_surface.set_anchor(Anchor::Top | Anchor::Left);
-                layer_surface.set_size(
-                    frame_copy.frame_format.size.width,
-                    frame_copy.frame_format.size.height,
-                );
+                layer_surface.set_anchor(Anchor::all());
+                layer_surface.set_margin(0, 0, 0, 0);
 
                 debug!("Committing surface creation changes.");
                 surface.commit();
