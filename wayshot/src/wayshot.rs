@@ -85,12 +85,22 @@ fn main() -> Result<()> {
         if area {
             notify_result(ext_capture_area(&mut state, stdout, pointer));
         } else {
-            notify_result(ext_capture_output(
-                &mut state,
-                Some(output.to_string()),
-                stdout,
-                pointer,
-            ));
+			let mut color_input = String::new();
+			print!("Color? (0 for false, 1 for true) [default: 0]: ");
+			io::stdout().flush().unwrap();
+			io::stdin().read_line(&mut color_input).unwrap();
+			let color = matches!(color_input.trim(), "1");
+			
+			if color {
+				notify_result(ext_capture_color(&mut state));
+			} else {
+				notify_result(ext_capture_output(
+					&mut state,
+					Some(output.to_string()),
+					stdout,
+					pointer,
+				));
+			}
         }
         return Ok(());
     }
