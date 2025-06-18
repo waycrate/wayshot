@@ -6,7 +6,7 @@ use std::{
 
 use clap::Parser;
 use eyre::{Result, bail};
-use libwayshot::WayshotConnection;
+use libwayshot::{WayshotConnection, region::Position};
 
 mod cli;
 mod config;
@@ -135,7 +135,7 @@ fn main() -> Result<()> {
                 .ok_or(libwayshot::Error::FreezeCallbackError(
                     "Failed to capture the area".to_string(),
                 ))?;
-                waysip_to_region(info.size(), info.left_top_point())
+                waysip_to_region(info, libwaysip::SelectionType::Area)
             },
             cursor,
         )?
