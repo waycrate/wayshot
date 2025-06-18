@@ -12,24 +12,76 @@ use std::{
 use chrono::Local;
 use libwayshot::Result;
 use libwayshot::region::{LogicalRegion, Position, Region, Size};
+use libwaysip::get_area;
 
-pub fn waysip_to_region(size: libwaysip::Size, point: libwaysip::Point) -> Result<LogicalRegion> {
-    let size: Size = Size {
-        width: size.width.try_into().map_err(|_| {
-            libwayshot::Error::FreezeCallbackError("width cannot be negative".to_string())
-        })?,
-        height: size.height.try_into().map_err(|_| {
-            libwayshot::Error::FreezeCallbackError("height cannot be negative".to_string())
-        })?,
-    };
-    let position: Position = Position {
-        x: point.x,
-        y: point.y,
-    };
+pub fn waysip_to_region(
+    info: libwaysip::state::AreaInfo,
+    selection_type: libwaysip::SelectionType,
+) -> Result<LogicalRegion> {
+    // Macro copied from waysip
+    macro_rules! get_info {
+        ($x: expr) => {
+            match get_area(None, $x) {
+                Ok(Some(info)) => info,
+                Ok(None) => {
+                    eprintln!("Get None, you cancel it");
+                    // TODO: Have proper error types
+                    return Err(libwayshot::Error::FreezeCallbackError(
+                        "Failed to capture the area".to_string(),
+                    ));
+                }
+                Err(e) => {
+                    eprintln!("Error,{e}");
+                    return Err(libwayshot::Error::FreezeCallbackError(e.to_string()));
+                }
+            }
+        };
+    }
+    match selection_type {
+        libwaysip::SelectionType::Point => {
+            let size: Size = Size {
+                width: info.width() as u32,
+                height: info.height() as u32,
+            };
 
-    Ok(LogicalRegion {
-        inner: Region { position, size },
-    })
+            let position: Position = Position {
+                x: info.left_top_point().x,
+                y: info.left_top_point().y,
+            };
+
+            return Ok(LogicalRegion {
+                inner: Region { position, size },
+            });
+        }
+        libwaysip::SelectionType::Area => {
+            let size: Size = Size {
+                width: info.width() as u32,
+                height: info.height() as u32,
+            };
+            let position: Position = Position {
+                x: info.left_top_point().x,
+                y: info.left_top_point().y,
+            };
+
+            return Ok(LogicalRegion {
+                inner: Region { position, size },
+            });
+        }
+        libwaysip::SelectionType::Screen => {
+            let screen_info = info.selected_screen_info();
+            let position: Position = Position {
+                x: screen_info.get_position().x,
+                y: screen_info.get_position().x,
+            };
+            let size: Size = Size {
+                width: info.width() as u32,
+                height: info.height() as u32,
+            };
+            return Ok(LogicalRegion {
+                inner: Region { position, size },
+            });
+        }
+    };
 }
 
 /// Supported image encoding formats.
