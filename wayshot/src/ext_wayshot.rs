@@ -5,6 +5,11 @@ use dialoguer::FuzzySelect;
 use dialoguer::theme::ColorfulTheme;
 use libwayshot::ext_image_protocols::HaruhiShotState;
 
+const TMP: &str = "/tmp";
+
+use libwayshot::ext_image_protocols::ImageViewInfo;
+use libwayshot::region::{Size, Position, Region};
+
 #[derive(Debug, Clone)]
 pub enum WayshotResult {
     StdoutSucceeded,
@@ -173,11 +178,6 @@ pub static SAVEPATH: LazyLock<PathBuf> = LazyLock::new(|| {
     targetpath
 });
 
-const TMP: &str = "/tmp";
-
-use libwayshot::ext_image_protocols::ImageViewInfo;
-use libwayshot::ext_image_protocols::{Position, Region, Size};
-
 pub fn ext_capture_area(
     state: &mut HaruhiShotState,
     use_stdout: bool,
@@ -196,7 +196,7 @@ pub fn ext_capture_area(
                 position: Position { x, y },
                 size: Size { width, height },
             },
-    } = state.ext_capture_area(pointer.to_capture_option(), |w_conn: &HaruhiShotState| {
+    } = state.ext_capture_area2(pointer.to_capture_option(), |w_conn: &HaruhiShotState| {
         let info = libwaysip::get_area(
             Some(libwaysip::WaysipConnection {
                 connection: w_conn.connection(),
@@ -237,8 +237,8 @@ pub fn waysip_to_region(
 	point: libwaysip::Position,
 ) -> Result<Region, libwayshot::ext_image_protocols::HaruhiError> {
 	let size: Size = Size {
-		width: size.width,
-		height: size.height,
+		width: size.width as u32,
+		height: size.height as u32,
 	};
 	let position: Position = Position {
 		x: point.x,
@@ -262,7 +262,7 @@ pub fn ext_capture_color(state: &mut HaruhiShotState) -> Result<WayshotResult, W
 			position: Position { x, y },
 			size: Size { width, height },
 		},
-	} = state.ext_capture_area(CaptureOption::None, |w_conn: &HaruhiShotState| {
+	} = state.ext_capture_area2(CaptureOption::None, |w_conn: &HaruhiShotState| {
 		let info = libwaysip::get_area(
 			Some(libwaysip::WaysipConnection {
 				connection: w_conn.connection(),

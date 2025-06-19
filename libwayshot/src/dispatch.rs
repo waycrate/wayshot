@@ -77,7 +77,7 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
                 if version >= 4 {
                     let output = wl_registry.bind::<wl_output::WlOutput, _, _>(name, 4, qh, ());
                     state.outputs.push(OutputInfo {
-                        wl_output: output,
+                        output: output,
                         name: "".to_string(),
                         description: String::new(),
                         transform: wl_output::Transform::Normal,
@@ -103,7 +103,7 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
         _: &QueueHandle<Self>,
     ) {
         let output: &mut OutputInfo =
-            match state.outputs.iter_mut().find(|x| x.wl_output == *wl_output) {
+            match state.outputs.iter_mut().find(|x| x.output == *wl_output) {
                 Some(output) => output,
                 _ => {
                     tracing::error!(

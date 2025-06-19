@@ -199,7 +199,7 @@ impl WayshotConnection {
             .iter()
             .enumerate()
             .map(|(index, output)| {
-                zxdg_output_manager.get_xdg_output(&output.wl_output, &qh, index)
+                zxdg_output_manager.get_xdg_output(&output.output, &qh, index)
             })
             .collect();
 
@@ -779,7 +779,7 @@ impl WayshotConnection {
 
         let (frame_format, frame_guard) = self.capture_output_frame_shm_from_file(
             cursor_overlay,
-            &output_info.wl_output,
+            &output_info.output,
             &mem_file,
             capture_region,
         )?;
@@ -894,11 +894,11 @@ impl WayshotConnection {
 
                 let layer_surface = layer_shell.get_layer_surface(
                     &surface,
-                    Some(&output_info.wl_output),
+                    Some(&output_info.output),
                     Layer::Top,
                     "wayshot".to_string(),
                     &qh,
-                    output_info.wl_output.clone(),
+                    output_info.output.clone(),
                 );
 
                 layer_surface.set_exclusive_zone(-1);
@@ -912,7 +912,7 @@ impl WayshotConnection {
                 surface.commit();
 
                 debug!("Waiting for layer surface to be configured.");
-                while !state.configured_outputs.contains(&output_info.wl_output) {
+                while !state.configured_outputs.contains(&output_info.output) {
                     event_queue.blocking_dispatch(&mut state)?;
                 }
 
