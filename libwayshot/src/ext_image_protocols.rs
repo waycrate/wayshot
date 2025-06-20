@@ -30,11 +30,6 @@ use wayland_client::{
     },
 };
 
-use wayland_protocols_wlr::layer_shell::v1::client::{
-	zwlr_layer_shell_v1::{Layer, ZwlrLayerShellV1},
-	zwlr_layer_surface_v1::{Anchor, self, ZwlrLayerSurfaceV1},
-};
-
 use wayland_client::protocol::{wl_compositor::WlCompositor, wl_surface::WlSurface};
 
 use wayland_protocols::xdg::xdg_output::zv1::client::{
@@ -70,7 +65,7 @@ use wayland_client::{
     globals::{BindError, GlobalError},
 };
 
-use crate::region::{Size, Position, Region, LogicalRegion};
+use crate::region::{LogicalRegion, Position, Region, Size};
 
 /// This main state of HaruhiShot, We use it to do screen copy
 #[derive(Debug, Default)]
@@ -208,50 +203,50 @@ impl CaptureInfo {
 }
 
 pub trait AreaSelectCallback {
-	fn slurp(self, state: &HaruhiShotState) -> Result<Region, HaruhiError>;
+    fn slurp(self, state: &HaruhiShotState) -> Result<Region, HaruhiError>;
 }
 
 impl<F> AreaSelectCallback for F
 where
-	F: Fn(&HaruhiShotState) -> Result<Region, HaruhiError>,
+    F: Fn(&HaruhiShotState) -> Result<Region, HaruhiError>,
 {
-	fn slurp(self, state: &HaruhiShotState) -> Result<Region, HaruhiError> {
-		self(state)
-	}
+    fn slurp(self, state: &HaruhiShotState) -> Result<Region, HaruhiError> {
+        self(state)
+    }
 }
 impl AreaSelectCallback for Region {
-	fn slurp(self, _state: &HaruhiShotState) -> Result<Region, HaruhiError> {
-		Ok(self)
-	}
+    fn slurp(self, _state: &HaruhiShotState) -> Result<Region, HaruhiError> {
+        Ok(self)
+    }
 }
 
 use std::collections::HashSet;
 
 #[derive(Debug)]
 pub(crate) struct LayerShellState {
-	pub configured_outputs: HashSet<WlOutput>,
+    pub configured_outputs: HashSet<WlOutput>,
 }
 
 impl LayerShellState {
-	pub(crate) fn new() -> Self {
-		Self {
-			configured_outputs: HashSet::new(),
-		}
-	}
+    pub(crate) fn new() -> Self {
+        Self {
+            configured_outputs: HashSet::new(),
+        }
+    }
 }
 
 /// contain the output and their messages
 #[derive(Debug, Clone)]
 pub struct WlOutputInfo {
     pub(crate) output: WlOutput,
-	pub(crate) name: String,
-	pub(crate) description: String,
-	pub(crate) transform: wl_output::Transform,
-	pub(crate) physical_size: Size,
+    pub(crate) name: String,
+    pub(crate) description: String,
+    pub(crate) transform: wl_output::Transform,
+    pub(crate) physical_size: Size,
 
     pub(crate) logical_region: LogicalRegion,
 
-    pub(crate) xdg_output: OnceLock<ZxdgOutputV1>,
+    pub(crate) xdg_output: Option<ZxdgOutputV1>,
     pub(crate) scale: i32,
 }
 
@@ -264,11 +259,11 @@ impl WlOutputInfo {
     pub(crate) fn new(output: WlOutput) -> Self {
         Self {
             output,
-			logical_region: LogicalRegion::default(),
+            logical_region: LogicalRegion::default(),
             physical_size: Size::default(),
             name: "".to_owned(),
             description: "".to_owned(),
-            xdg_output: OnceLock::new(),
+            xdg_output: None,
             transform: wl_output::Transform::Normal,
             scale: 1,
         }
@@ -295,82 +290,82 @@ impl From<CaptureOption> for Options {
 }
 
 struct AreaShotInfo {
-	data: CaptureOutputData,
-	mem_file: File,
+    data: CaptureOutputData,
+    mem_file: File,
 }
 
 impl AreaShotInfo {
-	fn in_this_screen(
-		&self,
-		Region {
-			position: point, ..
-		}: Region,
-	) -> bool {
-		let CaptureOutputData {
-			real_width,
-			real_height,
-			screen_position: Position { x, y },
-			..
-		} = self.data;
-		if point.y < y
-			|| point.x < x
-			|| point.x > x + real_width as i32
-			|| point.y > y + real_height as i32
-		{
-			return false;
-		}
-		true
-	}
-	fn clip_area(&self, region: Region) -> Option<Region> {
-		if !self.in_this_screen(region) {
-			return None;
-		}
-		let CaptureOutputData {
-			real_width,
-			real_height,
-			width,
-			height,
-			screen_position,
-			..
-		} = self.data;
-		let Region {
-			position: point,
-			size,
-		} = region;
-		let relative_point = point - screen_position;
-		let position = Position {
-			x: (relative_point.x as f64 * width as f64 / real_width as f64) as i32,
-			y: (relative_point.y as f64 * height as f64 / real_height as f64) as i32,
-		};
+    fn in_this_screen(
+        &self,
+        Region {
+            position: point, ..
+        }: Region,
+    ) -> bool {
+        let CaptureOutputData {
+            real_width,
+            real_height,
+            screen_position: Position { x, y },
+            ..
+        } = self.data;
+        if point.y < y
+            || point.x < x
+            || point.x > x + real_width as i32
+            || point.y > y + real_height as i32
+        {
+            return false;
+        }
+        true
+    }
+    fn clip_area(&self, region: Region) -> Option<Region> {
+        if !self.in_this_screen(region) {
+            return None;
+        }
+        let CaptureOutputData {
+            real_width,
+            real_height,
+            width,
+            height,
+            screen_position,
+            ..
+        } = self.data;
+        let Region {
+            position: point,
+            size,
+        } = region;
+        let relative_point = point - screen_position;
+        let position = Position {
+            x: (relative_point.x as f64 * width as f64 / real_width as f64) as i32,
+            y: (relative_point.y as f64 * height as f64 / real_height as f64) as i32,
+        };
 
-		Some(Region {
-			position,
-			size: Size {
-				width: (size.width as f64 * width as f64 / real_width as f64) as u32,
-				height: (size.height as f64 * height as f64 / real_height as f64) as u32,
-			},
-		})
-	}
+        Some(Region {
+            position,
+            size: Size {
+                width: (size.width as f64 * width as f64 / real_width as f64) as u32,
+                height: (size.height as f64 * height as f64 / real_height as f64) as u32,
+            },
+        })
+    }
 }
 
 // Replace the layer shell imports with xdg_shell imports
 use wayland_protocols::xdg::shell::client::{
-	xdg_wm_base::{self, XdgWmBase},
-	xdg_surface::{self, XdgSurface},
-	xdg_toplevel::{self, XdgToplevel},
+    xdg_surface::{self, XdgSurface},
+    xdg_toplevel::{self, XdgToplevel},
+    xdg_wm_base::{self, XdgWmBase},
 };
 
 #[derive(Debug)]
 pub(crate) struct XdgShellState {
-	pub configured_surfaces: HashSet<XdgSurface>,
+    pub configured_surfaces: HashSet<XdgSurface>,
 }
 
 impl XdgShellState {
-	pub(crate) fn new() -> Self {
-		Self {
-			configured_surfaces: HashSet::new(),
-		}
-	}
+    pub(crate) fn new() -> Self {
+        Self {
+            configured_surfaces: HashSet::new(),
+        }
+    }
 }
 
 // Replace the LayerShellState dispatch implementations with XdgShell ones
@@ -385,43 +380,43 @@ delegate_noop!(XdgShellState: ignore WpViewporter);
 delegate_noop!(XdgShellState: ignore XdgToplevel);
 
 impl Dispatch<XdgSurface, WlOutput> for XdgShellState {
-	fn event(
-		state: &mut Self,
-		proxy: &XdgSurface,
-		event: <XdgSurface as Proxy>::Event,
-		_data: &WlOutput,
-		_conn: &Connection,
-		_qhandle: &QueueHandle<Self>,
-	) {
-		match event {
-			xdg_surface::Event::Configure { serial } => {
-				tracing::debug!("Acking XDG surface configure");
-				state.configured_surfaces.insert(proxy.clone());
-				proxy.ack_configure(serial);
-				tracing::trace!("Acked XDG surface configure");
-			}
-			_ => {}
-		}
-	}
+    fn event(
+        state: &mut Self,
+        proxy: &XdgSurface,
+        event: <XdgSurface as Proxy>::Event,
+        _data: &WlOutput,
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        match event {
+            xdg_surface::Event::Configure { serial } => {
+                tracing::debug!("Acking XDG surface configure");
+                state.configured_surfaces.insert(proxy.clone());
+                proxy.ack_configure(serial);
+                tracing::trace!("Acked XDG surface configure");
+            }
+            _ => {}
+        }
+    }
 }
 
 // Add XdgWmBase ping handling
 impl Dispatch<XdgWmBase, ()> for XdgShellState {
-	fn event(
-		_state: &mut Self,
-		proxy: &XdgWmBase,
-		event: <XdgWmBase as Proxy>::Event,
-		_data: &(),
-		_conn: &Connection,
-		_qhandle: &QueueHandle<Self>,
-	) {
-		match event {
-			xdg_wm_base::Event::Ping { serial } => {
-				proxy.pong(serial);
-			}
-			_ => {}
-		}
-	}
+    fn event(
+        _state: &mut Self,
+        proxy: &XdgWmBase,
+        event: <XdgWmBase as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        match event {
+            xdg_wm_base::Event::Ping { serial } => {
+                proxy.pong(serial);
+            }
+            _ => {}
+        }
+    }
 }
 
 impl HaruhiShotState {
@@ -462,13 +457,13 @@ impl HaruhiShotState {
         self.event_queue = Some(event_queue);
     }
 
-	pub fn connection(&self) -> &Connection {
-		self.conn.get().expect("should init")
-	}
+    pub fn connection(&self) -> &Connection {
+        self.conn.get().expect("should init")
+    }
 
-	pub fn globals(&self) -> &GlobalList {
-		self.globals.get().expect("should init")
-	}
+    pub fn globals(&self) -> &GlobalList {
+        self.globals.get().expect("should init")
+    }
 
     fn init(connection: Option<Connection>) -> Result<Self, HaruhiError> {
         let conn = if let Some(conn) = connection {
@@ -495,7 +490,7 @@ impl HaruhiShotState {
 
         for output in state.output_infos.iter_mut() {
             let xdg_the_output = the_xdg_output_manager.get_xdg_output(&output.output, &qh, ());
-            output.xdg_output.set(xdg_the_output).unwrap();
+            output.xdg_output = Some(xdg_the_output);
         }
 
         event_queue.blocking_dispatch(&mut state)?;
@@ -545,22 +540,24 @@ impl HaruhiShotState {
         &mut self,
         WlOutputInfo {
             output,
-			logical_region:
-				LogicalRegion {
-					inner: Region {
-						position: screen_position,
-						size: Size {
-							width: real_width,
-							height: real_height,
-						},
-					},
-				},
-//			logical_size:
-//                Size {
-//                    width: real_width,
-//                    height: real_height,
-//                },
-//            position: screen_position,
+            logical_region:
+                LogicalRegion {
+                    inner:
+                        Region {
+                            position: screen_position,
+                            size:
+                                Size {
+                                    width: real_width,
+                                    height: real_height,
+                                },
+                        },
+                },
+            //			logical_size:
+            //                Size {
+            //                    width: real_width,
+            //                    height: real_height,
+            //                },
+            //            position: screen_position,
             ..
         }: WlOutputInfo,
         option: CaptureOption,
@@ -669,108 +666,108 @@ impl HaruhiShotState {
         })
     }
 
-	pub fn ext_capture_area2<F>(
-		&mut self,
-		option: CaptureOption,
-		callback: F,
-	) -> Result<ImageViewInfo, HaruhiError>
-	where
-		F: AreaSelectCallback,
-	{
-		let outputs = self.outputs().clone();
+    pub fn ext_capture_area2<F>(
+        &mut self,
+        option: CaptureOption,
+        callback: F,
+    ) -> Result<ImageViewInfo, HaruhiError>
+    where
+        F: AreaSelectCallback,
+    {
+        let outputs = self.outputs().clone();
 
-		let mut data_list = vec![];
-		for data in outputs.into_iter() {
-			let mem_fd = ext_create_shm_fd().unwrap();
-			let mem_file = File::from(mem_fd);
-			let data =
-				self.ext_capture_output_inner(data, option, mem_file.as_fd(), Some(&mem_file))?;
-			data_list.push(AreaShotInfo { data, mem_file })
-		}
+        let mut data_list = vec![];
+        for data in outputs.into_iter() {
+            let mem_fd = ext_create_shm_fd().unwrap();
+            let mem_file = File::from(mem_fd);
+            let data =
+                self.ext_capture_output_inner(data, option, mem_file.as_fd(), Some(&mem_file))?;
+            data_list.push(AreaShotInfo { data, mem_file })
+        }
 
-		let mut state = XdgShellState::new();
-		let mut event_queue: EventQueue<XdgShellState> = self.connection().new_event_queue();
-		let globals = self.globals();
-		let qh = event_queue.handle();
+        let mut state = XdgShellState::new();
+        let mut event_queue: EventQueue<XdgShellState> = self.connection().new_event_queue();
+        let globals = self.globals();
+        let qh = event_queue.handle();
 
-		let compositor = globals.bind::<WlCompositor, _, _>(&qh, 3..=3, ())?;
-		let xdg_wm_base = globals.bind::<XdgWmBase, _, _>(&qh, 1..=1, ())?;
-		let viewporter = globals.bind::<WpViewporter, _, _>(&qh, 1..=1, ())?;
+        let compositor = globals.bind::<WlCompositor, _, _>(&qh, 3..=3, ())?;
+        let xdg_wm_base = globals.bind::<XdgWmBase, _, _>(&qh, 1..=1, ())?;
+        let viewporter = globals.bind::<WpViewporter, _, _>(&qh, 1..=1, ())?;
 
-		let mut xdg_surfaces: Vec<(WlSurface, XdgSurface, XdgToplevel)> =
-			Vec::with_capacity(data_list.len());
-		for AreaShotInfo { data, .. } in data_list.iter() {
-			let CaptureOutputData {
-				output,
-				buffer,
-				real_width,
-				real_height,
-				transform,
-				..
-			} = data;
-			let surface = compositor.create_surface(&qh, ());
+        let mut xdg_surfaces: Vec<(WlSurface, XdgSurface, XdgToplevel)> =
+            Vec::with_capacity(data_list.len());
+        for AreaShotInfo { data, .. } in data_list.iter() {
+            let CaptureOutputData {
+                output,
+                buffer,
+                real_width,
+                real_height,
+                transform,
+                ..
+            } = data;
+            let surface = compositor.create_surface(&qh, ());
 
-			let xdg_surface = xdg_wm_base.get_xdg_surface(&surface, &qh, output.clone());
-			let xdg_toplevel = xdg_surface.get_toplevel(&qh, ());
+            let xdg_surface = xdg_wm_base.get_xdg_surface(&surface, &qh, output.clone());
+            let xdg_toplevel = xdg_surface.get_toplevel(&qh, ());
 
-			// Configure the toplevel to be fullscreen on the specific output
-			xdg_toplevel.set_fullscreen(Some(output));
-			xdg_toplevel.set_title("wayshot-overlay".to_string());
-			xdg_toplevel.set_app_id("wayshot".to_string());
+            // Configure the toplevel to be fullscreen on the specific output
+            xdg_toplevel.set_fullscreen(Some(output));
+            xdg_toplevel.set_title("wayshot-overlay".to_string());
+            xdg_toplevel.set_app_id("wayshot".to_string());
 
-			debug!("Committing surface creation changes.");
-			surface.commit();
+            debug!("Committing surface creation changes.");
+            surface.commit();
 
-			debug!("Waiting for layer surface to be configured.");
-			while !state.configured_surfaces.contains(&xdg_surface) {
-				event_queue.blocking_dispatch(&mut state)?;
-			}
+            debug!("Waiting for layer surface to be configured.");
+            while !state.configured_surfaces.contains(&xdg_surface) {
+                event_queue.blocking_dispatch(&mut state)?;
+            }
 
-			surface.set_buffer_transform(*transform);
-			// surface.set_buffer_scale(output_info.scale());
-			surface.attach(Some(buffer), 0, 0);
+            surface.set_buffer_transform(*transform);
+            // surface.set_buffer_scale(output_info.scale());
+            surface.attach(Some(buffer), 0, 0);
 
-			let viewport = viewporter.get_viewport(&surface, &qh, ());
-			viewport.set_destination(*real_width as i32, *real_height as i32);
+            let viewport = viewporter.get_viewport(&surface, &qh, ());
+            viewport.set_destination(*real_width as i32, *real_height as i32);
 
-			debug!("Committing surface with attached buffer.");
-			surface.commit();
-			xdg_surfaces.push((surface, xdg_surface, xdg_toplevel));
-			event_queue.blocking_dispatch(&mut state)?;
-		}
+            debug!("Committing surface with attached buffer.");
+            surface.commit();
+            xdg_surfaces.push((surface, xdg_surface, xdg_toplevel));
+            event_queue.blocking_dispatch(&mut state)?;
+        }
 
-		let region_re = callback.slurp(self);
+        let region_re = callback.slurp(self);
 
-		debug!("Unmapping and destroying layer shell surfaces.");
-		for (surface, xdg_surface, xdg_toplevel) in xdg_surfaces.iter() {
-			surface.attach(None, 0, 0);
-			surface.commit(); // unmap surface by committing a null buffer
-			xdg_toplevel.destroy();
-			xdg_surface.destroy();
-		}
-		event_queue.roundtrip(&mut state)?;
-		let region = region_re?;
+        debug!("Unmapping and destroying layer shell surfaces.");
+        for (surface, xdg_surface, xdg_toplevel) in xdg_surfaces.iter() {
+            surface.attach(None, 0, 0);
+            surface.commit(); // unmap surface by committing a null buffer
+            xdg_toplevel.destroy();
+            xdg_surface.destroy();
+        }
+        event_queue.roundtrip(&mut state)?;
+        let region = region_re?;
 
-		let shotdata = data_list
-			.iter()
-			.find(|data| data.in_this_screen(region))
-			.ok_or(HaruhiError::CaptureFailed("not in region".to_owned()))?;
-		let area = shotdata.clip_area(region).expect("should have");
-		let mut frame_mmap = unsafe { MmapMut::map_mut(&shotdata.mem_file).unwrap() };
+        let shotdata = data_list
+            .iter()
+            .find(|data| data.in_this_screen(region))
+            .ok_or(HaruhiError::CaptureFailed("not in region".to_owned()))?;
+        let area = shotdata.clip_area(region).expect("should have");
+        let mut frame_mmap = unsafe { MmapMut::map_mut(&shotdata.mem_file).unwrap() };
 
-		let converter = crate::convert::create_converter(shotdata.data.frame_format).unwrap();
-		let color_type = converter.convert_inplace(&mut frame_mmap);
+        let converter = crate::convert::create_converter(shotdata.data.frame_format).unwrap();
+        let color_type = converter.convert_inplace(&mut frame_mmap);
 
-		Ok(ImageViewInfo {
-			info: ImageInfo {
-				data: frame_mmap.deref().into(),
-				width: shotdata.data.width,
-				height: shotdata.data.height,
-				color_type,
-			},
-			region: area,
-		})
-	}
+        Ok(ImageViewInfo {
+            info: ImageInfo {
+                data: frame_mmap.deref().into(),
+                width: shotdata.data.width,
+                height: shotdata.data.height,
+                color_type,
+            },
+            region: area,
+        })
+    }
 }
 
 use nix::{
@@ -797,7 +794,7 @@ fn ext_create_shm_fd() -> std::io::Result<OwnedFd> {
                     fd.as_fd(),
                     fcntl::F_ADD_SEALS(
                         fcntl::SealFlag::F_SEAL_SHRINK | fcntl::SealFlag::F_SEAL_SEAL,
-					),
+                    ),
                 );
                 return Ok(fd);
             }
@@ -925,17 +922,22 @@ impl Dispatch<ZxdgOutputV1, ()> for HaruhiShotState {
                 .output_infos
                 .iter_mut()
                 .find(|WlOutputInfo { xdg_output, .. }| {
-                    xdg_output.get().expect("we need to init here") == proxy
+                    xdg_output.as_ref().expect("we need to init here") == proxy
                 })
         else {
             return;
         };
 
         match event {
-            zxdg_output_v1::Event::LogicalPosition { x, y } => data.logical_region.inner.position = Position { x, y },
+            zxdg_output_v1::Event::LogicalPosition { x, y } => {
+                data.logical_region.inner.position = Position { x, y }
+            }
             zxdg_output_v1::Event::LogicalSize { width, height } => {
-				data.logical_region.inner.size = Size {  width: width as u32, height: height as u32 }
-			}
+                data.logical_region.inner.size = Size {
+                    width: width as u32,
+                    height: height as u32,
+                }
+            }
             zxdg_output_v1::Event::Description { description } => {
                 data.description = description;
             }
@@ -983,16 +985,14 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, Arc<RwLock<FrameInfo>>> for HaruhiSh
         let frame_info = data.write().unwrap();
         match event {
             ext_image_copy_capture_session_v1::Event::BufferSize { width, height } => {
-                frame_info
-                    .buffer_size
-                    .set(Size { width, height })
-                    .expect("should set only once");
+                if frame_info.buffer_size.get().is_none() {
+                    frame_info.buffer_size.set(Size { width, height }).unwrap();
+                }
             }
             ext_image_copy_capture_session_v1::Event::ShmFormat { format } => {
-                frame_info
-                    .shm_format
-                    .set(format)
-                    .expect("should set only once");
+                if frame_info.shm_format.get().is_none() {
+                    frame_info.shm_format.set(format).unwrap();
+                }
             }
             ext_image_copy_capture_session_v1::Event::Done => {}
             _ => {}
@@ -1048,7 +1048,10 @@ impl Dispatch<WlOutput, ()> for HaruhiShotState {
                 data.scale = factor;
             }
             wl_output::Event::Mode { width, height, .. } => {
-                data.physical_size = Size { width: width as u32, height: height as u32 };
+                data.physical_size = Size {
+                    width: width as u32,
+                    height: height as u32,
+                };
             }
             wl_output::Event::Geometry {
                 transform: WEnum::Value(transform),
@@ -1061,45 +1064,12 @@ impl Dispatch<WlOutput, ()> for HaruhiShotState {
     }
 }
 
-use wayland_protocols::wp::viewporter::client::{
-	wp_viewport::WpViewport
-};
+use wayland_protocols::wp::viewporter::client::wp_viewport::WpViewport;
 
 delegate_noop!(LayerShellState: ignore WlCompositor);
 delegate_noop!(LayerShellState: ignore WlShm);
 delegate_noop!(LayerShellState: ignore WlShmPool);
 delegate_noop!(LayerShellState: ignore WlBuffer);
-delegate_noop!(LayerShellState: ignore ZwlrLayerShellV1);
 delegate_noop!(LayerShellState: ignore WlSurface);
 delegate_noop!(LayerShellState: ignore WpViewport);
 delegate_noop!(LayerShellState: ignore WpViewporter);
-
-impl wayland_client::Dispatch<ZwlrLayerSurfaceV1, WlOutput> for LayerShellState {
-	// No need to instrument here, span from lib.rs is automatically used.
-	fn event(
-		state: &mut Self,
-		proxy: &ZwlrLayerSurfaceV1,
-		event: <ZwlrLayerSurfaceV1 as wayland_client::Proxy>::Event,
-		data: &WlOutput,
-		_conn: &Connection,
-		_qhandle: &QueueHandle<Self>,
-	) {
-		match event {
-			zwlr_layer_surface_v1::Event::Configure {
-				serial,
-				width: _,
-				height: _,
-			} => {
-				tracing::debug!("Acking configure");
-				state.configured_outputs.insert(data.clone());
-
-				proxy.ack_configure(serial);
-				tracing::trace!("Acked configure");
-			}
-			zwlr_layer_surface_v1::Event::Closed => {
-				tracing::debug!("Closed")
-			}
-			_ => {}
-		}
-	}
-}

@@ -145,25 +145,36 @@ impl WayshotConnection {
         self.output_infos.as_slice()
     }
 
-	/// print the displays' info
-	pub fn print_displays_info(&self) {
-		for OutputInfo {
-			physical_size: Size { width, height },
-			logical_region: LogicalRegion {inner: region::Region { position: region::Position {x,y}, size: Size {width: logical_width,height: logical_height}}},
-			name,
-			description,
-			// scale,
-			..
-		} in self.get_all_outputs()
-		{
-			println!("{name}");
-			println!("description: {description}");
-			println!("    Size: {width},{height}");
-			println!("    LogicSize: {logical_width}, {logical_height}");
-			println!("    Position: {x}, {y}");
-			// println!("    Scale: {scale}");
-		}
-	}
+    /// print the displays' info
+    pub fn print_displays_info(&self) {
+        for OutputInfo {
+            physical_size: Size { width, height },
+            logical_region:
+                LogicalRegion {
+                    inner:
+                        region::Region {
+                            position: region::Position { x, y },
+                            size:
+                                Size {
+                                    width: logical_width,
+                                    height: logical_height,
+                                },
+                        },
+                },
+            name,
+            description,
+            // scale,
+            ..
+        } in self.get_all_outputs()
+        {
+            println!("{name}");
+            println!("description: {description}");
+            println!("    Size: {width},{height}");
+            println!("    LogicSize: {logical_width}, {logical_height}");
+            println!("    Position: {x}, {y}");
+            // println!("    Scale: {scale}");
+        }
+    }
 
     /// refresh the outputs, to get new outputs
     pub fn refresh_outputs(&mut self) -> Result<()> {
@@ -198,9 +209,7 @@ impl WayshotConnection {
             .outputs
             .iter()
             .enumerate()
-            .map(|(index, output)| {
-                zxdg_output_manager.get_xdg_output(&output.output, &qh, index)
-            })
+            .map(|(index, output)| zxdg_output_manager.get_xdg_output(&output.output, &qh, index))
             .collect();
 
         event_queue.roundtrip(&mut state)?;
@@ -950,24 +959,24 @@ impl WayshotConnection {
         callback_result
     }
 
-    /// Take a screenshot from the specified region.
-    #[tracing::instrument(skip_all, fields(max_scale = tracing::field::Empty))]
-    fn screenshot_region_capturer(
-        &self,
-        region_capturer: RegionCapturer,
-        cursor_overlay: bool,
-    ) -> Result<DynamicImage> {
-        let outputs_capture_regions: Vec<(OutputInfo, Option<EmbeddedRegion>)> =
-            match region_capturer {
-                RegionCapturer::Outputs(ref outputs) => outputs
-                    .iter()
-                    .map(|output_info| (output_info.clone(), None))
-                    .collect(),
-                RegionCapturer::Region(capture_region) => self
-                    .get_all_outputs()
-                    .iter()
-                    .filter_map(|output_info| {
-                        tracing::span!(
+	/// Take a screenshot from the specified region.
+	#[tracing::instrument(skip_all, fields(max_scale = tracing::field::Empty))]
+	fn screenshot_region_capturer(
+		&self,
+		region_capturer: RegionCapturer,
+		cursor_overlay: bool,
+	) -> Result<DynamicImage> {
+		let outputs_capture_regions: Vec<(OutputInfo, Option<EmbeddedRegion>)> =
+			match region_capturer {
+				RegionCapturer::Outputs(ref outputs) => outputs
+					.iter()
+					.map(|output_info| (output_info.clone(), None))
+					.collect(),
+				RegionCapturer::Region(capture_region) => self
+					.get_all_outputs()
+					.iter()
+					.filter_map(|output_info| {
+						tracing::span!(
                             tracing::Level::DEBUG,
                             "filter_map",
                             output = format!(
@@ -977,91 +986,91 @@ impl WayshotConnection {
                             ),
                             capture_region = format!("{}", capture_region),
                         )
-                        .in_scope(|| {
-                            if let Some(relative_region) =
-                                EmbeddedRegion::new(capture_region, output_info.into())
-                            {
-                                tracing::debug!("Intersection found: {}", relative_region);
-                                Some((output_info.clone(), Some(relative_region)))
-                            } else {
-                                tracing::debug!("No intersection found");
-                                None
-                            }
-                        })
-                    })
-                    .collect(),
-                RegionCapturer::Freeze(_) => self
-                    .get_all_outputs()
-                    .iter()
-                    .map(|output_info| (output_info.clone(), None))
-                    .collect(),
-            };
+							.in_scope(|| {
+								if let Some(relative_region) =
+									EmbeddedRegion::new(capture_region, output_info.into())
+								{
+									tracing::debug!("Intersection found: {}", relative_region);
+									Some((output_info.clone(), Some(relative_region)))
+								} else {
+									tracing::debug!("No intersection found");
+									None
+								}
+							})
+					})
+					.collect(),
+				RegionCapturer::Freeze(_) => self
+					.get_all_outputs()
+					.iter()
+					.map(|output_info| (output_info.clone(), None))
+					.collect(),
+			};
 
-        let frames = self.capture_frame_copies(&outputs_capture_regions, cursor_overlay)?;
+		let frames = self.capture_frame_copies(&outputs_capture_regions, cursor_overlay)?;
 
-        let capture_region: LogicalRegion = match region_capturer {
-            RegionCapturer::Outputs(outputs) => outputs.as_slice().try_into()?,
-            RegionCapturer::Region(region) => region,
-            RegionCapturer::Freeze(callback) => {
-                self.overlay_frames_and_select_region(&frames, callback)?
-            }
-        };
+		let capture_region: LogicalRegion = match region_capturer {
+			RegionCapturer::Outputs(outputs) => outputs.as_slice().try_into()?,
+			RegionCapturer::Region(region) => region,
+			RegionCapturer::Freeze(callback) => {
+				self.overlay_frames_and_select_region(&frames, callback)?
+			}
+		};
 
-        // TODO When freeze was used, we can still further remove the outputs
-        // that don't intersect with the capture region.
+		// TODO When freeze was used, we can still further remove the outputs
+		// that don't intersect with the capture region.
 
-        thread::scope(|scope| {
-            let max_scale = outputs_capture_regions
-                .iter()
-                .map(|(output_info, _)| output_info.scale())
-                .fold(1.0, f64::max);
+		thread::scope(|scope| {
+			let max_scale = outputs_capture_regions
+				.iter()
+				.map(|(output_info, _)| output_info.scale as f64)
+				.fold(1.0, f64::max);
 
-            tracing::Span::current().record("max_scale", max_scale);
+			tracing::Span::current().record("max_scale", max_scale);
 
-            let rotate_join_handles = frames
-                .into_iter()
-                .map(|(frame_copy, _, _)| {
-                    scope.spawn(move || {
-                        let image = (&frame_copy).try_into()?;
-                        Ok((
-                            image_util::rotate_image_buffer(
-                                image,
-                                frame_copy.transform,
-                                frame_copy.logical_region.inner.size,
-                                max_scale,
-                            ),
-                            frame_copy,
-                        ))
-                    })
-                })
-                .collect::<Vec<_>>();
+			let rotate_join_handles = frames
+				.into_iter()
+				.map(|(frame_copy, _, _)| {
+					scope.spawn(move || {
+						let image = (&frame_copy).try_into()?;
+						Ok((
+							image_util::rotate_image_buffer(
+								image,
+								frame_copy.transform,
+								frame_copy.logical_region.inner.size,
+								max_scale,
+							),
+							frame_copy,
+						))
+					})
+				})
+				.collect::<Vec<_>>();
 
-            rotate_join_handles
-                .into_iter()
-                .flat_map(|join_handle| join_handle.join())
-                .fold(
-                    None,
-                    |composite_image: Option<Result<_>>, image: Result<_>| {
-                        // Default to a transparent image.
-                        let composite_image = composite_image.unwrap_or_else(|| {
-                            Ok(DynamicImage::new_rgba8(
-                                (capture_region.inner.size.width as f64 * max_scale) as u32,
-                                (capture_region.inner.size.height as f64 * max_scale) as u32,
-                            ))
-                        });
+			rotate_join_handles
+				.into_iter()
+				.flat_map(|join_handle| join_handle.join())
+				.fold(
+					None,
+					|composite_image: Option<Result<_>>, image: Result<_>| {
+						// Default to a transparent image.
+						let composite_image = composite_image.unwrap_or_else(|| {
+							Ok(DynamicImage::new_rgba8(
+								(capture_region.inner.size.width as f64 * max_scale) as u32,
+								(capture_region.inner.size.height as f64 * max_scale) as u32,
+							))
+						});
 
-                        Some(|| -> Result<_> {
-                            let mut composite_image = composite_image?;
-                            let (image, frame_copy) = image?;
-                            let (x, y) = (
-                                ((frame_copy.logical_region.inner.position.x as f64
-                                    - capture_region.inner.position.x as f64)
-                                    * max_scale) as i64,
-                                ((frame_copy.logical_region.inner.position.y as f64
-                                    - capture_region.inner.position.y as f64)
-                                    * max_scale) as i64,
-                            );
-                            tracing::span!(
+						Some(|| -> Result<_> {
+							let mut composite_image = composite_image?;
+							let (image, frame_copy) = image?;
+							let (x, y) = (
+								((frame_copy.logical_region.inner.position.x as f64
+									- capture_region.inner.position.x as f64)
+									* max_scale) as i64,
+								((frame_copy.logical_region.inner.position.y as f64
+									- capture_region.inner.position.y as f64)
+									* max_scale) as i64,
+							);
+							tracing::span!(
                                 tracing::Level::DEBUG,
                                 "replace",
                                 frame_copy_region = format!("{}", frame_copy.logical_region),
@@ -1069,67 +1078,67 @@ impl WayshotConnection {
                                 x = x,
                                 y = y,
                             )
-                            .in_scope(|| {
-                                tracing::debug!("Replacing parts of the final image");
-                                replace(&mut composite_image, &image, x, y);
-                            });
+								.in_scope(|| {
+									tracing::debug!("Replacing parts of the final image");
+									replace(&mut composite_image, &image, x, y);
+								});
 
-                            Ok(composite_image)
-                        }())
-                    },
-                )
-                .ok_or_else(|| {
-                    tracing::error!("Provided capture region doesn't intersect with any outputs!");
-                    Error::NoOutputs
-                })?
-        })
-    }
+							Ok(composite_image)
+						}())
+					},
+				)
+				.ok_or_else(|| {
+					tracing::error!("Provided capture region doesn't intersect with any outputs!");
+					Error::NoOutputs
+				})?
+		})
+	}
 
-    /// Take a screenshot from the specified region.
-    pub fn screenshot(
-        &self,
-        capture_region: LogicalRegion,
-        cursor_overlay: bool,
-    ) -> Result<DynamicImage> {
-        self.screenshot_region_capturer(RegionCapturer::Region(capture_region), cursor_overlay)
-    }
+	/// Take a screenshot from the specified region.
+	pub fn screenshot(
+		&self,
+		capture_region: LogicalRegion,
+		cursor_overlay: bool,
+	) -> Result<DynamicImage> {
+		self.screenshot_region_capturer(RegionCapturer::Region(capture_region), cursor_overlay)
+	}
 
-    /// Take a screenshot, overlay the screenshot, run the callback, and then
-    /// unfreeze the screenshot and return the selected region.
-    pub fn screenshot_freeze<F>(&self, callback: F, cursor_overlay: bool) -> Result<DynamicImage>
-    where
-        F: Fn(&WayshotConnection) -> Result<LogicalRegion> + 'static,
-    {
-        self.screenshot_region_capturer(RegionCapturer::Freeze(Box::new(callback)), cursor_overlay)
-    }
+	/// Take a screenshot, overlay the screenshot, run the callback, and then
+	/// unfreeze the screenshot and return the selected region.
+	pub fn screenshot_freeze<F>(&self, callback: F, cursor_overlay: bool) -> Result<DynamicImage>
+	where
+		F: Fn(&WayshotConnection) -> Result<LogicalRegion> + 'static,
+	{
+		self.screenshot_region_capturer(RegionCapturer::Freeze(Box::new(callback)), cursor_overlay)
+	}
 
-    /// Take a screenshot from one output
-    pub fn screenshot_single_output(
-        &self,
-        output_info: &OutputInfo,
-        cursor_overlay: bool,
-    ) -> Result<DynamicImage> {
-        let (frame_copy, _) = self.capture_frame_copy(cursor_overlay, output_info, None)?;
-        (&frame_copy).try_into()
-    }
+	/// Take a screenshot from one output
+	pub fn screenshot_single_output(
+		&self,
+		output_info: &OutputInfo,
+		cursor_overlay: bool,
+	) -> Result<DynamicImage> {
+		let (frame_copy, _) = self.capture_frame_copy(cursor_overlay, output_info, None)?;
+		(&frame_copy).try_into()
+	}
 
-    /// Take a screenshot from all of the specified outputs.
-    pub fn screenshot_outputs(
-        &self,
-        outputs: &[OutputInfo],
-        cursor_overlay: bool,
-    ) -> Result<DynamicImage> {
-        if outputs.is_empty() {
-            return Err(Error::NoOutputs);
-        }
+	/// Take a screenshot from all of the specified outputs.
+	pub fn screenshot_outputs(
+		&self,
+		outputs: &[OutputInfo],
+		cursor_overlay: bool,
+	) -> Result<DynamicImage> {
+		if outputs.is_empty() {
+			return Err(Error::NoOutputs);
+		}
 
-        self.screenshot_region_capturer(RegionCapturer::Outputs(outputs.to_owned()), cursor_overlay)
-    }
+		self.screenshot_region_capturer(RegionCapturer::Outputs(outputs.to_owned()), cursor_overlay)
+	}
 
-    /// Take a screenshot from all accessible outputs.
-    pub fn screenshot_all(&self, cursor_overlay: bool) -> Result<DynamicImage> {
-        self.screenshot_outputs(self.get_all_outputs(), cursor_overlay)
-    }
+	/// Take a screenshot from all accessible outputs.
+	pub fn screenshot_all(&self, cursor_overlay: bool) -> Result<DynamicImage> {
+		self.screenshot_outputs(self.get_all_outputs(), cursor_overlay)
+	}
 }
 
 pub mod ext_image_protocols;

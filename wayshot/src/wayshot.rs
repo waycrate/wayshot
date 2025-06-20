@@ -55,7 +55,7 @@ fn main() -> Result<()> {
         true => cli.cursor,
         _ => base.cursor.unwrap_or_default(),
     };
-	
+
     let clipboard = match cli.clipboard {
         true => cli.clipboard,
         _ => base.clipboard.unwrap_or_default(),
@@ -110,48 +110,43 @@ fn main() -> Result<()> {
 
     let output = cli.output.or(base.output);
 
-	if cli.experimental {
-		let mut state =
-			HaruhiShotState::new().expect("Your wm needs to support Image Copy Capture protocol");
-		println!("Hello, world!");
+    if cli.experimental {
+        let mut state =
+            HaruhiShotState::new().expect("Your wm needs to support Image Copy Capture protocol");
+        println!("Hello, world!");
 
-		print!("Enter stdout (0 or 1): ");
-		io::stdout().flush().unwrap();
-		let mut stdout_input = String::new();
-		io::stdin().read_line(&mut stdout_input).unwrap();
-		let stdout: bool = matches!(stdout_input.trim(), "1");
+        print!("Enter stdout (0 or 1): ");
+        io::stdout().flush().unwrap();
+        let mut stdout_input = String::new();
+        io::stdin().read_line(&mut stdout_input).unwrap();
+        let stdout: bool = matches!(stdout_input.trim(), "1");
 
-		let mut area_input = String::new();
-		print!("Area? (0 for false, 1 for true) [default: 0]: ");
-		io::stdout().flush().unwrap();
-		io::stdin().read_line(&mut area_input).unwrap();
-		let area = matches!(area_input.trim(), "1");
+        let mut area_input = String::new();
+        print!("Area? (0 for false, 1 for true) [default: 0]: ");
+        io::stdout().flush().unwrap();
+        io::stdin().read_line(&mut area_input).unwrap();
+        let area = matches!(area_input.trim(), "1");
 
-		if area {
-			notify_result(ext_capture_area(&mut state, stdout, cursor));
-		} else {
-			let mut color_input = String::new();
-			print!("Color? (0 for false, 1 for true) [default: 0]: ");
-			io::stdout().flush().unwrap();
-			io::stdin().read_line(&mut color_input).unwrap();
-			let color = matches!(color_input.trim(), "1");
+        if area {
+            notify_result(ext_capture_area(&mut state, stdout, cursor));
+        } else {
+            let mut color_input = String::new();
+            print!("Color? (0 for false, 1 for true) [default: 0]: ");
+            io::stdout().flush().unwrap();
+            io::stdin().read_line(&mut color_input).unwrap();
+            let color = matches!(color_input.trim(), "1");
 
-			if color {
-				notify_result(ext_capture_color(&mut state));
-			} else {
-				notify_result(ext_capture_output(
-					&mut state,
-					output,
-					stdout,
-					cursor,
-				));
-			}
-		}
-		return Ok(());
-	}
+            if color {
+                notify_result(ext_capture_color(&mut state));
+            } else {
+                notify_result(ext_capture_output(&mut state, output, stdout, cursor));
+            }
+        }
+        println!("Done!");
+        return Ok(());
+    }
 
-
-	let wayshot_conn = WayshotConnection::new()?;
+    let wayshot_conn = WayshotConnection::new()?;
 
     let stdout = io::stdout();
     let mut writer = BufWriter::new(stdout.lock());
@@ -167,10 +162,10 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-	if cli.list_outputs_info {
-		wayshot_conn.print_displays_info();
-		return Ok(());
-	}
+    if cli.list_outputs_info {
+        wayshot_conn.print_displays_info();
+        return Ok(());
+    }
 
     let image_buffer = if cli.geometry {
         wayshot_conn.screenshot_freeze(
@@ -214,7 +209,10 @@ fn main() -> Result<()> {
 
     let mut image_buf: Option<Cursor<Vec<u8>>> = None;
     if let Some(f) = file {
-        image_buffer.save(f)?;
+        if let Err(e) = image_buffer.save(&f) {
+            tracing::error!("Failed to save file '{}': {}", f.display(), e);
+            // Optionally, notify the user or handle the error as needed
+        }
     }
 
     if stdout_print {

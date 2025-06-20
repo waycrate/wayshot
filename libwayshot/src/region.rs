@@ -1,9 +1,9 @@
-use std::cmp;
 use crate::{
     WayshotConnection,
     error::{Error, Result},
     output::OutputInfo,
 };
+use std::cmp;
 
 pub type FreezeCallback = Box<dyn Fn(&WayshotConnection) -> Result<LogicalRegion>>;
 
@@ -241,17 +241,15 @@ impl TryFrom<&[OutputInfo]> for LogicalRegion {
     }
 }
 
-
-
 use std::ops::Sub;
 
 impl Sub for Position {
-	type Output = Self;
+    type Output = Self;
 
-	fn sub(self, rhs: Self) -> Self::Output {
-		Self {
-			x: self.x - rhs.x,
-			y: self.y - rhs.y,
-		}
-	}
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+        }
+    }
 }

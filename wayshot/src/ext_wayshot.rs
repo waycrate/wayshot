@@ -8,7 +8,7 @@ use libwayshot::ext_image_protocols::HaruhiShotState;
 const TMP: &str = "/tmp";
 
 use libwayshot::ext_image_protocols::ImageViewInfo;
-use libwayshot::region::{Size, Position, Region};
+use libwayshot::region::{Position, Region, Size};
 
 #[derive(Debug, Clone)]
 pub enum WayshotResult {
@@ -233,63 +233,65 @@ pub fn ext_capture_area(
 }
 
 pub fn waysip_to_region(
-	size: libwaysip::Size,
-	point: libwaysip::Position,
+    size: libwaysip::Size,
+    point: libwaysip::Position,
 ) -> Result<Region, libwayshot::ext_image_protocols::HaruhiError> {
-	let size: Size = Size {
-		width: size.width as u32,
-		height: size.height as u32,
-	};
-	let position: Position = Position {
-		x: point.x,
-		y: point.y,
-	};
+    let size: Size = Size {
+        width: size.width as u32,
+        height: size.height as u32,
+    };
+    let position: Position = Position {
+        x: point.x,
+        y: point.y,
+    };
 
-	Ok(Region { position, size })
+    Ok(Region { position, size })
 }
 
-pub fn ext_capture_color(state: &mut HaruhiShotState) -> Result<WayshotResult, WayshotImageWriteError> {
-	let ImageViewInfo {
-		info:
-		ImageInfo {
-			data,
-			width: img_width,
-			height: img_height,
-			color_type,
-		},
-		region:
-		Region {
-			position: Position { x, y },
-			size: Size { width, height },
-		},
-	} = state.ext_capture_area2(CaptureOption::None, |w_conn: &HaruhiShotState| {
-		let info = libwaysip::get_area(
-			Some(libwaysip::WaysipConnection {
-				connection: w_conn.connection(),
-				globals: w_conn.globals(),
-			}),
-			libwaysip::SelectionType::Point,
-		)
-			.map_err(|e| libwayshot::ext_image_protocols::HaruhiError::CaptureFailed(e.to_string()))?
-			.ok_or(libwayshot::ext_image_protocols::HaruhiError::CaptureFailed(
-				"Failed to capture the area".to_string(),
-			))?;
-		waysip_to_region(info.size(), info.left_top_point())
-	})?;
+pub fn ext_capture_color(
+    state: &mut HaruhiShotState,
+) -> Result<WayshotResult, WayshotImageWriteError> {
+    let ImageViewInfo {
+        info:
+            ImageInfo {
+                data,
+                width: img_width,
+                height: img_height,
+                color_type,
+            },
+        region:
+            Region {
+                position: Position { x, y },
+                size: Size { width, height },
+            },
+    } = state.ext_capture_area2(CaptureOption::None, |w_conn: &HaruhiShotState| {
+        let info = libwaysip::get_area(
+            Some(libwaysip::WaysipConnection {
+                connection: w_conn.connection(),
+                globals: w_conn.globals(),
+            }),
+            libwaysip::SelectionType::Point,
+        )
+        .map_err(|e| libwayshot::ext_image_protocols::HaruhiError::CaptureFailed(e.to_string()))?
+        .ok_or(libwayshot::ext_image_protocols::HaruhiError::CaptureFailed(
+            "Failed to capture the area".to_string(),
+        ))?;
+        waysip_to_region(info.size(), info.left_top_point())
+    })?;
 
-	let mut buff = std::io::Cursor::new(Vec::new());
-	PngEncoder::new(&mut buff).write_image(&data, img_width, img_height, color_type.into())?;
-	let img = image::load_from_memory_with_format(buff.get_ref(), image::ImageFormat::Png).unwrap();
+    let mut buff = std::io::Cursor::new(Vec::new());
+    PngEncoder::new(&mut buff).write_image(&data, img_width, img_height, color_type.into())?;
+    let img = image::load_from_memory_with_format(buff.get_ref(), image::ImageFormat::Png).unwrap();
 
-	let clipimage = img.view(x as u32, y as u32, width as u32, height as u32);
-	let pixel = clipimage.get_pixel(0, 0);
-	println!(
-		"RGB: R:{}, G:{}, B:{}, A:{}",
-		pixel.0[0], pixel.0[1], pixel.0[2], pixel[3]
-	);
-	println!(
-		"16hex: #{:02x}{:02x}{:02x}{:02x}",
-		pixel.0[0], pixel.0[1], pixel.0[2], pixel[3]
-	);
-	Ok(WayshotResult::ColorSucceeded)
+    let clipimage = img.view(x as u32, y as u32, width as u32, height as u32);
+    let pixel = clipimage.get_pixel(0, 0);
+    println!(
+        "RGB: R:{}, G:{}, B:{}, A:{}",
+        pixel.0[0], pixel.0[1], pixel.0[2], pixel[3]
+    );
+    println!(
+        "16hex: #{:02x}{:02x}{:02x}{:02x}",
+        pixel.0[0], pixel.0[1], pixel.0[2], pixel[3]
+    );
+    Ok(WayshotResult::ColorSucceeded)
 }

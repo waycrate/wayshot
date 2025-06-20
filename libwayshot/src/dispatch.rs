@@ -83,6 +83,8 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
                         transform: wl_output::Transform::Normal,
                         physical_size: Size::default(),
                         logical_region: LogicalRegion::default(),
+                        scale: 1,
+                        xdg_output: None,
                     });
                 } else {
                     tracing::error!("Ignoring a wl_output with version < 4.");
@@ -132,7 +134,9 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
             } => {
                 output.transform = transform;
             }
-            wl_output::Event::Scale { .. } => {}
+            wl_output::Event::Scale { factor } => {
+                output.scale = factor;
+            }
             wl_output::Event::Done => {}
             _ => {}
         }
