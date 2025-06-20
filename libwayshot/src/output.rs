@@ -1,9 +1,6 @@
-use crate::ext_image_protocols::WlOutputInfo;
 use crate::region::{LogicalRegion, Position, Size};
 use std::fmt::Display;
-use std::sync::OnceLock;
 use wayland_client::protocol::{wl_output, wl_output::WlOutput};
-use wayland_protocols::xdg::xdg_output::zv1::client::zxdg_output_v1::ZxdgOutputV1;
 
 /// Represents an accessible wayland output.
 ///
@@ -14,12 +11,9 @@ pub struct OutputInfo {
     pub name: String,
     pub description: String,
     pub transform: wl_output::Transform,
-
     pub physical_size: Size,
     pub logical_region: LogicalRegion,
-
     pub scale: i32,
-    pub xdg_output: Option<ZxdgOutputV1>,
 }
 
 impl Display for OutputInfo {
@@ -30,5 +24,12 @@ impl Display for OutputInfo {
             name = self.name,
             description = self.description
         )
+    }
+}
+
+impl OutputInfo {
+    /// The name of the output or maybe the screen?
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }

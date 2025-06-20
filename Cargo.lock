@@ -1214,7 +1214,6 @@ dependencies = [
  "image",
  "khronos-egl",
  "memmap2",
- "nix",
  "rustix 1.0.7",
  "thiserror 2.0.12",
  "tracing",

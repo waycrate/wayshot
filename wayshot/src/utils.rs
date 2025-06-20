@@ -19,10 +19,10 @@ pub fn waysip_to_region(
 ) -> Result<LogicalRegion> {
     let size: Size = Size {
         width: size.width.try_into().map_err(|_| {
-            libwayshot::Error::FreezeCallbackError("width cannot be negative".to_string())
+            libwayshot::WayshotError::FreezeCallbackError("width cannot be negative".to_string())
         })?,
         height: size.height.try_into().map_err(|_| {
-            libwayshot::Error::FreezeCallbackError("height cannot be negative".to_string())
+            libwayshot::WayshotError::FreezeCallbackError("height cannot be negative".to_string())
         })?,
     };
     let position: Position = Position {
