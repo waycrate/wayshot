@@ -42,6 +42,18 @@ pub struct Cli {
     #[arg(short, long)]
     pub geometry: bool,
 
+    /// Get color of a perticular pixel at the given coordinates
+    #[arg(long, conflicts_with_all = ["geometry", "cursor"] )]
+    pub color: bool,
+
+    /// list all details of valid outouts
+    #[arg(long, alias = "list-outputs-info")]
+    pub list_outputs_info: bool,
+
+    /// Enable streaming
+    #[arg(short, long)]
+    pub experimental: bool,
+
     /// Enable cursor in screenshots
     #[arg(short, long)]
     pub cursor: bool,

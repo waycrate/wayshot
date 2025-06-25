@@ -1,10 +1,9 @@
-use std::cmp;
-
 use crate::{
     WayshotConnection,
-    error::{Error, Result},
+    error::{Result, WayshotError},
     output::OutputInfo,
 };
+use std::cmp;
 
 pub type FreezeCallback = Box<dyn Fn(&WayshotConnection) -> Result<LogicalRegion>>;
 
@@ -77,6 +76,19 @@ pub struct Position {
     pub x: i32,
     /// Y coordinate.
     pub y: i32,
+}
+
+use std::ops::Sub;
+
+impl Sub for Position {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
@@ -201,19 +213,19 @@ impl From<&OutputInfo> for LogicalRegion {
 }
 
 impl TryFrom<&[OutputInfo]> for LogicalRegion {
-    type Error = Error;
+    type Error = WayshotError;
 
     fn try_from(output_info: &[OutputInfo]) -> std::result::Result<Self, Self::Error> {
         let x1 = output_info
             .iter()
             .map(|output| output.logical_region.inner.position.x)
             .min()
-            .ok_or(Error::NoOutputs)?;
+            .ok_or(WayshotError::NoOutputs)?;
         let y1 = output_info
             .iter()
             .map(|output| output.logical_region.inner.position.y)
             .min()
-            .ok_or(Error::NoOutputs)?;
+            .ok_or(WayshotError::NoOutputs)?;
         let x2 = output_info
             .iter()
             .map(|output| {
@@ -221,7 +233,7 @@ impl TryFrom<&[OutputInfo]> for LogicalRegion {
                     + output.logical_region.inner.size.width as i32
             })
             .max()
-            .ok_or(Error::NoOutputs)?;
+            .ok_or(WayshotError::NoOutputs)?;
         let y2 = output_info
             .iter()
             .map(|output| {
@@ -229,7 +241,7 @@ impl TryFrom<&[OutputInfo]> for LogicalRegion {
                     + output.logical_region.inner.size.height as i32
             })
             .max()
-            .ok_or(Error::NoOutputs)?;
+            .ok_or(WayshotError::NoOutputs)?;
         Ok(LogicalRegion {
             inner: Region {
                 position: Position { x: x1, y: y1 },

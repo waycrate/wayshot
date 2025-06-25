@@ -4,7 +4,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 use wayland_client::{
-    Connection, Dispatch, QueueHandle,
+    Connection, Dispatch, Proxy, QueueHandle,
     WEnum::{self, Value},
     delegate_noop,
     globals::GlobalListContents,
@@ -19,6 +19,7 @@ use wayland_client::{
     },
 };
 use wayland_protocols::{
+    ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason,
     wp::{
         linux_dmabuf::zv1::client::{
             zwp_linux_buffer_params_v1::{self, ZwpLinuxBufferParamsV1},
@@ -31,15 +32,9 @@ use wayland_protocols::{
         zxdg_output_v1::{self, ZxdgOutputV1},
     },
 };
-use wayland_protocols_wlr::{
-    layer_shell::v1::client::{
-        zwlr_layer_shell_v1::ZwlrLayerShellV1,
-        zwlr_layer_surface_v1::{self, ZwlrLayerSurfaceV1},
-    },
-    screencopy::v1::client::{
-        zwlr_screencopy_frame_v1::{self, ZwlrScreencopyFrameV1},
-        zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
-    },
+use wayland_protocols_wlr::screencopy::v1::client::{
+    zwlr_screencopy_frame_v1::{self, ZwlrScreencopyFrameV1},
+    zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
 };
 
 use crate::{
@@ -77,12 +72,13 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
                 if version >= 4 {
                     let output = wl_registry.bind::<wl_output::WlOutput, _, _>(name, 4, qh, ());
                     state.outputs.push(OutputInfo {
-                        wl_output: output,
+                        output: output,
                         name: "".to_string(),
                         description: String::new(),
                         transform: wl_output::Transform::Normal,
                         physical_size: Size::default(),
                         logical_region: LogicalRegion::default(),
+                        scale: 1,
                     });
                 } else {
                     tracing::error!("Ignoring a wl_output with version < 4.");
@@ -103,7 +99,7 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
         _: &QueueHandle<Self>,
     ) {
         let output: &mut OutputInfo =
-            match state.outputs.iter_mut().find(|x| x.wl_output == *wl_output) {
+            match state.outputs.iter_mut().find(|x| x.output == *wl_output) {
                 Some(output) => output,
                 _ => {
                     tracing::error!(
@@ -132,7 +128,9 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
             } => {
                 output.transform = transform;
             }
-            wl_output::Event::Scale { .. } => {}
+            wl_output::Event::Scale { factor } => {
+                output.scale = factor;
+            }
             wl_output::Event::Done => {}
             _ => {}
         }
@@ -179,13 +177,15 @@ impl Dispatch<ZxdgOutputV1, usize> for OutputCaptureState {
     }
 }
 
-/// State of the frame after attempting to copy it's data to a wl_buffer.
+/// State of the frame after attempting to copy its data to a buffer.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum FrameState {
     /// Compositor returned a failed event on calling `frame.copy`.
-    Failed,
+    Failed(Option<WEnum<FailureReason>>),
     /// Compositor sent a Ready event on calling `frame.copy`.
-    Finished,
+    Succeeded,
+    /// Capture is still pending (not yet failed or succeeded).
+    Pending,
 }
 
 pub struct CaptureFrameState {
@@ -250,10 +250,10 @@ impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
             zwlr_screencopy_frame_v1::Event::Ready { .. } => {
                 // If the frame is successfully copied, a “flags” and a “ready” events are sent. Otherwise, a “failed” event is sent.
                 // This is useful when we call .copy on the frame object.
-                frame.state.replace(FrameState::Finished);
+                frame.state.replace(FrameState::Succeeded);
             }
             zwlr_screencopy_frame_v1::Event::Failed => {
-                frame.state.replace(FrameState::Failed);
+                frame.state.replace(FrameState::Failed(None));
             }
             zwlr_screencopy_frame_v1::Event::Damage { .. } => {}
             zwlr_screencopy_frame_v1::Event::LinuxDmabuf {
@@ -298,47 +298,6 @@ impl wayland_client::Dispatch<wl_registry::WlRegistry, GlobalListContents> for W
     }
 }
 
-pub struct LayerShellState {
-    pub configured_outputs: HashSet<WlOutput>,
-}
-
-delegate_noop!(LayerShellState: ignore WlCompositor);
-delegate_noop!(LayerShellState: ignore WlShm);
-delegate_noop!(LayerShellState: ignore WlShmPool);
-delegate_noop!(LayerShellState: ignore WlBuffer);
-delegate_noop!(LayerShellState: ignore ZwlrLayerShellV1);
-delegate_noop!(LayerShellState: ignore WlSurface);
-delegate_noop!(LayerShellState: ignore WpViewport);
-delegate_noop!(LayerShellState: ignore WpViewporter);
-
-impl wayland_client::Dispatch<ZwlrLayerSurfaceV1, WlOutput> for LayerShellState {
-    // No need to instrument here, span from lib.rs is automatically used.
-    fn event(
-        state: &mut Self,
-        proxy: &ZwlrLayerSurfaceV1,
-        event: <ZwlrLayerSurfaceV1 as wayland_client::Proxy>::Event,
-        data: &WlOutput,
-        _conn: &Connection,
-        _qhandle: &QueueHandle<Self>,
-    ) {
-        match event {
-            zwlr_layer_surface_v1::Event::Configure {
-                serial,
-                width: _,
-                height: _,
-            } => {
-                tracing::debug!("Acking configure");
-                state.configured_outputs.insert(data.clone());
-                proxy.ack_configure(serial);
-                tracing::trace!("Acked configure");
-            }
-            zwlr_layer_surface_v1::Event::Closed => {
-                tracing::debug!("Closed")
-            }
-            _ => {}
-        }
-    }
-}
 pub(crate) struct Card(std::fs::File);
 
 /// Implementing [`AsFd`] is a prerequisite to implementing the traits found
@@ -363,4 +322,222 @@ impl Card {
 pub(crate) struct DMABUFState {
     pub linux_dmabuf: ZwpLinuxDmabufV1,
     pub gbmdev: gbm::Device<Card>,
+}
+
+// Replace the layer shell imports with xdg_shell imports
+use wayland_protocols::xdg::shell::client::{
+    xdg_surface::{self, XdgSurface},
+    xdg_toplevel::XdgToplevel,
+    xdg_wm_base::{self, XdgWmBase},
+};
+
+#[derive(Debug)]
+pub(crate) struct XdgShellState {
+    pub configured_surfaces: HashSet<XdgSurface>,
+}
+
+impl XdgShellState {
+    pub(crate) fn new() -> Self {
+        Self {
+            configured_surfaces: HashSet::new(),
+        }
+    }
+}
+
+// Replace the LayerShellState dispatch implementations with XdgShell ones
+delegate_noop!(XdgShellState: ignore WlCompositor);
+delegate_noop!(XdgShellState: ignore WlShm);
+delegate_noop!(XdgShellState: ignore WlShmPool);
+delegate_noop!(XdgShellState: ignore WlBuffer);
+delegate_noop!(XdgShellState: ignore WlSurface);
+delegate_noop!(XdgShellState: ignore WpViewport);
+delegate_noop!(XdgShellState: ignore WpViewporter);
+delegate_noop!(XdgShellState: ignore XdgToplevel);
+
+impl Dispatch<XdgSurface, WlOutput> for XdgShellState {
+    fn event(
+        state: &mut Self,
+        proxy: &XdgSurface,
+        event: <XdgSurface as Proxy>::Event,
+        _data: &WlOutput,
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        match event {
+            xdg_surface::Event::Configure { serial } => {
+                tracing::debug!("Acking XDG surface configure");
+                state.configured_surfaces.insert(proxy.clone());
+                proxy.ack_configure(serial);
+                tracing::trace!("Acked XDG surface configure");
+            }
+            _ => {}
+        }
+    }
+}
+
+// Add XdgWmBase ping handling
+impl Dispatch<XdgWmBase, ()> for XdgShellState {
+    fn event(
+        _state: &mut Self,
+        proxy: &XdgWmBase,
+        event: <XdgWmBase as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        match event {
+            xdg_wm_base::Event::Ping { serial } => {
+                proxy.pong(serial);
+            }
+            _ => {}
+        }
+    }
+}
+
+use wayland_protocols::ext::image_copy_capture::v1::client::{
+    ext_image_copy_capture_frame_v1::{self, ExtImageCopyCaptureFrameV1},
+    ext_image_copy_capture_manager_v1::ExtImageCopyCaptureManagerV1,
+    ext_image_copy_capture_session_v1::{self, ExtImageCopyCaptureSessionV1},
+};
+
+use wayland_protocols::ext::image_capture_source::v1::client::{
+    ext_foreign_toplevel_image_capture_source_manager_v1::ExtForeignToplevelImageCaptureSourceManagerV1,
+    ext_image_capture_source_v1::ExtImageCaptureSourceV1,
+    ext_output_image_capture_source_manager_v1::ExtOutputImageCaptureSourceManagerV1,
+};
+
+use wayland_protocols::ext::foreign_toplevel_list::v1::client::{
+    ext_foreign_toplevel_handle_v1::{self, ExtForeignToplevelHandleV1},
+    ext_foreign_toplevel_list_v1::{self, ExtForeignToplevelListV1},
+};
+
+use wayland_client::event_created_child;
+
+use std::sync::{Arc, RwLock};
+
+use crate::WayshotConnection;
+use crate::ext_image_protocols::{CaptureInfo, FrameInfo, TopLevel}; // Add this import
+
+delegate_noop!(WayshotConnection: ignore ExtImageCaptureSourceV1);
+delegate_noop!(WayshotConnection: ignore ExtOutputImageCaptureSourceManagerV1);
+delegate_noop!(WayshotConnection: ignore ExtForeignToplevelImageCaptureSourceManagerV1);
+delegate_noop!(WayshotConnection: ignore WlShm);
+delegate_noop!(WayshotConnection: ignore ZxdgOutputManagerV1);
+delegate_noop!(WayshotConnection: ignore ExtImageCopyCaptureManagerV1);
+delegate_noop!(WayshotConnection: ignore WlBuffer);
+delegate_noop!(WayshotConnection: ignore WlShmPool);
+
+impl Dispatch<WlRegistry, GlobalListContents> for WayshotConnection {
+    fn event(
+        _state: &mut Self,
+        _proxy: &WlRegistry,
+        _event: <WlRegistry as wayland_client::Proxy>::Event,
+        _data: &GlobalListContents,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+    ) {
+    }
+}
+
+impl Dispatch<ExtForeignToplevelListV1, ()> for WayshotConnection {
+    fn event(
+        state: &mut Self,
+        _proxy: &ExtForeignToplevelListV1,
+        event: <ExtForeignToplevelListV1 as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &wayland_client::QueueHandle<Self>,
+    ) {
+        if let ext_foreign_toplevel_list_v1::Event::Toplevel { toplevel } = event {
+            state
+                .ext_image
+                .as_mut()
+                .expect("ext_image should be initialized")
+                .toplevels
+                .push(TopLevel::new(toplevel));
+        }
+    }
+    event_created_child!(WayshotConnection, ExtForeignToplevelHandleV1, [
+        ext_foreign_toplevel_list_v1::EVT_TOPLEVEL_OPCODE => (ExtForeignToplevelHandleV1, ())
+    ]);
+}
+
+impl Dispatch<ExtForeignToplevelHandleV1, ()> for WayshotConnection {
+    fn event(
+        state: &mut Self,
+        toplevel: &ExtForeignToplevelHandleV1,
+        event: <ExtForeignToplevelHandleV1 as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &wayland_client::QueueHandle<Self>,
+    ) {
+        let ext_foreign_toplevel_handle_v1::Event::Title { title } = event else {
+            return;
+        };
+        let Some(current_info) = state
+            .ext_image
+            .as_mut()
+            .expect("ext_image should be initialized")
+            .toplevels
+            .iter_mut()
+            .find(|my_toplevel| my_toplevel.handle == *toplevel)
+        else {
+            return;
+        };
+        current_info.title = title;
+    }
+}
+
+impl Dispatch<ExtImageCopyCaptureFrameV1, Arc<RwLock<CaptureInfo>>> for WayshotConnection {
+    fn event(
+        _state: &mut Self,
+        _proxy: &ExtImageCopyCaptureFrameV1,
+        event: <ExtImageCopyCaptureFrameV1 as Proxy>::Event,
+        data: &Arc<RwLock<CaptureInfo>>,
+        _conn: &Connection,
+        _qhandle: &wayland_client::QueueHandle<Self>,
+    ) {
+        let mut data = data.write().unwrap();
+        match event {
+            ext_image_copy_capture_frame_v1::Event::Ready => {
+                data.state = FrameState::Succeeded;
+            }
+            ext_image_copy_capture_frame_v1::Event::Failed { reason } => {
+                data.state = FrameState::Failed(Some(reason))
+            }
+            ext_image_copy_capture_frame_v1::Event::Transform {
+                transform: WEnum::Value(transform),
+            } => {
+                data.transform = transform;
+            }
+            _ => {}
+        }
+    }
+}
+
+impl Dispatch<ExtImageCopyCaptureSessionV1, Arc<RwLock<FrameInfo>>> for WayshotConnection {
+    fn event(
+        _state: &mut Self,
+        _proxy: &ExtImageCopyCaptureSessionV1,
+        event: <ExtImageCopyCaptureSessionV1 as Proxy>::Event,
+        data: &Arc<RwLock<FrameInfo>>,
+        _conn: &Connection,
+        _qhandle: &wayland_client::QueueHandle<Self>,
+    ) {
+        let mut frame_info = data.write().unwrap();
+        match event {
+            ext_image_copy_capture_session_v1::Event::BufferSize { width, height } => {
+                if frame_info.buffer_size.is_none() {
+                    frame_info.buffer_size = Some(Size { width, height });
+                }
+            }
+            ext_image_copy_capture_session_v1::Event::ShmFormat { format } => {
+                if frame_info.shm_format.is_none() {
+                    frame_info.shm_format = Some(format);
+                }
+            }
+            ext_image_copy_capture_session_v1::Event::Done => {}
+            _ => {}
+        }
+    }
 }

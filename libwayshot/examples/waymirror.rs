@@ -138,11 +138,7 @@ impl Dispatch<xdg_surface::XdgSurface, ()> for State {
             let surface = state.base_surface.as_ref().unwrap();
             let (_frame_format, guard, _bo) = state
                 .wayshot
-                .capture_output_frame_dmabuf(
-                    true,
-                    &state.wayshot.get_all_outputs()[0].wl_output,
-                    None,
-                )
+                .capture_output_frame_dmabuf(true, &state.wayshot.get_all_outputs()[0].output, None)
                 .unwrap();
             surface.attach(Some(&guard.buffer), 0, 0);
             surface.commit();
