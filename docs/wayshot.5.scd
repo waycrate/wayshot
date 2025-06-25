@@ -102,7 +102,7 @@ This section documents the *[file]* table of the configuration file
 
 	Default: _"None"_ (fallbacks to *"wayshot-%Y_%m_%d-%H_%M_%S"*)
 
-*encoding* = _"png"_ | _"jpg"_ | _"ppm"_ | _"qui"_ | _"webp"_ | _"avif"_
+*encoding* = _"png"_ | _"jpg"_ | _"ppm"_ | _"qui"_ | _"webp"_ | _"avif"_ | _"jxl"_
 
 	Screenshot file encoding
 
