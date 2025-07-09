@@ -143,30 +143,49 @@ fn main() -> Result<()> {
                 let image_result = if cli.color {
                     // ext_capture_color does not return a DynamicImage, so handle separately
                     match ext_capture_color(&mut state) {
-                        Ok(_) => return Ok(()),
+                        Ok(res) => {
+                            notify_result(Ok(res));
+                            return Ok(());
+                        },
                         Err(e) => {
                             tracing::error!("Failed to capture color: {}", e);
+                            notify_result(Err(e));
                             return Ok(());
                         }
                     }
                 } else if cli.geometry {
                     ext_capture_area(&mut state, stdout_print, cursor)
                 } else if cli.toplevel {
-                    ext_capture_toplevel(&mut state, stdout_print, cursor)
+                    ext_capture_toplevel(&mut state, stdout_print, cursor).map(|(img, name)| (img, WayshotResult::ToplevelCaptured { name }))
                 } else if output.as_ref().is_some() || cli.choose_output {
-                    ext_capture_output(&mut state, output.clone(), stdout_print, cursor).map_err(|e| e.into())
+                    ext_capture_output(&mut state, output.clone(), stdout_print, cursor)
+                        .map(|(img, name)| (img, WayshotResult::OutputCaptured { name }))
+                        .map_err(|e| e.into())
                 } else {
                     // If no flag is provided, default to output selection (choose_output = true)
-                    ext_capture_output(&mut state, None, stdout_print, cursor).map_err(|e| e.into())
+                    ext_capture_output(&mut state, None, stdout_print, cursor)
+                        .map(|(img, name)| (img, WayshotResult::OutputCaptured { name }))
+                        .map_err(|e| e.into())
                 };
 
                 match image_result {
-                    Ok(image_buffer) => {
+                    Ok((image_buffer, result_variant)) => {
                         let mut image_buf: Option<Cursor<Vec<u8>>> = None;
                         if let Some(f) = file.as_ref() {
                             if let Err(e) = image_buffer.save(&f) {
                                 tracing::error!("Failed to save file '{}': {}", f.display(), e);
+                                notify_result(Err(ext_wayshot::WayshotImageWriteError::ImageError(e)));
+                            } else {
+                                // Only show notification for OutputCaptured, ToplevelCaptured, or AreaCaptured
+                                match &result_variant {
+                                    WayshotResult::ToplevelCaptured { name } => notify_result(Ok(WayshotResult::ToplevelCaptured { name: name.clone() })),
+                                    WayshotResult::OutputCaptured { name } => notify_result(Ok(WayshotResult::OutputCaptured { name: name.clone() })),
+                                    WayshotResult::AreaCaptured => notify_result(Ok(WayshotResult::AreaCaptured)),
+                                    _ => {},
+                                }
                             }
+                        } else {
+                            notify_result(Ok(result_variant));
                         }
 
                         if stdout_print {
@@ -189,6 +208,7 @@ fn main() -> Result<()> {
                     }
                     Err(e) => {
                         tracing::error!("Failed to capture output: {}", e);
+                        notify_result(Err(e));
                     }
                 }
 

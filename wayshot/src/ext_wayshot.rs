@@ -1,5 +1,5 @@
 use image::{DynamicImage, GenericImageView, ImageEncoder, ImageError};
-use std::{env, fs, path::PathBuf};
+use std::path::PathBuf;
 
 use crate::utils::waysip_to_region;
 use dialoguer::FuzzySelect;
@@ -13,9 +13,10 @@ use libwayshot::region::{Position, Region, Size};
 
 #[derive(Debug, Clone)]
 pub enum WayshotResult {
-    StdoutSucceeded,
-    SaveToFile(PathBuf),
     ColorSucceeded,
+    OutputCaptured { name: String },
+    ToplevelCaptured { name: String },
+    AreaCaptured,
 }
 
 pub const SUCCEED_IMAGE: &str = "haruhi_succeeded";
@@ -39,27 +40,41 @@ pub enum WayshotImageWriteError {
 pub fn notify_result(shot_result: Result<WayshotResult, WayshotImageWriteError>) {
     use notify_rust::Notification;
     match shot_result {
-        Ok(WayshotResult::StdoutSucceeded) => {
+        Ok(WayshotResult::OutputCaptured { name }) => {
             let _ = Notification::new()
-                .summary("Screenshot Succeed")
-                .body("Screenshot Succeed")
+                .summary("Screenshot Taken")
+                .body(format!("Screenshot taken of output: {name}").as_str())
                 .icon(SUCCEED_IMAGE)
                 .timeout(TIMEOUT)
                 .show();
         }
-        Ok(WayshotResult::SaveToFile(file)) => {
-            let file_name = file.to_string_lossy().to_string();
+        Ok(WayshotResult::ToplevelCaptured { name }) => {
             let _ = Notification::new()
-                .summary("File Saved SUcceed")
-                .body(format!("File Saved to {file:?}").as_str())
-                .icon(&file_name)
+                .summary("Screenshot Taken")
+                .body(format!("Screenshot taken of application: {name}").as_str())
+                .icon(SUCCEED_IMAGE)
                 .timeout(TIMEOUT)
                 .show();
         }
-        Ok(WayshotResult::ColorSucceeded) => {}
+        Ok(WayshotResult::AreaCaptured) => {
+            let _ = Notification::new()
+                .summary("Screenshot Captured")
+                .body("Type: Cropping")
+                .icon(SUCCEED_IMAGE)
+                .timeout(TIMEOUT)
+                .show();
+        }
+        Ok(WayshotResult::ColorSucceeded) => {
+            let _ = Notification::new()
+                .summary("Screenshot Captured")
+                .body("Type: Pixel Color grab")
+                .icon(SUCCEED_IMAGE)
+                .timeout(TIMEOUT)
+                .show();
+        }
         Err(e) => {
             let _ = Notification::new()
-                .summary("File Saved Failed")
+                .summary("Screenshot Failed")
                 .body(&e.to_string())
                 .icon(FAILED_IMAGE)
                 .timeout(TIMEOUT)
@@ -83,88 +98,89 @@ impl ToCaptureOption for bool {
 }
 
 pub fn ext_capture_toplevel(
-	state: &mut WayshotConnection,
-	use_stdout: bool,
-	pointer: bool,
-) -> Result<DynamicImage, WayshotImageWriteError> {
-	let toplevels = state.toplevels();
-	let names: Vec<String> = toplevels.iter().map(|info| info.id_and_title()).collect();
+    state: &mut WayshotConnection,
+    use_stdout: bool,
+    pointer: bool,
+) -> Result<(DynamicImage, String), WayshotImageWriteError> {
+    let toplevels = state.toplevels();
+    let names: Vec<String> = toplevels.iter().map(|info| info.id_and_title()).collect();
 
-	let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
-		.with_prompt("Choose Application")
-		.default(0)
-		.items(&names)
-		.interact()?;
+    let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
+        .with_prompt("Choose Application")
+        .default(0)
+        .items(&names)
+        .interact()?;
 
-	let toplevel = toplevels[selection].clone();
-	let img = state
-		.ext_capture_toplevel2(pointer.to_capture_option(), toplevel)
-		.map_err(WayshotImageWriteError::WaylandError)?;
-	Ok(img)
+    let toplevel = toplevels[selection].clone();
+    let img = state
+        .ext_capture_toplevel2(pointer.to_capture_option(), toplevel)
+        .map_err(WayshotImageWriteError::WaylandError)?;
+    Ok((img, names[selection].clone()))
 }
 
 pub fn ext_capture_output(
-	state: &mut WayshotConnection,
-	output: Option<String>,
-	use_stdout: bool,
-	pointer: bool,
-) -> eyre::Result<image::DynamicImage, WayshotImageWriteError> {
-	let outputs = state.vector_of_Outputs();
-	let names: Vec<&str> = outputs.iter().map(|info| info.name()).collect();
+    state: &mut WayshotConnection,
+    output: Option<String>,
+    use_stdout: bool,
+    pointer: bool,
+) -> eyre::Result<(image::DynamicImage, String), WayshotImageWriteError> {
+    let outputs = state.vector_of_Outputs();
+    let names: Vec<&str> = outputs.iter().map(|info| info.name()).collect();
 
-	let selection = match output {
-		Some(name) => names
-			.iter()
-			.position(|tname| *tname == name)
-			.ok_or(WayshotImageWriteError::OutputNotExist)?,
-		None => FuzzySelect::with_theme(&ColorfulTheme::default())
-			.with_prompt("Choose Screen")
-			.default(0)
-			.items(&names)
-			.interact()?,
-	};
+    let selection = match output {
+        Some(name) => names
+            .iter()
+            .position(|tname| *tname == name)
+            .ok_or(WayshotImageWriteError::OutputNotExist)?,
+        None => FuzzySelect::with_theme(&ColorfulTheme::default())
+            .with_prompt("Choose Screen")
+            .default(0)
+            .items(&names)
+            .interact()?,
+    };
 
-	let output = outputs[selection].clone();
-	let img = state
-		.ext_capture_single_output(pointer.to_capture_option(), output)
-		.map_err(WayshotImageWriteError::WaylandError)?;
-	Ok(img)
+    let output_name = names[selection].to_string();
+    let output = outputs[selection].clone();
+    let img = state
+        .ext_capture_single_output(pointer.to_capture_option(), output)
+        .map_err(WayshotImageWriteError::WaylandError)?;
+    Ok((img, output_name))
 }
 
 pub fn ext_capture_area(
-	state: &mut WayshotConnection,
-	use_stdout: bool,
-	pointer: bool,
-) -> Result<DynamicImage, WayshotImageWriteError> {
-	let (data, img_width, img_height, _color_type, region) = state.ext_capture_area2(pointer.to_capture_option(), |w_conn: &WayshotConnection| {
-		let info = libwaysip::get_area(
-			Some(libwaysip::WaysipConnection {
-				connection: &w_conn.conn,
-				globals: &w_conn.globals,
-			}),
-			libwaysip::SelectionType::Area,
-		)
-			.map_err(|e| libwayshot::error::WayshotError::CaptureFailed(e.to_string()))?
-			.ok_or(libwayshot::error::WayshotError::CaptureFailed(
-				"Failed to capture the area".to_string(),
-			))?;
+    state: &mut WayshotConnection,
+    use_stdout: bool,
+    pointer: bool,
+) -> Result<(DynamicImage, WayshotResult), WayshotImageWriteError> {
+    let (data, img_width, img_height, _color_type, region) = state.ext_capture_area2(pointer.to_capture_option(), |w_conn: &WayshotConnection| {
+        let info = libwaysip::get_area(
+            Some(libwaysip::WaysipConnection {
+                connection: &w_conn.conn,
+                globals: &w_conn.globals,
+            }),
+            libwaysip::SelectionType::Area,
+        )
+            .map_err(|e| libwayshot::error::WayshotError::CaptureFailed(e.to_string()))?
+            .ok_or(libwayshot::error::WayshotError::CaptureFailed(
+                "Failed to capture the area".to_string(),
+            ))?;
 
-		// Map the Result<LogicalRegion> directly to Result<Region>
-		waysip_to_region(info.size(), info.left_top_point())
-			.map(|logical_region| logical_region.inner)
-	})?;
+        // Map the Result<LogicalRegion> directly to Result<Region>
+        waysip_to_region(info.size(), info.left_top_point())
+            .map(|logical_region| logical_region.inner)
+    })?;
 
-	let Region { position: Position { x, y }, size: Size { width, height } } = region;
-	// Always use RGBA8, as ext_capture_area2 already does the conversion
-	let buffer = image::ImageBuffer::from_vec(img_width, img_height, data)
-		.ok_or(ImageError::Parameter(
-			image::error::ParameterError::from_kind(
-				image::error::ParameterErrorKind::DimensionMismatch,
-			),
-		))?;
-	let full_img = DynamicImage::ImageRgba8(buffer);
-	let cropped = full_img.crop_imm(x as u32, y as u32, width as u32, height as u32);
-	Ok(cropped)
+    let Region { position: Position { x, y }, size: Size { width, height } } = region;
+    // Always use RGBA8, as ext_capture_area2 already does the conversion
+    let buffer = image::ImageBuffer::from_vec(img_width, img_height, data)
+        .ok_or(ImageError::Parameter(
+            image::error::ParameterError::from_kind(
+                image::error::ParameterErrorKind::DimensionMismatch,
+            ),
+        ))?;
+    let full_img = DynamicImage::ImageRgba8(buffer);
+    let cropped = full_img.crop_imm(x as u32, y as u32, width as u32, height as u32);
+    Ok((cropped, WayshotResult::AreaCaptured))
 }
 
 use image::codecs::png::PngEncoder;
