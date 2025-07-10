@@ -56,7 +56,7 @@ pub struct Cli {
 
     /// Enable streaming
     #[arg(short, long)]
-    pub experimental: bool,
+    pub streaming: bool,
 
     /// Enable cursor in screenshots
     #[arg(short, long)]

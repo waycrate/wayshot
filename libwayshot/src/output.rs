@@ -26,10 +26,3 @@ impl Display for OutputInfo {
         )
     }
 }
-
-impl OutputInfo {
-    /// The name of the output or maybe the screen?
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-}

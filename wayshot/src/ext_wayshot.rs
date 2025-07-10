@@ -118,6 +118,25 @@ pub fn ext_capture_toplevel(
     Ok((img, names[selection].clone()))
 }
 
+pub fn ext_capture_output_streaming(
+    state: &mut WayshotConnection,
+    output: Option<String>,
+    use_stdout: bool,
+    pointer: bool,
+    frame_count: usize,
+) -> eyre::Result<(image::DynamicImage, String), WayshotImageWriteError> {
+    let frames = state
+        .ext_capture_streaming(output, use_stdout, pointer, frame_count)
+        .map_err(WayshotImageWriteError::WaylandError)?;
+    // Return the first frame for compatibility
+    frames
+        .into_iter()
+        .next()
+        .ok_or(WayshotImageWriteError::WaylandError(
+            libwayshot::WayshotError::CaptureFailed("No frames captured".to_string()),
+        ))
+}
+
 pub fn ext_capture_output(
     state: &mut WayshotConnection,
     output: Option<String>,
@@ -125,8 +144,7 @@ pub fn ext_capture_output(
     pointer: bool,
 ) -> eyre::Result<(image::DynamicImage, String), WayshotImageWriteError> {
     let outputs = state.vector_of_Outputs();
-    let names: Vec<&str> = outputs.iter().map(|info| info.name()).collect();
-
+	let names: Vec<&str> = outputs.iter().map(|info| info.name.as_str()).collect();
     let selection = match output {
         Some(name) => names
             .iter()
@@ -223,3 +241,4 @@ pub fn ext_capture_color(
     );
     Ok(WayshotResult::ColorSucceeded)
 }
+

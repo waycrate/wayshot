@@ -78,6 +78,8 @@ use wayland_protocols::xdg::shell::client::xdg_surface::XdgSurface;
 use wayland_protocols::xdg::shell::client::xdg_toplevel::XdgToplevel;
 use wayland_protocols::xdg::shell::client::xdg_wm_base::XdgWmBase;
 use wayland_protocols::ext::image_capture_source::v1::client::ext_foreign_toplevel_image_capture_source_manager_v1::ExtForeignToplevelImageCaptureSourceManagerV1;
+use wayland_protocols::ext::image_capture_source::v1::client::ext_image_capture_source_v1::ExtImageCaptureSourceV1;
+use wayland_protocols::ext::image_copy_capture::v1::client::ext_image_copy_capture_session_v1::ExtImageCopyCaptureSessionV1;
 use crate::region::Region;
 
 /// Struct to store wayland connection and globals list.
@@ -90,6 +92,14 @@ use crate::region::Region;
 /// ```
 
 #[derive(Debug)]
+pub struct StreamingSession {
+	pub source: ExtImageCaptureSourceV1,
+	pub session: ExtImageCopyCaptureSessionV1,
+	pub info: std::sync::Arc<std::sync::RwLock<FrameFormat>>,   // ← NEW
+	pub output_info: crate::output::OutputInfo,
+}
+
+#[derive(Debug)]
 pub struct ExtBase<T> {
     pub toplevels: Vec<TopLevel>,
     pub img_copy_manager: Option<ExtImageCopyCaptureManagerV1>,
@@ -98,6 +108,8 @@ pub struct ExtBase<T> {
     pub qh: Option<QueueHandle<T>>,
     pub event_queue: Option<EventQueue<T>>,
 	pub toplevel_image_manager: Option<ExtForeignToplevelImageCaptureSourceManagerV1>,
+	// New field for streaming optimization
+	pub cached_streaming_session: Option<StreamingSession>,
 }
 
 #[derive(Debug)]
@@ -159,6 +171,7 @@ impl WayshotConnection {
                     qh: None,
                     event_queue: None,
 					toplevel_image_manager: None,
+					cached_streaming_session: None,
 				})
             } else {
                 None
