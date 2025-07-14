@@ -40,7 +40,7 @@ wl-clipboard-rs = "0.9.2"
 rustix = { version = "1.0", features = ["process", "runtime"] }
 
 shellexpand = "3.1.1"
-toml = { version = "0.8.23", default-features = false, features = ["parse"] }
+toml = { version = "0.9.2", default-features = false, features = ["parse"] }
 serde = { version = "1.0.219", features = ["derive"] }
 dirs = "6.0.0"
 libwaysip = "0.4"
