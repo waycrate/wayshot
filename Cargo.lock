@@ -1925,9 +1925,9 @@ dependencies = [
 
 [[package]]
 name = "wayland-egl"
-version = "0.32.5"
+version = "0.32.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "504838241a10e271f48ffd429ac4033e0ac468b399fe7c2e2840f5c3a82d9902"
+checksum = "7dc56cc3ef057a5efb434e58a0712ea30d2823b736ba9faa4669854ac6454395"
 dependencies = [
  "wayland-backend",
  "wayland-sys",
