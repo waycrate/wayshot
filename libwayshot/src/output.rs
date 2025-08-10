@@ -1,4 +1,4 @@
-use crate::region::{LogicalRegion, Position, Size};
+use crate::region::{LogicalRegion, Size};
 use std::fmt::Display;
 use wayland_client::protocol::{wl_output, wl_output::WlOutput};
 

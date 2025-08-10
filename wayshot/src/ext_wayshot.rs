@@ -6,8 +6,6 @@ use dialoguer::FuzzySelect;
 use dialoguer::theme::ColorfulTheme;
 use libwayshot::WayshotConnection;
 
-const TMP: &str = "/tmp";
-
 use libwayshot::ext_image_protocols::CaptureOption;
 use libwayshot::region::{Position, Region, Size};
 
@@ -116,25 +114,6 @@ pub fn ext_capture_toplevel(
         .ext_capture_toplevel2(pointer.to_capture_option(), toplevel)
         .map_err(WayshotImageWriteError::WaylandError)?;
     Ok((img, names[selection].clone()))
-}
-
-pub fn ext_capture_output_streaming(
-    state: &mut WayshotConnection,
-    output: Option<String>,
-    use_stdout: bool,
-    pointer: bool,
-    frame_count: usize,
-) -> eyre::Result<(image::DynamicImage, String), WayshotImageWriteError> {
-    let frames = state
-        .ext_capture_streaming(output, use_stdout, pointer, frame_count)
-        .map_err(WayshotImageWriteError::WaylandError)?;
-    // Return the first frame for compatibility
-    frames
-        .into_iter()
-        .next()
-        .ok_or(WayshotImageWriteError::WaylandError(
-            libwayshot::WayshotError::CaptureFailed("No frames captured".to_string()),
-        ))
 }
 
 pub fn ext_capture_output(
