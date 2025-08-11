@@ -8,6 +8,11 @@ use wayland_client::protocol::{
     wl_shm::Format,
 };
 
+use wayland_protocols_wlr::layer_shell::v1::client::{
+	zwlr_layer_shell_v1::{Layer, ZwlrLayerShellV1},
+	zwlr_layer_surface_v1::{Anchor, self, ZwlrLayerSurfaceV1},
+};
+
 use std::sync::{Arc, RwLock};
 
 use wayland_protocols::ext::image_copy_capture::v1::client::ext_image_copy_capture_manager_v1::Options;
@@ -22,7 +27,7 @@ use std::fs::File;
 
 use crate::WayshotConnection;
 use crate::WayshotError; // Removed WayshotBase import
-use crate::dispatch::FrameState;
+use crate::dispatch::{FrameState, LayerShellState};
 use crate::region::{Position, Region, Size, LogicalRegion};
 use crate::screencopy::{create_shm_fd, FrameFormat};
 
@@ -228,7 +233,6 @@ impl crate::WayshotConnection {
     where
         F: AreaSelectCallback,
     {
-        use crate::dispatch::XdgShellState;
         use wayland_client::{protocol::wl_surface::WlSurface, EventQueue};
         use wayland_protocols::xdg::shell::client::{xdg_surface::XdgSurface, xdg_toplevel::XdgToplevel};
         use wayland_protocols::wp::viewporter::client::wp_viewporter::WpViewporter;
@@ -250,17 +254,17 @@ impl crate::WayshotConnection {
             data_list.push(AreaShotInfo { data })
         }
 
-        let mut state = XdgShellState::new();
-        let mut event_queue: EventQueue<XdgShellState> = self.conn.new_event_queue();
+        let mut state = LayerShellState::new();
+        let mut event_queue: EventQueue<LayerShellState> = self.conn.new_event_queue();
         let globals = &self.globals;
         let qh = event_queue.handle();
 
         let compositor = globals.bind::<WlCompositor, _, _>(&qh, 3..=3, ())?;
-        let xdg_wm_base = globals.bind::<XdgWmBase, _, _>(&qh, 1..=1, ())?;
+        let layer_shell = globals.bind::<ZwlrLayerShellV1, _, _>(&qh, 1..=1, ())?;
         let viewporter = globals.bind::<WpViewporter, _, _>(&qh, 1..=1, ())?;
 
-        let mut xdg_surfaces: Vec<(WlSurface, XdgSurface, XdgToplevel)> =
-            Vec::with_capacity(data_list.len());
+		let mut layer_shell_surfaces: Vec<(WlSurface, ZwlrLayerSurfaceV1)> =
+			Vec::with_capacity(data_list.len());
         for AreaShotInfo { data, .. } in data_list.iter() {
             let CaptureOutputData {
                 output,
@@ -270,21 +274,26 @@ impl crate::WayshotConnection {
                 ..
             } = data;
             let surface = compositor.create_surface(&qh, ());
-
-            let xdg_surface = xdg_wm_base.get_xdg_surface(&surface, &qh, output.clone());
-            let xdg_toplevel = xdg_surface.get_toplevel(&qh, ());
+			let layer_surface = layer_shell.get_layer_surface(
+				&surface,
+				Some(output),
+				Layer::Top,
+				"wayshot".to_string(),
+				&qh,
+				output.clone(),
+			);
 
             // Configure the toplevel to be fullscreen on the specific output
-            xdg_toplevel.set_fullscreen(Some(output));
-            xdg_toplevel.set_title("wayshot-overlay".to_string());
-            xdg_toplevel.set_app_id("wayshot".to_string());
+			layer_surface.set_exclusive_zone(-1);
+			layer_surface.set_anchor(Anchor::all());
+			layer_surface.set_margin(0, 0, 0, 0);
 
             debug!("Committing surface creation changes.");
             surface.commit();
 
             debug!("Waiting for layer surface to be configured.");
-            while !state.configured_surfaces.contains(&xdg_surface) {
-                event_queue.blocking_dispatch(&mut state)?;
+			while !state.configured_outputs.contains(output) {
+				event_queue.blocking_dispatch(&mut state)?;
             }
 
             surface.set_buffer_transform(*transform);
@@ -296,18 +305,17 @@ impl crate::WayshotConnection {
 
             debug!("Committing surface with attached buffer.");
             surface.commit();
-            xdg_surfaces.push((surface, xdg_surface, xdg_toplevel));
-            event_queue.blocking_dispatch(&mut state)?;
+			layer_shell_surfaces.push((surface, layer_surface));
+			event_queue.blocking_dispatch(&mut state)?;
         }
 
         let region_re = callback.screenshot(self);
 
         debug!("Unmapping and destroying layer shell surfaces.");
-        for (surface, xdg_surface, xdg_toplevel) in xdg_surfaces.iter() {
-            surface.attach(None, 0, 0);
-            surface.commit(); // unmap surface by committing a null buffer
-            xdg_toplevel.destroy();
-            xdg_surface.destroy();
+		for (surface, layer_shell_surface) in layer_shell_surfaces.iter() {
+			surface.attach(None, 0, 0);
+			surface.commit(); //unmap surface by committing a null buffer
+			layer_shell_surface.destroy();
         }
         event_queue.roundtrip(&mut state)?;
         let region = region_re?;

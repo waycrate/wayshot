@@ -1,3 +1,5 @@
+use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_surface_v1::ZwlrLayerSurfaceV1;
+use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_shell_v1::ZwlrLayerShellV1;
 use std::{
     collections::HashSet,
     os::fd::{AsFd, BorrowedFd},
@@ -18,6 +20,7 @@ use wayland_client::{
         wl_surface::WlSurface,
     },
 };
+
 use wayland_protocols::{
     ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason,
     wp::{
@@ -282,8 +285,6 @@ delegate_noop!(CaptureFrameState: ignore WlShmPool);
 delegate_noop!(CaptureFrameState: ignore WlBuffer);
 delegate_noop!(CaptureFrameState: ignore ZwlrScreencopyManagerV1);
 
-// TODO: Create a xdg-shell surface, check for the enter event, grab the output from it.
-
 pub struct WayshotState {}
 delegate_noop!(WayshotState: ignore ZwpLinuxDmabufV1);
 impl wayland_client::Dispatch<wl_registry::WlRegistry, GlobalListContents> for WayshotState {
@@ -324,74 +325,54 @@ pub(crate) struct DMABUFState {
     pub gbmdev: gbm::Device<Card>,
 }
 
-// Replace the layer shell imports with xdg_shell imports
-use wayland_protocols::xdg::shell::client::{
-    xdg_surface::{self, XdgSurface},
-    xdg_toplevel::XdgToplevel,
-    xdg_wm_base::{self, XdgWmBase},
-};
-
-#[derive(Debug)]
-pub(crate) struct XdgShellState {
-    pub configured_surfaces: HashSet<XdgSurface>,
+pub struct LayerShellState {
+	pub configured_outputs: HashSet<WlOutput>,
 }
 
-impl XdgShellState {
-    pub(crate) fn new() -> Self {
-        Self {
-            configured_surfaces: HashSet::new(),
-        }
-    }
+impl LayerShellState {
+	pub(crate) fn new() -> Self {
+		Self {
+			configured_outputs: HashSet::new(),
+		}
+	}
 }
 
-// Replace the LayerShellState dispatch implementations with XdgShell ones
-delegate_noop!(XdgShellState: ignore WlCompositor);
-delegate_noop!(XdgShellState: ignore WlShm);
-delegate_noop!(XdgShellState: ignore WlShmPool);
-delegate_noop!(XdgShellState: ignore WlBuffer);
-delegate_noop!(XdgShellState: ignore WlSurface);
-delegate_noop!(XdgShellState: ignore WpViewport);
-delegate_noop!(XdgShellState: ignore WpViewporter);
-delegate_noop!(XdgShellState: ignore XdgToplevel);
+delegate_noop!(LayerShellState: ignore WlCompositor);
+delegate_noop!(LayerShellState: ignore WlShm);
+delegate_noop!(LayerShellState: ignore WlShmPool);
+delegate_noop!(LayerShellState: ignore WlBuffer);
+delegate_noop!(LayerShellState: ignore ZwlrLayerShellV1);
+delegate_noop!(LayerShellState: ignore WlSurface);
+delegate_noop!(LayerShellState: ignore WpViewport);
+delegate_noop!(LayerShellState: ignore WpViewporter);
 
-impl Dispatch<XdgSurface, WlOutput> for XdgShellState {
-    fn event(
-        state: &mut Self,
-        proxy: &XdgSurface,
-        event: <XdgSurface as Proxy>::Event,
-        _data: &WlOutput,
-        _conn: &Connection,
-        _qhandle: &QueueHandle<Self>,
-    ) {
-        match event {
-            xdg_surface::Event::Configure { serial } => {
-                tracing::debug!("Acking XDG surface configure");
-                state.configured_surfaces.insert(proxy.clone());
-                proxy.ack_configure(serial);
-                tracing::trace!("Acked XDG surface configure");
-            }
-            _ => {}
-        }
-    }
-}
-
-// Add XdgWmBase ping handling
-impl Dispatch<XdgWmBase, ()> for XdgShellState {
-    fn event(
-        _state: &mut Self,
-        proxy: &XdgWmBase,
-        event: <XdgWmBase as Proxy>::Event,
-        _data: &(),
-        _conn: &Connection,
-        _qhandle: &QueueHandle<Self>,
-    ) {
-        match event {
-            xdg_wm_base::Event::Ping { serial } => {
-                proxy.pong(serial);
-            }
-            _ => {}
-        }
-    }
+impl wayland_client::Dispatch<ZwlrLayerSurfaceV1, WlOutput> for LayerShellState {
+	// No need to instrument here, span from lib.rs is automatically used.
+	fn event(
+		state: &mut Self,
+		proxy: &ZwlrLayerSurfaceV1,
+		event: <ZwlrLayerSurfaceV1 as wayland_client::Proxy>::Event,
+		data: &WlOutput,
+		_conn: &Connection,
+		_qhandle: &QueueHandle<Self>,
+	) {
+		match event {
+			wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_surface_v1::Event::Configure {
+				serial,
+				width: _,
+				height: _,
+			} => {
+				tracing::debug!("Acking configure");
+				state.configured_outputs.insert(data.clone());
+				proxy.ack_configure(serial);
+				tracing::trace!("Acked configure");
+			}
+			wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_surface_v1::Event::Closed => {
+				tracing::debug!("Closed")
+			}
+			_ => {}
+		}
+	}
 }
 
 use wayland_protocols::ext::image_copy_capture::v1::client::{

@@ -12,12 +12,13 @@ pub mod output;
 pub mod region;
 mod screencopy;
 
-use dispatch::{DMABUFState, XdgShellState};
+use dispatch::{DMABUFState, LayerShellState};
 use image::{DynamicImage, imageops::replace};
 use khronos_egl::{self as egl, Instance};
 use memmap2::MmapMut;
 use region::{EmbeddedRegion, RegionCapturer};
 use screencopy::{DMAFrameFormat, DMAFrameGuard, EGLImageGuard, FrameData, FrameGuard};
+use std::collections::HashSet;
 use std::{
     ffi::c_void,
     fs::File,
@@ -46,9 +47,15 @@ use wayland_protocols::{
         zxdg_output_manager_v1::ZxdgOutputManagerV1, zxdg_output_v1::ZxdgOutputV1,
     },
 };
-use wayland_protocols_wlr::screencopy::v1::client::{
-    zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
-    zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
+use wayland_protocols_wlr::{
+    layer_shell::v1::client::{
+        zwlr_layer_shell_v1::{Layer, ZwlrLayerShellV1},
+        zwlr_layer_surface_v1::Anchor,
+    },
+    screencopy::v1::client::{
+        zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
+        zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
+    },
 };
 
 use crate::{
@@ -85,10 +92,10 @@ use wayland_protocols::ext::image_copy_capture::v1::client::ext_image_copy_captu
 
 #[derive(Debug)]
 pub struct StreamingSession {
-	pub source: ExtImageCaptureSourceV1,
-	pub session: ExtImageCopyCaptureSessionV1,
-	pub info: std::sync::Arc<std::sync::RwLock<FrameFormat>>,   // ← NEW
-	pub output_info: crate::output::OutputInfo,
+    pub source: ExtImageCaptureSourceV1,
+    pub session: ExtImageCopyCaptureSessionV1,
+    pub info: std::sync::Arc<std::sync::RwLock<FrameFormat>>, // ← NEW
+    pub output_info: crate::output::OutputInfo,
 }
 
 #[derive(Debug)]
@@ -99,9 +106,9 @@ pub struct ExtBase<T> {
     pub shm: Option<WlShm>,
     pub qh: Option<QueueHandle<T>>,
     pub event_queue: Option<EventQueue<T>>,
-	pub toplevel_image_manager: Option<ExtForeignToplevelImageCaptureSourceManagerV1>,
-	// New field for streaming optimization
-	pub cached_streaming_session: Option<StreamingSession>,
+    pub toplevel_image_manager: Option<ExtForeignToplevelImageCaptureSourceManagerV1>,
+    // New field for streaming optimization
+    pub cached_streaming_session: Option<StreamingSession>,
 }
 
 #[derive(Debug)]
@@ -162,9 +169,9 @@ impl WayshotConnection {
                     shm: None,
                     qh: None,
                     event_queue: None,
-					toplevel_image_manager: None,
-					cached_streaming_session: None,
-				})
+                    toplevel_image_manager: None,
+                    cached_streaming_session: None,
+                })
             } else {
                 None
             },
@@ -191,7 +198,11 @@ impl WayshotConnection {
                             // Add binding for toplevel_image_manager here
                             let toplevel_image_manager = initial_state
                                 .globals
-                                .bind::<ExtForeignToplevelImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())
+                                .bind::<ExtForeignToplevelImageCaptureSourceManagerV1, _, _>(
+                                    &qh,
+                                    1..=1,
+                                    (),
+                                )
                                 .ok();
 
                             match initial_state.globals.bind::<WlShm, _, _>(&qh, 1..=2, ()) {
@@ -696,7 +707,7 @@ impl WayshotConnection {
                 matches!(
                     frame.format,
                     wl_shm::Format::Xbgr2101010
-						| wl_shm::Format::Xrgb2101010
+                        | wl_shm::Format::Xrgb2101010
                         | wl_shm::Format::Abgr2101010
                         | wl_shm::Format::Argb8888
                         | wl_shm::Format::Xrgb8888
@@ -997,9 +1008,11 @@ impl WayshotConnection {
     where
         F: Fn(&WayshotConnection) -> Result<LogicalRegion, WayshotError>,
     {
-        let mut state = XdgShellState::new();
-        let mut event_queue: EventQueue<XdgShellState> =
-            self.conn.new_event_queue::<XdgShellState>();
+        let mut state = LayerShellState {
+            configured_outputs: HashSet::new(),
+        };
+        let mut event_queue: EventQueue<LayerShellState> =
+            self.conn.new_event_queue::<LayerShellState>();
         let qh = event_queue.handle();
 
         let compositor = match self.globals.bind::<WlCompositor, _, _>(&qh, 3..=3, ()) {
@@ -1015,22 +1028,15 @@ impl WayshotConnection {
             }
         };
 
-        // Use XDG shell instead of layer shell
-        let xdg_wm_base = match self
-            .globals
-            .bind::<wayland_protocols::xdg::shell::client::xdg_wm_base::XdgWmBase, _, _>(
-            &qh,
-            1..=1,
-            (),
-        ) {
+        let layer_shell = match self.globals.bind::<ZwlrLayerShellV1, _, _>(&qh, 1..=1, ()) {
             Ok(x) => x,
             Err(e) => {
                 tracing::error!(
-                    "Failed to create xdg_wm_base. Does your compositor implement XdgWmBase?"
+                    "Failed to create layer shell. Does your compositor implement WlrLayerShellV1?"
                 );
                 tracing::error!("err: {e}");
                 return Err(WayshotError::ProtocolNotFound(
-                    "XdgWmBase not found".to_string(),
+                    "WlrLayerShellV1 not found".to_string(),
                 ));
             }
         };
@@ -1042,8 +1048,7 @@ impl WayshotConnection {
             );
         }
 
-        // Use a vector to store XDG surfaces instead of layer shell surfaces
-        let mut xdg_surfaces = Vec::with_capacity(frames.len());
+        let mut layer_shell_surfaces = Vec::with_capacity(frames.len());
 
         for (frame_copy, frame_guard, output_info) in frames {
             tracing::span!(
@@ -1053,26 +1058,30 @@ impl WayshotConnection {
             )
             .in_scope(|| -> Result<()> {
                 let surface = compositor.create_surface(&qh, ());
-
-                // Create XDG surface and toplevel instead of layer shell surface
-                let xdg_surface =
-                    xdg_wm_base.get_xdg_surface(&surface, &qh, output_info.output.clone());
-                let xdg_toplevel = xdg_surface.get_toplevel(&qh, ());
-
-                // Configure the toplevel to be fullscreen on the specific output
-                xdg_toplevel.set_fullscreen(Some(&output_info.output));
-                xdg_toplevel.set_title("wayshot-overlay".to_string());
-                xdg_toplevel.set_app_id("wayshot".to_string());
-
+                let layer_surface = layer_shell.get_layer_surface(
+                    &surface,
+                    Some(&output_info.output),
+                    Layer::Top,
+                    "wayshot".to_string(),
+                    &qh,
+                    output_info.output.clone(),
+                );
+                layer_surface.set_exclusive_zone(-1);
+                layer_surface.set_anchor(Anchor::Top | Anchor::Left);
+                layer_surface.set_size(
+                    frame_copy.frame_format.size.width,
+                    frame_copy.frame_format.size.height,
+                );
                 debug!("Committing surface creation changes.");
                 surface.commit();
-
-                debug!("Waiting for XDG surface to be configured.");
-                while !state.configured_surfaces.contains(&xdg_surface) {
+                debug!("Waiting for layer surface to be configured.");
+                while !state.configured_outputs.contains(&output_info.output) {
                     event_queue.blocking_dispatch(&mut state)?;
                 }
 
                 surface.set_buffer_transform(output_info.transform);
+                // surface.set_buffer_scale(output_info.scale());
+
                 surface.attach(Some(&frame_guard.buffer), 0, 0);
 
                 if let Some(viewporter) = viewporter.as_ref() {
@@ -1082,27 +1091,22 @@ impl WayshotConnection {
                         output_info.logical_region.inner.size.height as i32,
                     );
                 }
-
                 debug!("Committing surface with attached buffer.");
                 surface.commit();
-                xdg_surfaces.push((surface, xdg_surface, xdg_toplevel));
+                layer_shell_surfaces.push((surface, layer_surface));
                 event_queue.blocking_dispatch(&mut state)?;
-
                 Ok(())
             })?;
         }
 
         let callback_result = callback(self);
-
-        debug!("Unmapping and destroying XDG shell surfaces.");
-        for (surface, xdg_surface, xdg_toplevel) in xdg_surfaces.iter() {
+        debug!("Unmapping and destroying layer shell surfaces.");
+        for (surface, layer_shell_surface) in layer_shell_surfaces.iter() {
             surface.attach(None, 0, 0);
-            surface.commit(); // unmap surface by committing a null buffer
-            xdg_toplevel.destroy();
-            xdg_surface.destroy();
+            surface.commit(); //unmap surface by committing a null buffer
+            layer_shell_surface.destroy();
         }
         event_queue.roundtrip(&mut state)?;
-
         callback_result
     }
 
