@@ -1,5 +1,5 @@
 use image::{DynamicImage, GenericImageView, ImageEncoder, ImageError};
-use std::path::PathBuf;
+use std::io::{self, BufWriter, Cursor, Write};
 
 use crate::utils::waysip_to_region;
 use dialoguer::FuzzySelect;
@@ -82,24 +82,24 @@ pub fn notify_result(shot_result: Result<WayshotResult, WayshotImageWriteError>)
 }
 
 trait ToCaptureOption {
-	fn to_capture_option(self) -> CaptureOption;
+    fn to_capture_option(self) -> CaptureOption;
 }
 
 impl ToCaptureOption for bool {
-	fn to_capture_option(self) -> CaptureOption {
-		if self {
-			CaptureOption::PaintCursors
-		} else {
-			CaptureOption::None
-		}
-	}
+    fn to_capture_option(self) -> CaptureOption {
+        if self {
+            CaptureOption::PaintCursors
+        } else {
+            CaptureOption::None
+        }
+    }
 }
 
 pub fn ext_capture_toplevel(
     state: &mut WayshotConnection,
     use_stdout: bool,
     pointer: bool,
-) -> Result<(DynamicImage, String), WayshotImageWriteError> {
+) -> Result<(Option<DynamicImage>, String), WayshotImageWriteError> {
     let toplevels = state.toplevels();
     let names: Vec<String> = toplevels.iter().map(|info| info.id_and_title()).collect();
 
@@ -113,7 +113,18 @@ pub fn ext_capture_toplevel(
     let img = state
         .ext_capture_toplevel2(pointer.to_capture_option(), toplevel)
         .map_err(WayshotImageWriteError::WaylandError)?;
-    Ok((img, names[selection].clone()))
+
+    if use_stdout {
+        let stdout = io::stdout();
+        let mut writer = BufWriter::new(stdout.lock());
+        let mut buffer = Cursor::new(Vec::new());
+        img.write_to(&mut buffer, image::ImageFormat::Png)?;
+        writer.write_all(buffer.get_ref())?;
+        writer.flush()?;
+        Ok((None, names[selection].clone()))
+    } else {
+        Ok((Some(img), names[selection].clone()))
+    }
 }
 
 pub fn ext_capture_output(
@@ -121,9 +132,9 @@ pub fn ext_capture_output(
     output: Option<String>,
     use_stdout: bool,
     pointer: bool,
-) -> eyre::Result<(image::DynamicImage, String), WayshotImageWriteError> {
-    let outputs = state.vector_of_Outputs();
-	let names: Vec<&str> = outputs.iter().map(|info| info.name.as_str()).collect();
+) -> eyre::Result<(Option<image::DynamicImage>, String), WayshotImageWriteError> {
+    let outputs = state.vector_of_outputs();
+    let names: Vec<&str> = outputs.iter().map(|info| info.name.as_str()).collect();
     let selection = match output {
         Some(name) => names
             .iter()
@@ -141,74 +152,108 @@ pub fn ext_capture_output(
     let img = state
         .ext_capture_single_output(pointer.to_capture_option(), output)
         .map_err(WayshotImageWriteError::WaylandError)?;
-    Ok((img, output_name))
+
+    if use_stdout {
+        let stdout = io::stdout();
+        let mut writer = BufWriter::new(stdout.lock());
+        let mut buffer = Cursor::new(Vec::new());
+        img.write_to(&mut buffer, image::ImageFormat::Png)?;
+        writer.write_all(buffer.get_ref())?;
+        writer.flush()?;
+        Ok((None, output_name))
+    } else {
+        Ok((Some(img), output_name))
+    }
 }
 
 pub fn ext_capture_area(
     state: &mut WayshotConnection,
     use_stdout: bool,
     pointer: bool,
-) -> Result<(DynamicImage, WayshotResult), WayshotImageWriteError> {
-    let (data, img_width, img_height, _color_type, region) = state.ext_capture_area2(pointer.to_capture_option(), |w_conn: &WayshotConnection| {
-        let info = libwaysip::get_area(
-            Some(libwaysip::WaysipConnection {
-                connection: &w_conn.conn,
-                globals: &w_conn.globals,
-            }),
-            libwaysip::SelectionType::Area,
-        )
+) -> Result<(Option<DynamicImage>, WayshotResult), WayshotImageWriteError> {
+    let (data, img_width, img_height, _color_type, region) =
+        state.ext_capture_area2(pointer.to_capture_option(), |w_conn: &WayshotConnection| {
+            let info = libwaysip::get_area(
+                Some(libwaysip::WaysipConnection {
+                    connection: &w_conn.conn,
+                    globals: &w_conn.globals,
+                }),
+                libwaysip::SelectionType::Area,
+            )
             .map_err(|e| libwayshot::error::WayshotError::CaptureFailed(e.to_string()))?
             .ok_or(libwayshot::error::WayshotError::CaptureFailed(
                 "Failed to capture the area".to_string(),
             ))?;
 
-        // Map the Result<LogicalRegion> directly to Result<Region>
-        waysip_to_region(info.size(), info.left_top_point())
-            .map(|logical_region| logical_region.inner)
-    })?;
+            // Map the Result<LogicalRegion> directly to Result<Region>
+            waysip_to_region(info.size(), info.left_top_point())
+                .map(|logical_region| logical_region.inner)
+        })?;
 
-    let Region { position: Position { x, y }, size: Size { width, height } } = region;
+    let Region {
+        position: Position { x, y },
+        size: Size { width, height },
+    } = region;
     // Always use RGBA8, as ext_capture_area2 already does the conversion
-    let buffer = image::ImageBuffer::from_vec(img_width, img_height, data)
-        .ok_or(ImageError::Parameter(
-            image::error::ParameterError::from_kind(
-                image::error::ParameterErrorKind::DimensionMismatch,
-            ),
-        ))?;
+    let buffer = image::ImageBuffer::from_vec(img_width, img_height, data).ok_or(
+        ImageError::Parameter(image::error::ParameterError::from_kind(
+            image::error::ParameterErrorKind::DimensionMismatch,
+        )),
+    )?;
     let full_img = DynamicImage::ImageRgba8(buffer);
-    let cropped = full_img.crop_imm(x as u32, y as u32, width as u32, height as u32);
-    Ok((cropped, WayshotResult::AreaCaptured))
+    let cropped = full_img.crop_imm(x as u32, y as u32, width, height);
+
+    if use_stdout {
+        let stdout = io::stdout();
+        let mut writer = BufWriter::new(stdout.lock());
+        let mut buffer = Cursor::new(Vec::new());
+        cropped.write_to(&mut buffer, image::ImageFormat::Png)?;
+        writer.write_all(buffer.get_ref())?;
+        writer.flush()?;
+        Ok((None, WayshotResult::AreaCaptured))
+    } else {
+        Ok((Some(cropped), WayshotResult::AreaCaptured))
+    }
 }
+
+// The below snippet is Something directly taken from Decode's code,
+// In Fact Much of the code is technically from Decode's snippet However modified and with alot of changes by me,
+// However below snippet code of ext_capture_color is directly taken from Decode's code with no modifications done by me,
+// I added it simply because It seemed like a good feature, but can be removed if not wanted.
 
 use image::codecs::png::PngEncoder;
 
 pub fn ext_capture_color(
     state: &mut WayshotConnection,
 ) -> Result<WayshotResult, WayshotImageWriteError> {
-    let (data, img_width, img_height, color_type, region) = state.ext_capture_area2(CaptureOption::None, |w_conn: &WayshotConnection| {
-        let info = libwaysip::get_area(
-            Some(libwaysip::WaysipConnection {
-                connection: &w_conn.conn,
-                globals: &w_conn.globals,
-            }),
-            libwaysip::SelectionType::Point,
-        )
-        .map_err(|e| libwayshot::error::WayshotError::CaptureFailed(e.to_string()))?
-        .ok_or(libwayshot::error::WayshotError::CaptureFailed(
-            "Failed to capture the area".to_string(),
-        ))?;
+    let (data, img_width, img_height, color_type, region) =
+        state.ext_capture_area2(CaptureOption::None, |w_conn: &WayshotConnection| {
+            let info = libwaysip::get_area(
+                Some(libwaysip::WaysipConnection {
+                    connection: &w_conn.conn,
+                    globals: &w_conn.globals,
+                }),
+                libwaysip::SelectionType::Point,
+            )
+            .map_err(|e| libwayshot::error::WayshotError::CaptureFailed(e.to_string()))?
+            .ok_or(libwayshot::error::WayshotError::CaptureFailed(
+                "Failed to capture the area".to_string(),
+            ))?;
 
-        // Map the Result<LogicalRegion> directly to Result<Region>
-        waysip_to_region(info.size(), info.left_top_point())
-            .map(|logical_region| logical_region.inner)
-    })?;
+            // Map the Result<LogicalRegion> directly to Result<Region>
+            waysip_to_region(info.size(), info.left_top_point())
+                .map(|logical_region| logical_region.inner)
+        })?;
 
-    let Region { position: Position { x, y }, size: Size { width, height } } = region;
+    let Region {
+        position: Position { x, y },
+        size: Size { width, height },
+    } = region;
     let mut buff = std::io::Cursor::new(Vec::new());
     PngEncoder::new(&mut buff).write_image(&data, img_width, img_height, color_type.into())?;
     let img = image::load_from_memory_with_format(buff.get_ref(), image::ImageFormat::Png).unwrap();
 
-    let clipimage = img.view(x as u32, y as u32, width as u32, height as u32);
+    let clipimage = img.view(x as u32, y as u32, width, height);
     let pixel = clipimage.get_pixel(0, 0);
     println!(
         "RGB: R:{}, G:{}, B:{}, A:{}",
@@ -220,4 +265,3 @@ pub fn ext_capture_color(
     );
     Ok(WayshotResult::ColorSucceeded)
 }
-

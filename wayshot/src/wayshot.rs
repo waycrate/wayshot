@@ -67,12 +67,12 @@ fn main() -> Result<()> {
         .or(input_encoding)
         .unwrap_or(file.encoding.unwrap_or_default());
 
-    if let Some(ie) = input_encoding {
-        if ie != encoding {
-            tracing::warn!(
-                "The encoding requested '{encoding}' does not match the output file's encoding '{ie}'. Still using the requested encoding however.",
-            );
-        }
+    if let Some(ie) = input_encoding
+        && ie != encoding
+    {
+        tracing::warn!(
+            "The encoding requested '{encoding}' does not match the output file's encoding '{ie}'. Still using the requested encoding however.",
+        );
     }
 
     let file_name_format = cli.file_name_format.unwrap_or(
@@ -112,14 +112,12 @@ fn main() -> Result<()> {
     // Create WayshotConnection (will automatically use ext_image protocol if available)
     let connection_result = libwayshot::WayshotConnection::new();
 
-    let testing = true; // Change to false to force wlr_screencopy
-
     match connection_result {
         Ok(mut state) => {
             // If we have a connection, check if it has ext_image capability
             let has_ext_image = state.ext_image.is_some();
 
-            if has_ext_image && testing {
+            if has_ext_image {
                 tracing::info!("Using ext_image protocol");
 
                 let stdout = io::stdout();
@@ -146,7 +144,7 @@ fn main() -> Result<()> {
                         Ok(res) => {
                             notify_result(Ok(res));
                             return Ok(());
-                        },
+                        }
                         Err(e) => {
                             tracing::error!("Failed to capture color: {}", e);
                             notify_result(Err(e));
@@ -156,61 +154,55 @@ fn main() -> Result<()> {
                 } else if cli.geometry {
                     ext_capture_area(&mut state, stdout_print, cursor)
                 } else if cli.toplevel {
-                    ext_capture_toplevel(&mut state, stdout_print, cursor).map(|(img, name)| (img, WayshotResult::ToplevelCaptured { name }))
+                    ext_capture_toplevel(&mut state, stdout_print, cursor)
+                        .map(|(img, name)| (img, WayshotResult::ToplevelCaptured { name }))
                 } else if output.as_ref().is_some() || cli.choose_output {
                     ext_capture_output(&mut state, output.clone(), stdout_print, cursor)
                         .map(|(img, name)| (img, WayshotResult::OutputCaptured { name }))
-                        .map_err(|e| e.into())
                 } else {
                     // If no flag is provided, default to output selection (choose_output = true)
                     ext_capture_output(&mut state, None, stdout_print, cursor)
                         .map(|(img, name)| (img, WayshotResult::OutputCaptured { name }))
-                        .map_err(|e| e.into())
                 };
 
                 match image_result {
-                    Ok((image_buffer, result_variant)) => {
-                        let mut image_buf: Option<Cursor<Vec<u8>>> = None;
-                        if let Some(f) = file.as_ref() {
-                            if let Err(e) = image_buffer.save(&f) {
-                                tracing::error!("Failed to save file '{}': {}", f.display(), e);
-                                notify_result(Err(ext_wayshot::WayshotImageWriteError::ImageError(e)));
-                            } else {
-                                // Only show notification for OutputCaptured, ToplevelCaptured, or AreaCaptured
-                                match &result_variant {
-                                    WayshotResult::ToplevelCaptured { name } => notify_result(Ok(WayshotResult::ToplevelCaptured { name: name.clone() })),
-                                    WayshotResult::OutputCaptured { name } => {
-                                        if !cli.streaming {
-                                            notify_result(Ok(WayshotResult::OutputCaptured { name: name.clone() }))
-                                        }
-                                    },
-                                    WayshotResult::AreaCaptured => notify_result(Ok(WayshotResult::AreaCaptured)),
-                                    _ => {},
+                    Ok((image_buffer_opt, result_variant)) => {
+                        // If image_buffer_opt is None, it means stdout was used and we're done
+                        if let Some(image_buffer) = image_buffer_opt {
+                            if let Some(f) = file.as_ref() {
+                                if let Err(e) = image_buffer.save(f) {
+                                    tracing::error!("Failed to save file '{}': {}", f.display(), e);
+                                    notify_result(Err(
+                                        ext_wayshot::WayshotImageWriteError::ImageError(e),
+                                    ));
+                                } else {
+                                    notify_result(Ok(result_variant.clone()));
                                 }
-                            }
-                        } else {
-                            // Only notify if not streaming
-                            if !cli.streaming {
+                            } else {
                                 notify_result(Ok(result_variant));
                             }
-                        }
 
-                        if stdout_print {
-                            let mut buffer = Cursor::new(Vec::new());
-                            image_buffer.write_to(&mut buffer, encoding.into())?;
-                            writer.write_all(buffer.get_ref())?;
-                            image_buf = Some(buffer);
-                        }
+                            // This again depends on the Compositor present,
+                            // Compositors such as Cosmic doesn't have Ext/wlr data parsing protocol present
+                            // so Clipboard doesn't work yet for Cosmic or any such Compositors.
+                            // However Stdout wasn't affected in any manner
 
-                        if clipboard {
-                            clipboard_daemonize(match image_buf {
-                                Some(buf) => buf,
-                                None => {
-                                    let mut buffer = Cursor::new(Vec::new());
-                                    image_buffer.write_to(&mut buffer, encoding.into())?;
-                                    buffer
-                                }
-                            })?;
+                            if clipboard {
+                                let mut buffer = Cursor::new(Vec::new());
+                                image_buffer.write_to(&mut buffer, encoding.into())?;
+                                clipboard_daemonize(buffer)?;
+                            }
+                        } else {
+                            // Image was written to stdout, only handle clipboard if needed
+                            if clipboard {
+                                tracing::warn!(
+                                    "Clipboard functionality not available when using stdout output"
+                                );
+                            }
+                            // Only notify if not using stdout
+                            if !stdout_print {
+                                notify_result(Ok(result_variant));
+                            }
                         }
                     }
                     Err(e) => {
@@ -219,17 +211,6 @@ fn main() -> Result<()> {
                     }
                 }
 
-                //let result = if cli.geometry {
-                //    ext_capture_area(&mut state, stdout_print, cursor)
-                //} else if cli.color {
-				//	ext_capture_color(&mut state)
-				//} else if cli.experimental {
-				//	ext_capture_toplevel(&mut state, stdout_print, cursor)
-				//} else {
-                //    ext_capture_output(&mut state, output, stdout_print, cursor)
-				//};
-				//
-                //notify_result(result);
                 return Ok(());
             } else {
                 tracing::info!("ext_image protocol not available, using wlr_screencopy");
@@ -296,11 +277,11 @@ fn main() -> Result<()> {
                 };
 
                 let mut image_buf: Option<Cursor<Vec<u8>>> = None;
-                if let Some(f) = file {
-                    if let Err(e) = image_buffer.save(&f) {
-                        tracing::error!("Failed to save file '{}': {}", f.display(), e);
-                        // Optionally, notify the user or handle the error as needed
-                    }
+                if let Some(f) = file
+                    && let Err(e) = image_buffer.save(&f)
+                {
+                    tracing::error!("Failed to save file '{}': {}", f.display(), e);
+                    // TODO: Optionally, notify the user or handle the error as needed
                 }
 
                 if stdout_print {

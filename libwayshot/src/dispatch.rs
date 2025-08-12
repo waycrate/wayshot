@@ -1,5 +1,3 @@
-use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_surface_v1::ZwlrLayerSurfaceV1;
-use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_shell_v1::ZwlrLayerShellV1;
 use std::{
     collections::HashSet,
     os::fd::{AsFd, BorrowedFd},
@@ -20,6 +18,8 @@ use wayland_client::{
         wl_surface::WlSurface,
     },
 };
+use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_shell_v1::ZwlrLayerShellV1;
+use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_surface_v1::ZwlrLayerSurfaceV1;
 
 use wayland_protocols::{
     ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason,
@@ -70,22 +70,21 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
             interface,
             version,
         } = event
+            && interface == "wl_output"
         {
-            if interface == "wl_output" {
-                if version >= 4 {
-                    let output = wl_registry.bind::<wl_output::WlOutput, _, _>(name, 4, qh, ());
-                    state.outputs.push(OutputInfo {
-                        output: output,
-                        name: "".to_string(),
-                        description: String::new(),
-                        transform: wl_output::Transform::Normal,
-                        physical_size: Size::default(),
-                        logical_region: LogicalRegion::default(),
-                        scale: 1,
-                    });
-                } else {
-                    tracing::error!("Ignoring a wl_output with version < 4.");
-                }
+            if version >= 4 {
+                let output = wl_registry.bind::<wl_output::WlOutput, _, _>(name, 4, qh, ());
+                state.outputs.push(OutputInfo {
+                    output,
+                    name: "".to_string(),
+                    description: String::new(),
+                    transform: wl_output::Transform::Normal,
+                    physical_size: Size::default(),
+                    logical_region: LogicalRegion::default(),
+                    scale: 1,
+                });
+            } else {
+                tracing::error!("Ignoring a wl_output with version < 4.");
             }
         }
     }
@@ -326,16 +325,29 @@ pub(crate) struct DMABUFState {
 }
 
 pub struct LayerShellState {
-	pub configured_outputs: HashSet<WlOutput>,
+    pub configured_outputs: HashSet<WlOutput>,
 }
 
 impl LayerShellState {
-	pub(crate) fn new() -> Self {
-		Self {
-			configured_outputs: HashSet::new(),
-		}
-	}
+    pub(crate) fn new() -> Self {
+        Self {
+            configured_outputs: HashSet::new(),
+        }
+    }
 }
+
+// Here there is another problem for Cosmic Based Compositor
+// Currently LayerShell works flawlessly for wlroots based compositors such as sway or Treeland,
+// However when it comes to compositors like Cosmic, this doesn't seem to work properly..
+// The Layer won't appear on Cosmic similar to other compositors even while Cosmic does indeed support wlr_shell && wlr_layer_surface.
+
+// To Fix this, I have previosly implemented XDG based layer shell and Surface which seemingly works fine for Cosmic.
+// However another dillema here is while the previous scenario,
+// the wlr protocols didn't work, but now this works even while having waysip still uses the very same wlr protocols.
+
+// Aakash and I have deemed this again another one of the quirks of Cosmic Alpha build
+// So I have reverted it back to wlr-based protocols
+// but If anyone believes on converting waysip to xdg based protocols, do let me know I can gladly add Back the xdg protocols code for wayshot again.
 
 delegate_noop!(LayerShellState: ignore WlCompositor);
 delegate_noop!(LayerShellState: ignore WlShm);
@@ -347,16 +359,16 @@ delegate_noop!(LayerShellState: ignore WpViewport);
 delegate_noop!(LayerShellState: ignore WpViewporter);
 
 impl wayland_client::Dispatch<ZwlrLayerSurfaceV1, WlOutput> for LayerShellState {
-	// No need to instrument here, span from lib.rs is automatically used.
-	fn event(
-		state: &mut Self,
-		proxy: &ZwlrLayerSurfaceV1,
-		event: <ZwlrLayerSurfaceV1 as wayland_client::Proxy>::Event,
-		data: &WlOutput,
-		_conn: &Connection,
-		_qhandle: &QueueHandle<Self>,
-	) {
-		match event {
+    // No need to instrument here, span from lib.rs is automatically used.
+    fn event(
+        state: &mut Self,
+        proxy: &ZwlrLayerSurfaceV1,
+        event: <ZwlrLayerSurfaceV1 as wayland_client::Proxy>::Event,
+        data: &WlOutput,
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        match event {
 			wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_surface_v1::Event::Configure {
 				serial,
 				width: _,
@@ -372,7 +384,7 @@ impl wayland_client::Dispatch<ZwlrLayerSurfaceV1, WlOutput> for LayerShellState 
 			}
 			_ => {}
 		}
-	}
+    }
 }
 
 use wayland_protocols::ext::image_copy_capture::v1::client::{
@@ -395,7 +407,7 @@ use wayland_protocols::ext::foreign_toplevel_list::v1::client::{
 use wayland_client::event_created_child;
 
 use crate::WayshotConnection;
-use crate::ext_image_protocols::{CaptureInfo, TopLevel}; // Add this import
+use crate::ext_image_protocols::{CaptureInfo, TopLevel};
 
 delegate_noop!(WayshotConnection: ignore ExtImageCaptureSourceV1);
 delegate_noop!(WayshotConnection: ignore ExtOutputImageCaptureSourceManagerV1);
@@ -457,22 +469,34 @@ impl Dispatch<ExtForeignToplevelHandleV1, ()> for WayshotConnection {
         };
         match event {
             ext_foreign_toplevel_handle_v1::Event::Title { title } => {
-                if let Some(current_info) = toplevels.iter_mut().find(|my_toplevel| my_toplevel.handle == *toplevel) {
+                if let Some(current_info) = toplevels
+                    .iter_mut()
+                    .find(|my_toplevel| my_toplevel.handle == *toplevel)
+                {
                     current_info.title = title;
                 }
             }
             ext_foreign_toplevel_handle_v1::Event::AppId { app_id } => {
-                if let Some(current_info) = toplevels.iter_mut().find(|my_toplevel| my_toplevel.handle == *toplevel) {
+                if let Some(current_info) = toplevels
+                    .iter_mut()
+                    .find(|my_toplevel| my_toplevel.handle == *toplevel)
+                {
                     current_info.app_id = app_id;
                 }
             }
             ext_foreign_toplevel_handle_v1::Event::Identifier { identifier } => {
-                if let Some(current_info) = toplevels.iter_mut().find(|my_toplevel| my_toplevel.handle == *toplevel) {
+                if let Some(current_info) = toplevels
+                    .iter_mut()
+                    .find(|my_toplevel| my_toplevel.handle == *toplevel)
+                {
                     current_info.identifier = identifier;
                 }
             }
             ext_foreign_toplevel_handle_v1::Event::Closed => {
-                if let Some(current_info) = toplevels.iter_mut().find(|my_toplevel| my_toplevel.handle == *toplevel) {
+                if let Some(current_info) = toplevels
+                    .iter_mut()
+                    .find(|my_toplevel| my_toplevel.handle == *toplevel)
+                {
                     current_info.active = false;
                 }
             }
@@ -510,28 +534,39 @@ impl Dispatch<ExtImageCopyCaptureFrameV1, Arc<RwLock<CaptureInfo>>> for WayshotC
     }
 }
 
+//Currently the below Dispatch function does work
+//however for certain few compositors which doesn't display the format properly
+//such as Cosmic, this protocol will fail,
+//Currently its under assumption that Cosmic still being Alpha is the source of problem
+//Giving benefit of the Doubt that the code works correctly as it works in sway.
+
+// I will try to better explain this later in the blog I will write After my exams, (I will maybe link it here)
+
+//To Try making this work on Cosmic simply Comment the few code statements below.
+
 impl Dispatch<ExtImageCopyCaptureSessionV1, Arc<RwLock<FrameFormat>>> for WayshotConnection {
     fn event(
-		_state: &mut Self,
-		_proxy: &ExtImageCopyCaptureSessionV1,
-		event: <ExtImageCopyCaptureSessionV1 as Proxy>::Event,
-		data: &Arc<RwLock<FrameFormat>>,
-		_conn: &Connection,
-		_qhandle: &wayland_client::QueueHandle<Self>,
+        _state: &mut Self,
+        _proxy: &ExtImageCopyCaptureSessionV1,
+        event: <ExtImageCopyCaptureSessionV1 as Proxy>::Event,
+        data: &Arc<RwLock<FrameFormat>>,
+        _conn: &Connection,
+        _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
         let mut frame_info = data.write().unwrap();
         match event {
             ext_image_copy_capture_session_v1::Event::BufferSize { width, height } => {
                 frame_info.size = Size { width, height };
             }
-            ext_image_copy_capture_session_v1::Event::ShmFormat { format } => {
-                if let WEnum::Value(fmt) = format {
-                    println!("Compositor supports shm format: {:?}", fmt);
-					//if frame_info.format == wayland_client::protocol::wl_shm::Format::Xbgr8888 {
-						frame_info.format = wayland_client::protocol::wl_shm::Format::Xbgr8888;
-						//frame_info.format = fmt;
-					//}
-				}
+            ext_image_copy_capture_session_v1::Event::ShmFormat {
+                format: WEnum::Value(fmt),
+            } => {
+                tracing::trace!("Compositor supports shm format: {fmt:?}");
+                if frame_info.format == wayland_client::protocol::wl_shm::Format::Xbgr8888 {
+                    //<-- This
+                    //frame_info.format = wayland_client::protocol::wl_shm::Format::Xbgr8888; // <-- Uncomment this
+                    frame_info.format = fmt; // <-- This
+                } // <-- This
             }
             ext_image_copy_capture_session_v1::Event::Done => {}
             _ => {}

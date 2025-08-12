@@ -46,17 +46,13 @@ pub struct Cli {
     #[arg(long, conflicts_with_all = ["geometry", "cursor"] )]
     pub color: bool,
 
-	/// ScreenShot of a paritcular Application
-	#[arg(short, long, conflicts_with_all = ["geometry"] )]
-	pub toplevel: bool,
+    /// ScreenShot of a paritcular Application
+    #[arg(short, long, conflicts_with_all = ["geometry"] )]
+    pub toplevel: bool,
 
     /// list all details of valid outouts
     #[arg(long, alias = "list-outputs-info")]
     pub list_outputs_info: bool,
-
-    /// Enable streaming
-    #[arg(short, long)]
-    pub streaming: bool,
 
     /// Enable cursor in screenshots
     #[arg(short, long)]

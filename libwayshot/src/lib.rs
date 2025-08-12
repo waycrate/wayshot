@@ -115,15 +115,13 @@ pub struct ExtBase<T> {
 pub struct WayshotConnection {
     pub conn: Connection,
     pub globals: GlobalList,
-    pub output_infos: Vec<OutputInfo>, // Make this pub so it can be used in ext_image_protocols
+    pub output_infos: Vec<OutputInfo>,
     dmabuf_state: Option<DMABUFState>,
     pub ext_image: Option<ExtBase<Self>>,
 }
 
 impl WayshotConnection {
-    pub fn new() -> Result<
-        Self, //, HaruhiError
-    > {
+    pub fn new() -> Result<Self> {
         // Try to use ext_image protocol first
         match Self::create_connection(None, true) {
             Ok(connection) => {
@@ -195,7 +193,7 @@ impl WayshotConnection {
                         .bind::<ExtOutputImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())
                     {
                         Ok(output_image_manager) => {
-                            // Add binding for toplevel_image_manager here
+                            // Binding for toplevel_image_manager here
                             let toplevel_image_manager = initial_state
                                 .globals
                                 .bind::<ExtForeignToplevelImageCaptureSourceManagerV1, _, _>(
@@ -216,12 +214,12 @@ impl WayshotConnection {
                                     event_queue.blocking_dispatch(&mut initial_state)?;
 
                                     // Set toplevel_image_manager if available
-                                    if let Some(toplevel_image_manager) = toplevel_image_manager {
-                                        if let Some(state) = initial_state.ext_image.as_mut() {
-                                            state
-                                                .toplevel_image_manager
-                                                .replace(toplevel_image_manager);
-                                        }
+                                    if let Some(toplevel_image_manager) = toplevel_image_manager
+                                        && let Some(state) = initial_state.ext_image.as_mut()
+                                    {
+                                        state
+                                            .toplevel_image_manager
+                                            .replace(toplevel_image_manager);
                                     }
 
                                     // Store the globals we fetched
@@ -306,7 +304,7 @@ impl WayshotConnection {
                 tracing::error!(
                     "Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?"
                 );
-                panic!("{:#?}", e);
+                panic!("{e:#?}");
             }
         };
 
@@ -930,7 +928,7 @@ impl WayshotConnection {
     }
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
-    #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{:}", r)).unwrap_or("fullscreen".to_string())))]
+    #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{r:}")).unwrap_or("fullscreen".to_string())))]
     fn capture_frame_copy(
         &self,
         cursor_overlay: bool,
@@ -1294,7 +1292,7 @@ impl WayshotConnection {
 
 impl WayshotConnection {
     /// get all outputs and their info
-    pub fn vector_of_Outputs(&self) -> &Vec<OutputInfo> {
+    pub fn vector_of_outputs(&self) -> &Vec<OutputInfo> {
         &self.output_infos
     }
 
