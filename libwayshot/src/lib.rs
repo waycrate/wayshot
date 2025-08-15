@@ -165,7 +165,7 @@ impl WayshotConnection {
                 tracing::error!(
                     "Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?"
                 );
-                panic!("{:#?}", e);
+                panic!("{e:#?}");
             }
         };
 
@@ -745,7 +745,7 @@ impl WayshotConnection {
     }
 
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
-    #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{:}", r)).unwrap_or("fullscreen".to_string())))]
+    #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{r:}")).unwrap_or("fullscreen".to_string())))]
     fn capture_frame_copy(
         &self,
         cursor_overlay: bool,
