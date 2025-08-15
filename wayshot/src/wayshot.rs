@@ -163,14 +163,14 @@ fn main() -> Result<()> {
 
     let mut image_buf: Option<Cursor<Vec<u8>>> = None;
     if let Some(f) = file {
-        image_buffer.save(f)?;
-    }
-
-    if stdout_print {
-        let mut buffer = Cursor::new(Vec::new());
-        image_buffer.write_to(&mut buffer, encoding.into())?;
-        writer.write_all(buffer.get_ref())?;
-        image_buf = Some(buffer);
+        if stdout_print {
+            let mut buffer = Cursor::new(Vec::new());
+            image_buffer.write_to(&mut buffer, encoding.into())?;
+            writer.write_all(buffer.get_ref())?;
+            image_buf = Some(buffer);
+        } else {
+            image_buffer.save(f)?;
+        }
     }
 
     if clipboard {
