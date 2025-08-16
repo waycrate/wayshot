@@ -567,59 +567,8 @@ impl WayshotConnection {
         ZwlrScreencopyFrameV1,
         FrameFormat,
     )> {
-        let mut state = CaptureFrameState {
-            formats: Vec::new(),
-            dmabuf_formats: Vec::new(),
-            state: None,
-            buffer_done: AtomicBool::new(false),
-        };
-        let mut event_queue = self.conn.new_event_queue::<CaptureFrameState>();
-        let qh = event_queue.handle();
-
-        // Instantiating screencopy manager.
-        let screencopy_manager = match self.globals.bind::<ZwlrScreencopyManagerV1, _, _>(
-            &qh,
-            3..=3,
-            (),
-        ) {
-            Ok(x) => x,
-            Err(e) => {
-                tracing::error!(
-                    "Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?"
-                );
-                tracing::error!("err: {e}");
-                return Err(Error::ProtocolNotFound(
-                    "ZwlrScreencopy Manager not found".to_string(),
-                ));
-            }
-        };
-
-        tracing::debug!("Capturing output(shm buffer)...");
-        let frame = if let Some(embedded_region) = capture_region {
-            screencopy_manager.capture_output_region(
-                cursor_overlay,
-                output,
-                embedded_region.inner.position.x,
-                embedded_region.inner.position.y,
-                embedded_region.inner.size.width as i32,
-                embedded_region.inner.size.height as i32,
-                &qh,
-                (),
-            )
-        } else {
-            screencopy_manager.capture_output(cursor_overlay, output, &qh, ())
-        };
-
-        // Empty internal event buffer until buffer_done is set to true which is when the Buffer done
-        // event is fired, aka the capture from the compositor is successful.
-        while !state.buffer_done.load(Ordering::SeqCst) {
-            event_queue.blocking_dispatch(&mut state)?;
-        }
-
-        tracing::trace!(
-            "Received compositor frame buffer formats: {:#?}",
-            state.formats
-        );
+        let (state, event_queue, frame) =
+            self.capture_output_frame_get_state(cursor_overlay, output, capture_region)?;
         // Filter advertised wl_shm formats and select the first one that matches.
         let frame_format = state
             .formats
@@ -657,59 +606,8 @@ impl WayshotConnection {
         ZwlrScreencopyFrameV1,
         DMAFrameFormat,
     )> {
-        let mut state = CaptureFrameState {
-            formats: Vec::new(),
-            dmabuf_formats: Vec::new(),
-            state: None,
-            buffer_done: AtomicBool::new(false),
-        };
-        let mut event_queue = self.conn.new_event_queue::<CaptureFrameState>();
-        let qh = event_queue.handle();
-
-        // Instantiating screencopy manager.
-        let screencopy_manager = match self.globals.bind::<ZwlrScreencopyManagerV1, _, _>(
-            &qh,
-            3..=3,
-            (),
-        ) {
-            Ok(x) => x,
-            Err(e) => {
-                tracing::error!(
-                    "Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?"
-                );
-                tracing::error!("err: {e}");
-                return Err(Error::ProtocolNotFound(
-                    "ZwlrScreencopy Manager not found".to_string(),
-                ));
-            }
-        };
-
-        tracing::debug!("Capturing output for DMA-BUF API...");
-        let frame = if let Some(embedded_region) = capture_region {
-            screencopy_manager.capture_output_region(
-                cursor_overlay,
-                output,
-                embedded_region.inner.position.x,
-                embedded_region.inner.position.y,
-                embedded_region.inner.size.width as i32,
-                embedded_region.inner.size.height as i32,
-                &qh,
-                (),
-            )
-        } else {
-            screencopy_manager.capture_output(cursor_overlay, output, &qh, ())
-        };
-
-        // Empty internal event buffer until buffer_done is set to true which is when the Buffer done
-        // event is fired, aka the capture from the compositor is successful.
-        while !state.buffer_done.load(Ordering::SeqCst) {
-            event_queue.blocking_dispatch(&mut state)?;
-        }
-
-        tracing::trace!(
-            "Received compositor frame buffer formats: {:#?}",
-            state.formats
-        );
+        let (state, event_queue, frame) =
+            self.capture_output_frame_get_state(cursor_overlay, output, capture_region)?;
         // TODO select appropriate format if there is more than one
         let frame_format = state.dmabuf_formats[0];
         tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
