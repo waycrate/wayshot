@@ -199,13 +199,29 @@ impl WayshotConnection {
         Ok(())
     }
 
+    /// Query which `wl_shm::Format` the compositor supports for this output by performing a trial screenshot through wlr-screencopy protocol.
+    /// # Parameters
+    /// - `output`: Reference to the `WlOutput` to inspect.
+    /// # Returns
+    /// - A vector of [`FrameFormat`] if screen capture succeeds.
+    /// - [`Error::ProtocolNotFound`] if wlr-screencopy protocol is not found.
     pub fn get_available_frame_formats(&self, output: &WlOutput) -> Result<Vec<FrameFormat>> {
         let (state, _event_queue, _frame) = self.capture_output_frame_get_state(0, output, None)?;
         Ok(state.formats)
     }
 
-    /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
-    /// Data will be written to fd if format is available for screenshot.
+    /// Captures a screenshot into a shared memory buffer using a specified format, if available, and writes pixel data in the provided file descriptor.
+    /// This function uses wlr-screencopy protocol to capture pixel data from a `WlOutput`.
+    /// # Parameters
+    /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
+    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
+    /// - `fd`: file descriptor where the capture buffer will be written.
+    /// - `frame_format`: `wl_shm::Format` to use for screen capture.
+    /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
+    /// # Returns
+    /// - A [`FrameGuard`] instance that holds the screen capture result, if screen capture is successful and frame_format is supported.
+    /// - [`Error::FramecopyFailed`] if screen capture fails.
+    /// - [`Error::NoSupportedBufferFormat`] if frame_format is not supported for the given output.
     pub fn capture_output_frame_shm_fd_with_format<T: AsFd>(
         &self,
         cursor_overlay: i32,
