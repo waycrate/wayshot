@@ -567,12 +567,7 @@ impl WayshotConnection {
         Ok((state, event_queue, frame))
     }
 
-    // This API is exposed to provide users with access to window manager (WM)
-    // information. For instance, enabling Vulkan in wlroots alters the display
-    // format. Consequently, using PipeWire to capture streams without knowing
-    // the current format can lead to color distortion. This function attempts
-    // a trial screenshot to determine the screen's properties.
-    pub fn capture_output_frame_get_state_shm(
+    fn capture_output_frame_get_state_shm(
         &self,
         cursor_overlay: i32,
         output: &WlOutput,
