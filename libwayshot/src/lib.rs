@@ -199,6 +199,53 @@ impl WayshotConnection {
         Ok(())
     }
 
+    /// Query which `wl_shm::Format` the compositor supports for this output by performing a trial screenshot through wlr-screencopy protocol.
+    /// # Parameters
+    /// - `output`: Reference to the `WlOutput` to inspect.
+    /// # Returns
+    /// - A vector of [`FrameFormat`] if screen capture succeeds.
+    /// - [`Error::ProtocolNotFound`] if wlr-screencopy protocol is not found.
+    pub fn get_available_frame_formats(&self, output: &WlOutput) -> Result<Vec<FrameFormat>> {
+        let (state, _event_queue, _frame) = self.capture_output_frame_get_state(0, output, None)?;
+        Ok(state.formats)
+    }
+
+    /// Captures a screenshot into a shared memory buffer using a specified format, if available, and writes pixel data in the provided file descriptor.
+    /// This function uses wlr-screencopy protocol to capture pixel data from a `WlOutput`.
+    /// # Parameters
+    /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
+    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
+    /// - `fd`: file descriptor where the capture buffer will be written.
+    /// - `frame_format`: `wl_shm::Format` to use for screen capture.
+    /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
+    /// # Returns
+    /// - A [`FrameGuard`] instance that holds the screen capture result, if screen capture is successful and frame_format is supported.
+    /// - [`Error::FramecopyFailed`] if screen capture fails.
+    /// - [`Error::NoSupportedBufferFormat`] if frame_format is not supported for the given output.
+    pub fn capture_output_frame_shm_fd_with_format<T: AsFd>(
+        &self,
+        cursor_overlay: i32,
+        output: &WlOutput,
+        fd: T,
+        frame_format: wl_shm::Format,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<FrameGuard> {
+        let (state, event_queue, frame) =
+            self.capture_output_frame_get_state(cursor_overlay, output, capture_region)?;
+        if let Some(format) = state
+            .formats
+            .iter()
+            .find(|f| f.format == frame_format)
+            .copied()
+        {
+            let frame_guard: FrameGuard =
+                self.capture_output_frame_inner(state, event_queue, frame, format, fd)?;
+            Ok(frame_guard)
+        } else {
+            Err(Error::NoSupportedBufferFormat)
+        }
+    }
+
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
     ///  Data will be written to fd.
     pub fn capture_output_frame_shm_fd<T: AsFd>(
@@ -454,12 +501,7 @@ impl WayshotConnection {
         }
     }
 
-    // This API is exposed to provide users with access to window manager (WM)
-    // information. For instance, enabling Vulkan in wlroots alters the display
-    // format. Consequently, using PipeWire to capture streams without knowing
-    // the current format can lead to color distortion. This function attempts
-    // a trial screenshot to determine the screen's properties.
-    pub fn capture_output_frame_get_state_shm(
+    fn capture_output_frame_get_state(
         &self,
         cursor_overlay: i32,
         output: &WlOutput,
@@ -468,7 +510,6 @@ impl WayshotConnection {
         CaptureFrameState,
         EventQueue<CaptureFrameState>,
         ZwlrScreencopyFrameV1,
-        FrameFormat,
     )> {
         let mut state = CaptureFrameState {
             formats: Vec::new(),
@@ -497,7 +538,7 @@ impl WayshotConnection {
             }
         };
 
-        tracing::debug!("Capturing output(shm buffer)...");
+        tracing::debug!("Capturing output...");
         let frame = if let Some(embedded_region) = capture_region {
             screencopy_manager.capture_output_region(
                 cursor_overlay,
@@ -523,6 +564,22 @@ impl WayshotConnection {
             "Received compositor frame buffer formats: {:#?}",
             state.formats
         );
+        Ok((state, event_queue, frame))
+    }
+
+    fn capture_output_frame_get_state_shm(
+        &self,
+        cursor_overlay: i32,
+        output: &WlOutput,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<(
+        CaptureFrameState,
+        EventQueue<CaptureFrameState>,
+        ZwlrScreencopyFrameV1,
+        FrameFormat,
+    )> {
+        let (state, event_queue, frame) =
+            self.capture_output_frame_get_state(cursor_overlay, output, capture_region)?;
         // Filter advertised wl_shm formats and select the first one that matches.
         let frame_format = state
             .formats
@@ -560,59 +617,8 @@ impl WayshotConnection {
         ZwlrScreencopyFrameV1,
         DMAFrameFormat,
     )> {
-        let mut state = CaptureFrameState {
-            formats: Vec::new(),
-            dmabuf_formats: Vec::new(),
-            state: None,
-            buffer_done: AtomicBool::new(false),
-        };
-        let mut event_queue = self.conn.new_event_queue::<CaptureFrameState>();
-        let qh = event_queue.handle();
-
-        // Instantiating screencopy manager.
-        let screencopy_manager = match self.globals.bind::<ZwlrScreencopyManagerV1, _, _>(
-            &qh,
-            3..=3,
-            (),
-        ) {
-            Ok(x) => x,
-            Err(e) => {
-                tracing::error!(
-                    "Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?"
-                );
-                tracing::error!("err: {e}");
-                return Err(Error::ProtocolNotFound(
-                    "ZwlrScreencopy Manager not found".to_string(),
-                ));
-            }
-        };
-
-        tracing::debug!("Capturing output for DMA-BUF API...");
-        let frame = if let Some(embedded_region) = capture_region {
-            screencopy_manager.capture_output_region(
-                cursor_overlay,
-                output,
-                embedded_region.inner.position.x,
-                embedded_region.inner.position.y,
-                embedded_region.inner.size.width as i32,
-                embedded_region.inner.size.height as i32,
-                &qh,
-                (),
-            )
-        } else {
-            screencopy_manager.capture_output(cursor_overlay, output, &qh, ())
-        };
-
-        // Empty internal event buffer until buffer_done is set to true which is when the Buffer done
-        // event is fired, aka the capture from the compositor is successful.
-        while !state.buffer_done.load(Ordering::SeqCst) {
-            event_queue.blocking_dispatch(&mut state)?;
-        }
-
-        tracing::trace!(
-            "Received compositor frame buffer formats: {:#?}",
-            state.formats
-        );
+        let (state, event_queue, frame) =
+            self.capture_output_frame_get_state(cursor_overlay, output, capture_region)?;
         // TODO select appropriate format if there is more than one
         let frame_format = state.dmabuf_formats[0];
         tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
