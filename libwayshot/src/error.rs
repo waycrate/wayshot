@@ -7,10 +7,11 @@ use wayland_client::{
     globals::{BindError, GlobalError},
 };
 
-pub type Result<T, E = Error> = result::Result<T, E>;
+pub type Result<T, E = WayshotError> = result::Result<T, E>;
 
+/// Error type for wayshot.
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum WayshotError {
     #[error("no outputs supplied")]
     NoOutputs,
     #[error("image buffer is not big enough")]
@@ -45,4 +46,8 @@ pub enum Error {
     EGLError(#[from] khronos_egl::Error),
     #[error("No EGLImageTargetTexture2DOES function located, this extension may not be supported")]
     EGLImageToTexProcNotFoundError,
+    #[error("Not Support format")]
+    NotSupportFormat,
+    #[error("Capture Failed")]
+    CaptureFailed(String),
 }

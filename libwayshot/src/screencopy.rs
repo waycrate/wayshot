@@ -16,7 +16,7 @@ use wayland_client::protocol::{
 };
 
 use crate::{
-    Error, Result,
+    Result, WayshotError,
     region::{LogicalRegion, Size},
 };
 
@@ -104,7 +104,7 @@ where
             frame_format.size.height,
             frame_mmap.to_vec(),
         )
-        .ok_or(Error::BufferTooSmall),
+        .ok_or(WayshotError::BufferTooSmall),
         FrameData::GBMBo(_) => todo!(),
     }
 }
@@ -128,7 +128,7 @@ pub struct FrameCopy {
 }
 
 impl TryFrom<&FrameCopy> for DynamicImage {
-    type Error = Error;
+    type Error = WayshotError;
 
     fn try_from(value: &FrameCopy) -> Result<Self> {
         Ok(match value.frame_color_type {
@@ -138,7 +138,7 @@ impl TryFrom<&FrameCopy> for DynamicImage {
             ColorType::Rgba8 => {
                 Self::ImageRgba8(create_image_buffer(&value.frame_format, &value.frame_data)?)
             }
-            _ => return Err(Error::InvalidColor),
+            _ => return Err(WayshotError::InvalidColor),
         })
     }
 }

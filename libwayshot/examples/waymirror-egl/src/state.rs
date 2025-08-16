@@ -289,7 +289,7 @@ impl WaylandEGLState {
             self.wayshot
                 .bind_output_frame_to_gl_texture(
                     true,
-                    &self.wayshot.get_all_outputs()[0].wl_output,
+                    &self.wayshot.get_all_outputs()[0].output,
                     None,
                 )
                 .unwrap();
