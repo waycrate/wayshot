@@ -25,8 +25,8 @@ use std::os::fd::AsFd;
 
 use std::fs::File;
 
+use crate::Error;
 use crate::WayshotConnection;
-use crate::WayshotError;
 use crate::dispatch::{FrameState, LayerShellState};
 use crate::region::{LogicalRegion, Position, Region, Size};
 use crate::screencopy::{FrameFormat, create_shm_fd};
@@ -101,19 +101,19 @@ impl CaptureInfo {
 }
 
 pub trait AreaSelectCallback {
-    fn screenshot(self, state: &WayshotConnection) -> Result<Region, WayshotError>;
+    fn screenshot(self, state: &WayshotConnection) -> Result<Region, Error>;
 }
 
 impl<F> AreaSelectCallback for F
 where
-    F: Fn(&WayshotConnection) -> Result<Region, WayshotError>,
+    F: Fn(&WayshotConnection) -> Result<Region, Error>,
 {
-    fn screenshot(self, state: &WayshotConnection) -> Result<Region, WayshotError> {
+    fn screenshot(self, state: &WayshotConnection) -> Result<Region, Error> {
         self(state)
     }
 }
 impl AreaSelectCallback for Region {
-    fn screenshot(self, _state: &WayshotConnection) -> Result<Region, WayshotError> {
+    fn screenshot(self, _state: &WayshotConnection) -> Result<Region, Error> {
         Ok(self)
     }
 }
@@ -202,7 +202,7 @@ impl crate::WayshotConnection {
         &mut self,
         option: CaptureOption,
         output: crate::output::OutputInfo,
-    ) -> std::result::Result<DynamicImage, crate::WayshotError> {
+    ) -> std::result::Result<DynamicImage, crate::Error> {
         let mem_fd = create_shm_fd().unwrap();
         let mem_file = File::from(mem_fd);
         let mut capture_data = self.ext_capture_output_inner(
@@ -228,7 +228,7 @@ impl crate::WayshotConnection {
         &mut self,
         option: CaptureOption,
         callback: F,
-    ) -> std::result::Result<(Vec<u8>, u32, u32, ColorType, Region), crate::WayshotError>
+    ) -> std::result::Result<(Vec<u8>, u32, u32, ColorType, Region), crate::Error>
     where
         F: AreaSelectCallback,
     {
@@ -320,9 +320,7 @@ impl crate::WayshotConnection {
         let shotdata = data_list
             .iter()
             .find(|data| data.in_this_screen(region))
-            .ok_or(crate::WayshotError::CaptureFailed(
-                "not in region".to_owned(),
-            ))?;
+            .ok_or(crate::Error::CaptureFailed("not in region".to_owned()))?;
         let area = shotdata.clip_area(region).expect("should have");
         // Use mmap from CaptureOutputData
         let shotdata_ref = &shotdata.data;
@@ -340,12 +338,12 @@ impl crate::WayshotConnection {
         ))
     }
 
-    /// Capture a single output
+    /// Capture a TopLevel output
     pub fn ext_capture_toplevel2(
         &mut self,
         option: CaptureOption,
         toplevel: TopLevel,
-    ) -> Result<DynamicImage, WayshotError> {
+    ) -> Result<DynamicImage, Error> {
         let mem_fd = create_shm_fd().unwrap();
         let mem_file = File::from(mem_fd);
         let mut capture =
@@ -368,9 +366,9 @@ impl crate::WayshotConnection {
         option: CaptureOption,
         fd: T,
         file: Option<&File>,
-    ) -> std::result::Result<CaptureOutputData, crate::WayshotError> {
+    ) -> std::result::Result<CaptureOutputData, crate::Error> {
         let crate::output::OutputInfo {
-            output,
+            wl_output: output,
             logical_region,
             ..
         } = output_info;
@@ -447,7 +445,7 @@ impl crate::WayshotConnection {
                 | Format::Bgr888
         ) {
             println!("Unsupported format: {frame_format:?}");
-            return Err(crate::WayshotError::NotSupportFormat);
+            return Err(crate::Error::NotSupportFormat);
         } else {
             println!("Matched format: {frame_format:?}");
         }
@@ -486,25 +484,25 @@ impl crate::WayshotConnection {
 				FrameState::Failed(info) => match info {
 					Some(WEnum::Value(reason)) => match reason {
 						wayland_protocols::ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason::Stopped => {
-							return Err(crate::WayshotError::CaptureFailed("Stopped".to_owned()));
+							return Err(crate::Error::CaptureFailed("Stopped".to_owned()));
 						}
 
 						wayland_protocols::ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason::BufferConstraints => {
-							return Err(crate::WayshotError::CaptureFailed(
+							return Err(crate::Error::CaptureFailed(
 								"BufferConstraints".to_owned(),
 							));
 						}
 						wayland_protocols::ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason::Unknown | _ => {
-							return Err(crate::WayshotError::CaptureFailed("Unknown".to_owned()));
+							return Err(crate::Error::CaptureFailed("Unknown".to_owned()));
 						}
 					},
 					Some(WEnum::Unknown(code)) => {
-						return Err(crate::WayshotError::CaptureFailed(format!(
+						return Err(crate::Error::CaptureFailed(format!(
 							"Unknown reason, code : {code}"
 						)));
 					}
 					None => {
-						return Err(crate::WayshotError::CaptureFailed(
+						return Err(crate::Error::CaptureFailed(
 							"No failure reason provided".to_owned(),
 						));
 					}
@@ -543,7 +541,7 @@ impl crate::WayshotConnection {
         option: CaptureOption,
         fd: T,
         file: Option<&File>,
-    ) -> Result<CaptureTopLevelData, WayshotError> {
+    ) -> Result<CaptureTopLevelData, Error> {
         let mut event_queue = self
             .ext_image
             .as_mut()
@@ -614,7 +612,7 @@ impl crate::WayshotConnection {
                 | Format::Xrgb8888
                 | Format::Xbgr8888
         ) {
-            return Err(WayshotError::NotSupportFormat);
+            return Err(Error::NotSupportFormat);
         }
         let mem_fd = fd.as_fd();
 
@@ -649,25 +647,23 @@ impl crate::WayshotConnection {
                 FrameState::Failed(info) => match info {
                     Some(WEnum::Value(reason)) => match reason {
                         FailureReason::Stopped => {
-                            return Err(WayshotError::CaptureFailed("Stopped".to_owned()));
+                            return Err(Error::CaptureFailed("Stopped".to_owned()));
                         }
 
                         FailureReason::BufferConstraints => {
-                            return Err(WayshotError::CaptureFailed(
-                                "BufferConstraints".to_owned(),
-                            ));
+                            return Err(Error::CaptureFailed("BufferConstraints".to_owned()));
                         }
                         FailureReason::Unknown | _ => {
-                            return Err(WayshotError::CaptureFailed("Unknown".to_owned()));
+                            return Err(Error::CaptureFailed("Unknown".to_owned()));
                         }
                     },
                     Some(WEnum::Unknown(code)) => {
-                        return Err(WayshotError::CaptureFailed(format!(
+                        return Err(Error::CaptureFailed(format!(
                             "Unknown reason, code : {code}"
                         )));
                     }
                     None => {
-                        return Err(WayshotError::CaptureFailed(
+                        return Err(Error::CaptureFailed(
                             "No failure reason provided".to_owned(),
                         ));
                     }
@@ -694,38 +690,38 @@ impl crate::WayshotConnection {
 use wayland_protocols::ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason;
 
 impl TryFrom<&CaptureOutputData> for DynamicImage {
-    type Error = WayshotError;
+    type Error = Error;
 
-    fn try_from(value: &CaptureOutputData) -> Result<Self, WayshotError> {
-        let mmap = value.mmap.as_ref().ok_or(WayshotError::BufferTooSmall)?;
+    fn try_from(value: &CaptureOutputData) -> Result<Self, Error> {
+        let mmap = value.mmap.as_ref().ok_or(Error::BufferTooSmall)?;
         let width = value.frame_info.size.width;
         let height = value.frame_info.size.height;
         match value.color_type {
             image::ColorType::Rgb8 => {
                 let buffer = ImageBuffer::from_vec(width, height, mmap.to_vec())
-                    .ok_or(WayshotError::BufferTooSmall)?;
+                    .ok_or(Error::BufferTooSmall)?;
                 Ok(DynamicImage::ImageRgb8(buffer))
             }
             image::ColorType::Rgba8 => {
                 let buffer = ImageBuffer::from_vec(width, height, mmap.to_vec())
-                    .ok_or(WayshotError::BufferTooSmall)?;
+                    .ok_or(Error::BufferTooSmall)?;
                 Ok(DynamicImage::ImageRgba8(buffer))
             }
-            _ => Err(WayshotError::InvalidColor),
+            _ => Err(Error::InvalidColor),
         }
     }
 }
 
 impl TryFrom<&CaptureTopLevelData> for DynamicImage {
-    type Error = WayshotError;
+    type Error = Error;
 
-    fn try_from(value: &CaptureTopLevelData) -> Result<Self, WayshotError> {
-        let mmap = value.mmap.as_ref().ok_or(WayshotError::BufferTooSmall)?;
+    fn try_from(value: &CaptureTopLevelData) -> Result<Self, Error> {
+        let mmap = value.mmap.as_ref().ok_or(Error::BufferTooSmall)?;
         let width = value.frame_info.size.width;
         let height = value.frame_info.size.height;
         // Assume RGBA8 for toplevel, adjust if you add color_type
-        let buffer = ImageBuffer::from_vec(width, height, mmap.to_vec())
-            .ok_or(WayshotError::BufferTooSmall)?;
+        let buffer =
+            ImageBuffer::from_vec(width, height, mmap.to_vec()).ok_or(Error::BufferTooSmall)?;
         Ok(DynamicImage::ImageRgba8(buffer))
     }
 }

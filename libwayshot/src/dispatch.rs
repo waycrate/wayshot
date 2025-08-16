@@ -18,8 +18,6 @@ use wayland_client::{
         wl_surface::WlSurface,
     },
 };
-use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_shell_v1::ZwlrLayerShellV1;
-use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_surface_v1::ZwlrLayerSurfaceV1;
 
 use wayland_protocols::{
     ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason,
@@ -35,9 +33,15 @@ use wayland_protocols::{
         zxdg_output_v1::{self, ZxdgOutputV1},
     },
 };
-use wayland_protocols_wlr::screencopy::v1::client::{
-    zwlr_screencopy_frame_v1::{self, ZwlrScreencopyFrameV1},
-    zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
+use wayland_protocols_wlr::{
+    layer_shell::v1::client::{
+        zwlr_layer_shell_v1::ZwlrLayerShellV1,
+        zwlr_layer_surface_v1::{self, ZwlrLayerSurfaceV1},
+    },
+    screencopy::v1::client::{
+        zwlr_screencopy_frame_v1::{self, ZwlrScreencopyFrameV1},
+        zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
+    },
 };
 
 use crate::{
@@ -75,7 +79,7 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
             if version >= 4 {
                 let output = wl_registry.bind::<wl_output::WlOutput, _, _>(name, 4, qh, ());
                 state.outputs.push(OutputInfo {
-                    output,
+                    wl_output: output,
                     name: "".to_string(),
                     description: String::new(),
                     transform: wl_output::Transform::Normal,
@@ -101,7 +105,7 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
         _: &QueueHandle<Self>,
     ) {
         let output: &mut OutputInfo =
-            match state.outputs.iter_mut().find(|x| x.output == *wl_output) {
+            match state.outputs.iter_mut().find(|x| x.wl_output == *wl_output) {
                 Some(output) => output,
                 _ => {
                     tracing::error!(
@@ -341,8 +345,8 @@ impl LayerShellState {
 // However when it comes to compositors like Cosmic, this doesn't seem to work properly..
 // The Layer won't appear on Cosmic similar to other compositors even while Cosmic does indeed support wlr_shell && wlr_layer_surface.
 
-// To Fix this, I have previosly implemented XDG based layer shell and Surface which seemingly works fine for Cosmic.
-// However another dillema here is while the previous scenario,
+// To Fix this, I have previously implemented XDG based layer shell and Surface which seemingly works fine for Cosmic.
+// However another dilemma here is while the previous scenario,
 // the wlr protocols didn't work, but now this works even while having waysip still uses the very same wlr protocols.
 
 // Aakash and I have deemed this again another one of the quirks of Cosmic Alpha build
@@ -369,21 +373,21 @@ impl wayland_client::Dispatch<ZwlrLayerSurfaceV1, WlOutput> for LayerShellState 
         _qhandle: &QueueHandle<Self>,
     ) {
         match event {
-			wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_surface_v1::Event::Configure {
-				serial,
-				width: _,
-				height: _,
-			} => {
-				tracing::debug!("Acking configure");
-				state.configured_outputs.insert(data.clone());
-				proxy.ack_configure(serial);
-				tracing::trace!("Acked configure");
-			}
-			wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_surface_v1::Event::Closed => {
-				tracing::debug!("Closed")
-			}
-			_ => {}
-		}
+            zwlr_layer_surface_v1::Event::Configure {
+                serial,
+                width: _,
+                height: _,
+            } => {
+                tracing::debug!("Acking configure");
+                state.configured_outputs.insert(data.clone());
+                proxy.ack_configure(serial);
+                tracing::trace!("Acked configure");
+            }
+            zwlr_layer_surface_v1::Event::Closed => {
+                tracing::debug!("Closed")
+            }
+            _ => {}
+        }
     }
 }
 

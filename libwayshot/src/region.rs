@@ -1,6 +1,6 @@
 use crate::{
     WayshotConnection,
-    error::{Result, WayshotError},
+    error::{Error, Result},
     output::OutputInfo,
 };
 use std::cmp;
@@ -213,19 +213,19 @@ impl From<&OutputInfo> for LogicalRegion {
 }
 
 impl TryFrom<&[OutputInfo]> for LogicalRegion {
-    type Error = WayshotError;
+    type Error = Error;
 
     fn try_from(output_info: &[OutputInfo]) -> std::result::Result<Self, Self::Error> {
         let x1 = output_info
             .iter()
             .map(|output| output.logical_region.inner.position.x)
             .min()
-            .ok_or(WayshotError::NoOutputs)?;
+            .ok_or(Error::NoOutputs)?;
         let y1 = output_info
             .iter()
             .map(|output| output.logical_region.inner.position.y)
             .min()
-            .ok_or(WayshotError::NoOutputs)?;
+            .ok_or(Error::NoOutputs)?;
         let x2 = output_info
             .iter()
             .map(|output| {
@@ -233,7 +233,7 @@ impl TryFrom<&[OutputInfo]> for LogicalRegion {
                     + output.logical_region.inner.size.width as i32
             })
             .max()
-            .ok_or(WayshotError::NoOutputs)?;
+            .ok_or(Error::NoOutputs)?;
         let y2 = output_info
             .iter()
             .map(|output| {
@@ -241,7 +241,7 @@ impl TryFrom<&[OutputInfo]> for LogicalRegion {
                     + output.logical_region.inner.size.height as i32
             })
             .max()
-            .ok_or(WayshotError::NoOutputs)?;
+            .ok_or(Error::NoOutputs)?;
         Ok(LogicalRegion {
             inner: Region {
                 position: Position { x: x1, y: y1 },

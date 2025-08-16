@@ -17,8 +17,6 @@ pub enum WayshotResult {
     AreaCaptured,
 }
 
-pub const SUCCEED_IMAGE: &str = "haruhi_succeeded";
-pub const FAILED_IMAGE: &str = "haruhi_failed";
 pub const TIMEOUT: i32 = 10000;
 
 #[derive(Debug, thiserror::Error)]
@@ -32,7 +30,7 @@ pub enum WayshotImageWriteError {
     #[error("Output not exist")]
     OutputNotExist,
     #[error("Wayland shot error")]
-    WaylandError(#[from] libwayshot::error::WayshotError),
+    WaylandError(#[from] libwayshot::error::Error),
 }
 
 pub fn notify_result(shot_result: Result<WayshotResult, WayshotImageWriteError>) {
@@ -42,7 +40,6 @@ pub fn notify_result(shot_result: Result<WayshotResult, WayshotImageWriteError>)
             let _ = Notification::new()
                 .summary("Screenshot Taken")
                 .body(format!("Screenshot taken of output: {name}").as_str())
-                .icon(SUCCEED_IMAGE)
                 .timeout(TIMEOUT)
                 .show();
         }
@@ -50,7 +47,6 @@ pub fn notify_result(shot_result: Result<WayshotResult, WayshotImageWriteError>)
             let _ = Notification::new()
                 .summary("Screenshot Taken")
                 .body(format!("Screenshot taken of application: {name}").as_str())
-                .icon(SUCCEED_IMAGE)
                 .timeout(TIMEOUT)
                 .show();
         }
@@ -58,7 +54,6 @@ pub fn notify_result(shot_result: Result<WayshotResult, WayshotImageWriteError>)
             let _ = Notification::new()
                 .summary("Screenshot Captured")
                 .body("Type: Cropping")
-                .icon(SUCCEED_IMAGE)
                 .timeout(TIMEOUT)
                 .show();
         }
@@ -66,7 +61,6 @@ pub fn notify_result(shot_result: Result<WayshotResult, WayshotImageWriteError>)
             let _ = Notification::new()
                 .summary("Screenshot Captured")
                 .body("Type: Pixel Color grab")
-                .icon(SUCCEED_IMAGE)
                 .timeout(TIMEOUT)
                 .show();
         }
@@ -74,7 +68,6 @@ pub fn notify_result(shot_result: Result<WayshotResult, WayshotImageWriteError>)
             let _ = Notification::new()
                 .summary("Screenshot Failed")
                 .body(&e.to_string())
-                .icon(FAILED_IMAGE)
                 .timeout(TIMEOUT)
                 .show();
         }
@@ -180,8 +173,8 @@ pub fn ext_capture_area(
                 }),
                 libwaysip::SelectionType::Area,
             )
-            .map_err(|e| libwayshot::error::WayshotError::CaptureFailed(e.to_string()))?
-            .ok_or(libwayshot::error::WayshotError::CaptureFailed(
+            .map_err(|e| libwayshot::error::Error::CaptureFailed(e.to_string()))?
+            .ok_or(libwayshot::error::Error::CaptureFailed(
                 "Failed to capture the area".to_string(),
             ))?;
 
@@ -235,8 +228,8 @@ pub fn ext_capture_color(
                 }),
                 libwaysip::SelectionType::Point,
             )
-            .map_err(|e| libwayshot::error::WayshotError::CaptureFailed(e.to_string()))?
-            .ok_or(libwayshot::error::WayshotError::CaptureFailed(
+            .map_err(|e| libwayshot::error::Error::CaptureFailed(e.to_string()))?
+            .ok_or(libwayshot::error::Error::CaptureFailed(
                 "Failed to capture the area".to_string(),
             ))?;
 

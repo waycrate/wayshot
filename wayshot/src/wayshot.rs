@@ -185,7 +185,7 @@ fn main() -> Result<()> {
                             // This again depends on the Compositor present,
                             // Compositors such as Cosmic doesn't have Ext/wlr data parsing protocol present
                             // so Clipboard doesn't work yet for Cosmic or any such Compositors.
-                            // However Stdout shouldn't be affected in any manner 
+                            // However Stdout shouldn't be affected in any manner
 
                             if clipboard {
                                 let mut buffer = Cursor::new(Vec::new());
@@ -242,11 +242,9 @@ fn main() -> Result<()> {
                                 }),
                                 libwaysip::SelectionType::Area,
                             )
-                            .map_err(|e| {
-                                libwayshot::WayshotError::FreezeCallbackError(e.to_string())
-                            })?
+                            .map_err(|e| libwayshot::Error::FreezeCallbackError(e.to_string()))?
                             .ok_or(
-                                libwayshot::WayshotError::FreezeCallbackError(
+                                libwayshot::Error::FreezeCallbackError(
                                     "Failed to capture the area".to_string(),
                                 ),
                             )?;

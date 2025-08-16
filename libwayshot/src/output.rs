@@ -7,7 +7,7 @@ use wayland_client::protocol::{wl_output, wl_output::WlOutput};
 /// Do not instantiate, instead use [`crate::WayshotConnection::get_all_outputs`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OutputInfo {
-    pub output: WlOutput,
+    pub wl_output: WlOutput,
     pub name: String,
     pub description: String,
     pub transform: wl_output::Transform,
@@ -23,7 +23,7 @@ pub struct OutputInfo {
 // For whoever is planning to work on it,
 // Be mindful of the scaling as it can break the image structure and wlshm memory.
 // Again As I was testing on Cosmic, Format which are being displayed and do end up working,
-// Don't again neccessarily work on Cosmic due to Wl-shm memory handling which could again be Cosmic's Alpha stage issue.
+// Don't again necessarily work on Cosmic due to Wl-shm memory handling which could again be Cosmic's Alpha stage issue.
 
 impl Display for OutputInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

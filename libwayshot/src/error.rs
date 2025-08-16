@@ -7,11 +7,11 @@ use wayland_client::{
     globals::{BindError, GlobalError},
 };
 
-pub type Result<T, E = WayshotError> = result::Result<T, E>;
+pub type Result<T, E = Error> = result::Result<T, E>;
 
 /// Error type for wayshot.
 #[derive(Error, Debug)]
-pub enum WayshotError {
+pub enum Error {
     #[error("no outputs supplied")]
     NoOutputs,
     #[error("image buffer is not big enough")]

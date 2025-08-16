@@ -66,7 +66,7 @@ use crate::{
     screencopy::{FrameCopy, FrameFormat, create_shm_fd},
 };
 
-pub use crate::error::{Result, WayshotError};
+pub use crate::error::{Error, Result};
 
 pub mod reexport {
     use wayland_client::protocol::wl_output;
@@ -144,7 +144,7 @@ impl WayshotConnection {
     fn create_connection(
         connection: Option<Connection>,
         use_ext_image: bool,
-    ) -> Result<Self, WayshotError> {
+    ) -> Result<Self, Error> {
         let conn = if let Some(conn) = connection {
             conn
         } else {
@@ -232,21 +232,21 @@ impl WayshotConnection {
                                     }
                                 }
                                 Err(_) => {
-                                    return Err(WayshotError::ProtocolNotFound(
+                                    return Err(Error::ProtocolNotFound(
                                         "WlShm not found".to_string(),
                                     ));
                                 }
                             }
                         }
                         Err(_) => {
-                            return Err(WayshotError::ProtocolNotFound(
+                            return Err(Error::ProtocolNotFound(
                                 "ExtOutputImageCaptureSourceManagerV1 not found".to_string(),
                             ));
                         }
                     }
                 }
                 Err(_) => {
-                    return Err(WayshotError::ProtocolNotFound(
+                    return Err(Error::ProtocolNotFound(
                         "ExtImageCopyCaptureManagerV1 not found".to_string(),
                     ));
                 }
@@ -318,7 +318,9 @@ impl WayshotConnection {
             .outputs
             .iter()
             .enumerate()
-            .map(|(index, output)| zxdg_output_manager.get_xdg_output(&output.output, &qh, index))
+            .map(|(index, output)| {
+                zxdg_output_manager.get_xdg_output(&output.wl_output, &qh, index)
+            })
             .collect();
 
         event_queue.roundtrip(&mut state)?;
@@ -329,7 +331,7 @@ impl WayshotConnection {
 
         if state.outputs.is_empty() {
             tracing::error!("Compositor did not advertise any wl_output devices!");
-            return Err(WayshotError::NoOutputs);
+            return Err(Error::NoOutputs);
         }
         tracing::trace!("Outputs detected: {:#?}", state.outputs);
         self.output_infos = state.outputs;
@@ -428,7 +430,7 @@ impl WayshotConnection {
     /// # Returns
     /// - If the function was found and called, an OK(()), note that this does not necessarily mean that binding was successful, only that the function was called.
     ///   The caller may check for any OpenGL errors using the standard routes.
-    /// - If the function was not found, [`WayshotError::EGLImageToTexProcNotFoundError`] is returned
+    /// - If the function was not found, [`Error::EGLImageToTexProcNotFoundError`] is returned
     pub unsafe fn bind_output_frame_to_gl_texture(
         &self,
         cursor_overlay: bool,
@@ -450,7 +452,7 @@ impl WayshotConnection {
                     }
                     None => {
                         tracing::error!("glEGLImageTargetTexture2DOES not found");
-                        return Err(WayshotError::EGLImageToTexProcNotFoundError);
+                        return Err(Error::EGLImageToTexProcNotFoundError);
                     }
                 });
 
@@ -624,7 +626,7 @@ impl WayshotConnection {
 
                 Ok((frame_format, frame_guard, bo))
             }
-            None => Err(WayshotError::NoDMAStateError),
+            None => Err(Error::NoDMAStateError),
         }
     }
 
@@ -665,7 +667,7 @@ impl WayshotConnection {
                     "Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?"
                 );
                 tracing::error!("err: {e}");
-                return Err(WayshotError::ProtocolNotFound(
+                return Err(Error::ProtocolNotFound(
                     "ZwlrScreencopy Manager not found".to_string(),
                 ));
             }
@@ -717,7 +719,7 @@ impl WayshotConnection {
             // Check if frame format exists.
             .ok_or_else(|| {
                 tracing::error!("No suitable frame format found");
-                WayshotError::NoSupportedBufferFormat
+                Error::NoSupportedBufferFormat
             })?;
         tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
 
@@ -756,7 +758,7 @@ impl WayshotConnection {
                     "Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?"
                 );
                 tracing::error!("err: {e}");
-                return Err(WayshotError::ProtocolNotFound(
+                return Err(Error::ProtocolNotFound(
                     "ZwlrScreencopy Manager not found".to_string(),
                 ));
             }
@@ -808,7 +810,6 @@ impl WayshotConnection {
     ) -> Result<DMAFrameGuard> {
         match &self.dmabuf_state {
             Some(dmabuf_state) => {
-                println!("The program screenshoted via dmabuf");
                 // Connecting to wayland environment.
                 let qh = event_queue.handle();
 
@@ -847,7 +848,7 @@ impl WayshotConnection {
                         match state {
                             FrameState::Failed(_) => {
                                 tracing::error!("Frame copy failed");
-                                return Err(WayshotError::FramecopyFailed);
+                                return Err(Error::FramecopyFailed);
                             }
                             FrameState::Succeeded => {
                                 tracing::trace!("Frame copy finished");
@@ -865,7 +866,7 @@ impl WayshotConnection {
                     event_queue.blocking_dispatch(&mut state)?;
                 }
             }
-            None => Err(WayshotError::NoDMAStateError),
+            None => Err(Error::NoDMAStateError),
         }
     }
 
@@ -878,7 +879,6 @@ impl WayshotConnection {
         fd: T,
     ) -> Result<FrameGuard> {
         // Connecting to wayland environment.
-        println!("The program screenshoted via wlshm");
         let qh = event_queue.handle();
 
         // Instantiate shm global.
@@ -888,7 +888,7 @@ impl WayshotConnection {
             frame_format
                 .byte_size()
                 .try_into()
-                .map_err(|_| WayshotError::BufferTooSmall)?,
+                .map_err(|_| Error::BufferTooSmall)?,
             &qh,
             (),
         );
@@ -911,7 +911,7 @@ impl WayshotConnection {
                 match state {
                     FrameState::Failed(_) => {
                         tracing::error!("Frame copy failed");
-                        return Err(WayshotError::FramecopyFailed);
+                        return Err(Error::FramecopyFailed);
                     }
                     FrameState::Succeeded => {
                         tracing::trace!("Frame copy finished");
@@ -942,7 +942,7 @@ impl WayshotConnection {
 
         let (frame_format, frame_guard) = self.capture_output_frame_shm_from_file(
             cursor_overlay,
-            &output_info.output,
+            &output_info.wl_output,
             &mem_file,
             capture_region,
         )?;
@@ -956,7 +956,7 @@ impl WayshotConnection {
                 tracing::error!(
                     "You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot."
                 );
-                return Err(WayshotError::NoSupportedBufferFormat);
+                return Err(Error::NoSupportedBufferFormat);
             }
         };
         let rotated_physical_size = match output_info.transform {
@@ -1004,7 +1004,7 @@ impl WayshotConnection {
         callback: F,
     ) -> Result<LogicalRegion>
     where
-        F: Fn(&WayshotConnection) -> Result<LogicalRegion, WayshotError>,
+        F: Fn(&WayshotConnection) -> Result<LogicalRegion, Error>,
     {
         let mut state = LayerShellState {
             configured_outputs: HashSet::new(),
@@ -1020,7 +1020,7 @@ impl WayshotConnection {
                     "Failed to create compositor. Does your compositor implement WlCompositor?"
                 );
                 tracing::error!("err: {e}");
-                return Err(WayshotError::ProtocolNotFound(
+                return Err(Error::ProtocolNotFound(
                     "WlCompositor not found".to_string(),
                 ));
             }
@@ -1033,7 +1033,7 @@ impl WayshotConnection {
                     "Failed to create layer shell. Does your compositor implement WlrLayerShellV1?"
                 );
                 tracing::error!("err: {e}");
-                return Err(WayshotError::ProtocolNotFound(
+                return Err(Error::ProtocolNotFound(
                     "WlrLayerShellV1 not found".to_string(),
                 ));
             }
@@ -1058,19 +1058,19 @@ impl WayshotConnection {
                 let surface = compositor.create_surface(&qh, ());
                 let layer_surface = layer_shell.get_layer_surface(
                     &surface,
-                    Some(&output_info.output),
+                    Some(&output_info.wl_output),
                     Layer::Top,
                     "wayshot".to_string(),
                     &qh,
-                    output_info.output.clone(),
+                    output_info.wl_output.clone(),
                 );
                 layer_surface.set_exclusive_zone(-1);
                 layer_surface.set_anchor(Anchor::all());
-              
+
                 debug!("Committing surface creation changes.");
                 surface.commit();
                 debug!("Waiting for layer surface to be configured.");
-                while !state.configured_outputs.contains(&output_info.output) {
+                while !state.configured_outputs.contains(&output_info.wl_output) {
                     event_queue.blocking_dispatch(&mut state)?;
                 }
 
@@ -1236,7 +1236,7 @@ impl WayshotConnection {
                 )
                 .ok_or_else(|| {
                     tracing::error!("Provided capture region doesn't intersect with any outputs!");
-                    WayshotError::NoOutputs
+                    Error::NoOutputs
                 })?
         })
     }
@@ -1276,7 +1276,7 @@ impl WayshotConnection {
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
         if outputs.is_empty() {
-            return Err(WayshotError::NoOutputs);
+            return Err(Error::NoOutputs);
         }
 
         self.screenshot_region_capturer(RegionCapturer::Outputs(outputs.to_owned()), cursor_overlay)
