@@ -185,7 +185,7 @@ fn main() -> Result<()> {
                             // This again depends on the Compositor present,
                             // Compositors such as Cosmic doesn't have Ext/wlr data parsing protocol present
                             // so Clipboard doesn't work yet for Cosmic or any such Compositors.
-                            // However Stdout wasn't affected in any manner
+                            // However Stdout shouldn't be affected in any manner 
 
                             if clipboard {
                                 let mut buffer = Cursor::new(Vec::new());
