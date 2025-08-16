@@ -1066,7 +1066,7 @@ impl WayshotConnection {
                 );
                 layer_surface.set_exclusive_zone(-1);
                 layer_surface.set_anchor(Anchor::all());
-              
+
                 debug!("Committing surface creation changes.");
                 surface.commit();
                 debug!("Waiting for layer surface to be configured.");
