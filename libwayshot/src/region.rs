@@ -104,6 +104,7 @@ impl EmbeddedRegion {
             relative_to.inner.size.width as i32,
         );
         let width = if let Ok(width) = (x2 - x1).try_into() {
+            if width < 1 { return None };
             width
         } else {
             return None;
@@ -115,6 +116,7 @@ impl EmbeddedRegion {
             relative_to.inner.size.height as i32,
         );
         let height = if let Ok(height) = (y2 - y1).try_into() {
+            if height < 1 { return None };
             height
         } else {
             return None;
