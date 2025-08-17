@@ -42,6 +42,18 @@ pub struct Cli {
     #[arg(short, long)]
     pub geometry: bool,
 
+    /// Get color of a particular pixel at the given coordinates
+    #[arg(long, conflicts_with_all = ["geometry", "cursor"] )]
+    pub color: bool,
+
+    /// ScreenShot of a particular Application
+    #[arg(short, long, conflicts_with_all = ["geometry"] )]
+    pub toplevel: bool,
+
+    /// list all details of valid outputs
+    #[arg(long, alias = "list-outputs-info")]
+    pub list_outputs_info: bool,
+
     /// Enable cursor in screenshots
     #[arg(short, long)]
     pub cursor: bool,
