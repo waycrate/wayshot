@@ -372,11 +372,9 @@ impl WayshotConnection {
             println!("    LogicSize: {logical_width}, {logical_height}");
             println!("    Position: {x}, {y}");
             println!("    Scale: {scale}");
-
-
         }
     }
-          
+
     /// Query which `wl_shm::Format` the compositor supports for this output by performing a trial screenshot through wlr-screencopy protocol.
     /// # Parameters
     /// - `output`: Reference to the `WlOutput` to inspect.

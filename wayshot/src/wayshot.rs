@@ -169,7 +169,7 @@ fn main() -> Result<()> {
                     Ok((image_buffer_opt, result_variant)) => {
                         // If image_buffer_opt is None, it means stdout was used and we're done
                         if let Some(image_buffer) = image_buffer_opt {
-                            let mut image_buf: Option<Cursor<Vec<u8>>> = None;
+                            let image_buf: Option<Cursor<Vec<u8>>> = None;
                             if let Some(f) = file.as_ref() {
                                 if let Err(e) = image_buffer.save(f) {
                                     tracing::error!("Failed to save file '{}': {}", f.display(), e);
@@ -191,11 +191,11 @@ fn main() -> Result<()> {
                             if clipboard {
                                 if let Some(buf) = image_buf {
                                     clipboard_daemonize(buf)?;
-                              } else {
-                                let mut buffer = Cursor::new(Vec::new());
-                                image_buffer.write_to(&mut buffer, encoding.into())?;
-                                clipboard_daemonize(buffer)?;
-                              }
+                                } else {
+                                    let mut buffer = Cursor::new(Vec::new());
+                                    image_buffer.write_to(&mut buffer, encoding.into())?;
+                                    clipboard_daemonize(buffer)?;
+                                }
                             }
                         } else {
                             // Image was written to stdout, only handle clipboard if needed
