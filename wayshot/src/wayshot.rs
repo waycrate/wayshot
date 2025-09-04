@@ -17,6 +17,7 @@ use utils::waysip_to_region;
 
 use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
+use crate::utils::EncodingFormat;
 use rustix::runtime::{self, Fork};
 
 fn select_output<T>(outputs: &[T]) -> Option<usize>
@@ -163,7 +164,13 @@ fn main() -> Result<()> {
 
     let mut image_buf: Option<Cursor<Vec<u8>>> = None;
     if let Some(f) = file {
-        image_buffer.save(f)?;
+        if encoding == EncodingFormat::Jxl {
+            if let Err(e) = utils::encode_to_jxl(&image_buffer, &f) {
+                tracing::error!("Failed to encode to JXL: {}", e);
+            }
+        } else {
+            image_buffer.save(f)?;
+        }
     }
 
     if stdout_print {

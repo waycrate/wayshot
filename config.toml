@@ -20,5 +20,5 @@ log_level = "info"
 # refer to chrono formatting rules: https://docs.rs/chrono/latest/chrono/format/strftime/index.html
 name_format = "wayshot-%Y_%m_%d-%H_%M_%S"
 # screenshot file encoding
-# possible values: jpg, png, ppm, qui, webp, avif
+# possible values: jpg, png, ppm, qui, webp, avif, jxl
 encoding = "png"
