@@ -72,21 +72,20 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
             interface,
             version,
         } = event
+            && interface == "wl_output"
         {
-            if interface == "wl_output" {
-                if version >= 4 {
-                    let output = wl_registry.bind::<wl_output::WlOutput, _, _>(name, 4, qh, ());
-                    state.outputs.push(OutputInfo {
-                        wl_output: output,
-                        name: "".to_string(),
-                        description: String::new(),
-                        transform: wl_output::Transform::Normal,
-                        physical_size: Size::default(),
-                        logical_region: LogicalRegion::default(),
-                    });
-                } else {
-                    tracing::error!("Ignoring a wl_output with version < 4.");
-                }
+            if version >= 4 {
+                let output = wl_registry.bind::<wl_output::WlOutput, _, _>(name, 4, qh, ());
+                state.outputs.push(OutputInfo {
+                    wl_output: output,
+                    name: "".to_string(),
+                    description: String::new(),
+                    transform: wl_output::Transform::Normal,
+                    physical_size: Size::default(),
+                    logical_region: LogicalRegion::default(),
+                });
+            } else {
+                tracing::error!("Ignoring a wl_output with version < 4.");
             }
         }
     }

@@ -158,7 +158,7 @@ pub fn get_expanded_path(path: &Path) -> PathBuf {
 pub fn get_default_file_name(filename_format: &str, encoding: EncodingFormat) -> PathBuf {
     let format = Local::now().format(filename_format);
 
-    PathBuf::from(format!("{}.{}", format, encoding))
+    PathBuf::from(format!("{format}.{encoding}"))
 }
 
 pub fn get_full_file_name(path: &Path, filename_format: &str, encoding: EncodingFormat) -> PathBuf {
@@ -176,7 +176,7 @@ pub fn get_full_file_name(path: &Path, filename_format: &str, encoding: Encoding
             .file_stem()
             .unwrap_or_default()
             .to_string_lossy();
-        base_dir.join(format!("{}.{}", stem, encoding))
+        base_dir.join(format!("{stem}.{encoding}"))
     }
 }
 

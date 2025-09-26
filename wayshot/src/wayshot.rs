@@ -66,12 +66,12 @@ fn main() -> Result<()> {
         .or(input_encoding)
         .unwrap_or(file.encoding.unwrap_or_default());
 
-    if let Some(ie) = input_encoding {
-        if ie != encoding {
-            tracing::warn!(
-                "The encoding requested '{encoding}' does not match the output file's encoding '{ie}'. Still using the requested encoding however.",
-            );
-        }
+    if let Some(ie) = input_encoding
+        && ie != encoding
+    {
+        tracing::warn!(
+            "The encoding requested '{encoding}' does not match the output file's encoding '{ie}'. Still using the requested encoding however.",
+        );
     }
 
     let file_name_format = cli.file_name_format.unwrap_or(

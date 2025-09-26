@@ -143,10 +143,9 @@ impl Dispatch<wl_seat::WlSeat, ()> for WaylandEGLState {
         if let wl_seat::Event::Capabilities {
             capabilities: WEnum::Value(capabilities),
         } = event
+            && capabilities.contains(wl_seat::Capability::Keyboard)
         {
-            if capabilities.contains(wl_seat::Capability::Keyboard) {
-                seat.get_keyboard(qh, ());
-            }
+            seat.get_keyboard(qh, ());
         }
     }
 }
@@ -160,11 +159,11 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for WaylandEGLState {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        if let wl_keyboard::Event::Key { key, .. } = event {
-            if key == 1 {
-                // ESC key
-                state.running = false;
-            }
+        if let wl_keyboard::Event::Key { key, .. } = event
+            && key == 1
+        {
+            // ESC key
+            state.running = false;
         }
     }
 }
