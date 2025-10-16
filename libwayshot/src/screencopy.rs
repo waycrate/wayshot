@@ -17,6 +17,7 @@ use wayland_client::protocol::{
 
 use crate::{
     Error, Result,
+    convert::create_converter,
     region::{LogicalRegion, Size},
 };
 
@@ -125,6 +126,29 @@ pub struct FrameCopy {
     /// Logical region with the transform already applied.
     pub logical_region: LogicalRegion,
     pub physical_size: Size,
+}
+
+impl FrameCopy {
+    pub(crate) fn to_image(&mut self) -> Result<DynamicImage, Error> {
+        let frame_color_type = match create_converter(self.frame_format.format) {
+            Some(converter) => {
+                let FrameData::Mmap(raw) = &mut self.frame_data else {
+                    return Err(Error::InvalidColor);
+                };
+                converter.convert_inplace(raw)
+            }
+            _ => {
+                tracing::error!("Unsupported buffer format: {:?}", self.frame_format.format);
+                tracing::error!(
+                    "You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot."
+                );
+                return Err(Error::NoSupportedBufferFormat);
+            }
+        };
+        self.frame_color_type = frame_color_type;
+        let image: DynamicImage = (&*self).try_into()?;
+        Ok(image)
+    }
 }
 
 impl TryFrom<&FrameCopy> for DynamicImage {

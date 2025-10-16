@@ -66,7 +66,6 @@ use wayland_protocols_wlr::{
 };
 
 use crate::{
-    convert::create_converter,
     dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState},
     output::OutputInfo,
     region::{LogicalRegion, Size},
@@ -923,7 +922,6 @@ impl WayshotConnection {
             &qh,
             (),
         );
-        println!("{:?}", frame_format.format);
         let buffer = shm_pool.create_buffer(
             0,
             frame_format.size.width as i32,
@@ -977,18 +975,8 @@ impl WayshotConnection {
             capture_region,
         )?;
 
-        let mut frame_mmap = unsafe { MmapMut::map_mut(&mem_file)? };
-        let data = &mut *frame_mmap;
-        let frame_color_type = match create_converter(frame_format.format) {
-            Some(converter) => converter.convert_inplace(data),
-            _ => {
-                tracing::error!("Unsupported buffer format: {:?}", frame_format.format);
-                tracing::error!(
-                    "You can send a feature request for the above format to the mailing list for wayshot over at https://sr.ht/~shinyzenith/wayshot."
-                );
-                return Err(Error::NoSupportedBufferFormat);
-            }
-        };
+        let frame_mmap = unsafe { MmapMut::map_mut(&mem_file)? };
+
         let rotated_physical_size = match output_info.transform {
             Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270 => {
                 Size {
@@ -1000,7 +988,7 @@ impl WayshotConnection {
         };
         let frame_copy = FrameCopy {
             frame_format,
-            frame_color_type,
+            frame_color_type: image::ColorType::Rgb8,
             frame_data: FrameData::Mmap(frame_mmap),
             transform: output_info.transform,
             logical_region: capture_region
@@ -1209,9 +1197,9 @@ impl WayshotConnection {
 
             let rotate_join_handles = frames
                 .into_iter()
-                .map(|(frame_copy, _, _)| {
+                .map(|(mut frame_copy, _, _)| {
                     scope.spawn(move || {
-                        let image = (&frame_copy).try_into()?;
+                        let image = frame_copy.to_image()?;
                         Ok((
                             image_util::rotate_image_buffer(
                                 image,
@@ -1298,8 +1286,8 @@ impl WayshotConnection {
         output_info: &OutputInfo,
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
-        let (frame_copy, _) = self.capture_frame_copy(cursor_overlay, output_info, None)?;
-        (&frame_copy).try_into()
+        let (mut frame_copy, _) = self.capture_frame_copy(cursor_overlay, output_info, None)?;
+        frame_copy.to_image()
     }
 
     /// Take a screenshot from all of the specified outputs.
