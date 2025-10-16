@@ -277,12 +277,33 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
                 let format = state.formats.first_mut().unwrap();
                 format.size = Size { width, height };
                 format.stride = 4 * width;
+                for DMAFrameFormat {
+                    size:
+                        Size {
+                            width: dma_width,
+                            height: dma_height,
+                        },
+                    ..
+                } in &mut state.dmabuf_formats
+                {
+                    *dma_width = width;
+                    *dma_height = height;
+                }
             }
             ext_image_copy_capture_session_v1::Event::ShmFormat {
                 format: WEnum::Value(format),
             } => {
                 let set_format = state.formats.first_mut().unwrap();
                 set_format.format = format;
+            }
+            ext_image_copy_capture_session_v1::Event::DmabufFormat { format, .. } => {
+                state.dmabuf_formats.push(DMAFrameFormat {
+                    format,
+                    size: Size {
+                        width: 0,
+                        height: 0,
+                    },
+                });
             }
             _ => {}
         }

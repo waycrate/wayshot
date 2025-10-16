@@ -176,7 +176,7 @@ impl WayshotConnection {
                 tracing::error!(
                     "Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?"
                 );
-                panic!("{:#?}", e);
+                panic!("{e:#?}");
             }
         };
 
