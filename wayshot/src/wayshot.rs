@@ -13,15 +13,15 @@ mod config;
 mod utils;
 
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
+use libwaysip::WaySip;
 use utils::waysip_to_region;
-
 use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
 use rustix::runtime::{self, Fork};
 
 fn select_output<T>(outputs: &[T]) -> Option<usize>
 where
-    T: ToString,
+    T: ToString + std::fmt::Display,
 {
     let Ok(selection) = FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Choose Screen")
@@ -124,17 +124,14 @@ fn main() -> Result<()> {
     let image_buffer = if cli.geometry {
         wayshot_conn.screenshot_freeze(
             |w_conn| {
-                let info = libwaysip::get_area(
-                    Some(libwaysip::WaysipConnection {
-                        connection: &w_conn.conn,
-                        globals: &w_conn.globals,
-                    }),
-                    libwaysip::SelectionType::Area,
-                )
-                .map_err(|e| libwayshot::Error::FreezeCallbackError(e.to_string()))?
-                .ok_or(libwayshot::Error::FreezeCallbackError(
-                    "Failed to capture the area".to_string(),
-                ))?;
+                let info = WaySip::new()
+                    .with_connection(w_conn.conn.clone())
+                    .with_selection_type(libwaysip::SelectionType::Area)
+                    .get()
+                    .map_err(|e| libwayshot::Error::FreezeCallbackError(e.to_string()))?
+                    .ok_or(libwayshot::Error::FreezeCallbackError(
+                        "Failed to capture the area".to_string(),
+                    ))?;
                 waysip_to_region(info.size(), info.left_top_point())
             },
             cursor,

@@ -923,6 +923,7 @@ impl WayshotConnection {
             &qh,
             (),
         );
+        println!("{:?}", frame_format.format);
         let buffer = shm_pool.create_buffer(
             0,
             frame_format.size.width as i32,
@@ -1087,7 +1088,7 @@ impl WayshotConnection {
                 let layer_surface = layer_shell.get_layer_surface(
                     &surface,
                     Some(&output_info.wl_output),
-                    Layer::Top,
+                    Layer::Overlay,
                     "wayshot".to_string(),
                     &qh,
                     output_info.wl_output.clone(),

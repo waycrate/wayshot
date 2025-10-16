@@ -19,18 +19,18 @@ avif = ["image/avif"]
 [dependencies]
 tracing.workspace = true
 image = { version = "0.25", default-features = false }
-memmap2 = "0.9.5"
-rustix = { version = "1.0", features = ["fs", "shm"] }
+memmap2 = "0.9.8"
+rustix = { version = "1.1", features = ["fs", "shm"] }
 thiserror = "2"
 
-wayland-client = "0.31.8"
-wayland-protocols = { version = "0.32.6", features = [
+wayland-client = "0.31.11"
+wayland-protocols = { version = "0.32.9", features = [
 	"client",
 	"unstable",
 	"staging",
 ] }
-wayland-protocols-wlr = { version = "0.3.6", features = ["client"] }
-wayland-backend = { version = "0.3.10", features = ["client_system"] }
+wayland-protocols-wlr = { version = "0.3.9", features = ["client"] }
+wayland-backend = { version = "0.3.11", features = ["client_system"] }
 
 gbm = "0.18.0"
 drm = "0.14.1"

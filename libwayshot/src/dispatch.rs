@@ -281,6 +281,7 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
             ext_image_copy_capture_session_v1::Event::ShmFormat {
                 format: WEnum::Value(format),
             } => {
+                println!("it is {format:?}");
                 let set_format = state.formats.first_mut().unwrap();
                 set_format.format = format;
             }
