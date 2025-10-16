@@ -1199,7 +1199,7 @@ impl WayshotConnection {
                 .into_iter()
                 .map(|(mut frame_copy, _, _)| {
                     scope.spawn(move || {
-                        let image = frame_copy.to_image()?;
+                        let image = frame_copy.get_image()?;
                         Ok((
                             image_util::rotate_image_buffer(
                                 image,
@@ -1287,7 +1287,7 @@ impl WayshotConnection {
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
         let (mut frame_copy, _) = self.capture_frame_copy(cursor_overlay, output_info, None)?;
-        frame_copy.to_image()
+        frame_copy.get_image()
     }
 
     /// Take a screenshot from all of the specified outputs.

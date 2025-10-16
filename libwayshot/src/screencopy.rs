@@ -129,7 +129,7 @@ pub struct FrameCopy {
 }
 
 impl FrameCopy {
-    pub(crate) fn to_image(&mut self) -> Result<DynamicImage, Error> {
+    pub(crate) fn get_image(&mut self) -> Result<DynamicImage, Error> {
         let frame_color_type = match create_converter(self.frame_format.format) {
             Some(converter) => {
                 let FrameData::Mmap(raw) = &mut self.frame_data else {
