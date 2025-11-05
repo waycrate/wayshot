@@ -30,33 +30,11 @@ pub fn create_converter(format: wl_shm::Format) -> Option<Box<dyn Convert>> {
     match format {
         wl_shm::Format::Xbgr8888 | wl_shm::Format::Abgr8888 => Some(Box::<ConvertNone>::default()),
         wl_shm::Format::Xrgb8888 | wl_shm::Format::Argb8888 => Some(Box::<ConvertRGB8>::default()),
-        wl_shm::Format::Xrgb2101010 | wl_shm::Format::Argb2101010 => {
-            Some(Box::<ConvertRGB10>::default())
-        }
         wl_shm::Format::Xbgr2101010 | wl_shm::Format::Abgr2101010 => {
             Some(Box::<ConvertBGR10>::default())
         }
         wl_shm::Format::Bgr888 => Some(Box::<ConvertBGR888>::default()),
         _ => None,
-    }
-}
-
-impl Convert for ConvertRGB10 {
-    fn convert_inplace(&self, data: &mut [u8]) -> ColorType {
-        for chunk in data.chunks_exact_mut(4) {
-            let pixel = ((chunk[3] as u32) << 24)
-                | ((chunk[2] as u32) << 16)
-                | ((chunk[1] as u32) << 8)
-                | chunk[0] as u32;
-            let r = convert10_to_8(pixel >> SHIFT10BITS_1);
-            let g = convert10_to_8(pixel >> SHIFT10BITS_2);
-            let b = convert10_to_8(pixel);
-            chunk[0] = r;
-            chunk[1] = g;
-            chunk[2] = b;
-            chunk[3] = 255;
-        }
-        ColorType::Rgba8
     }
 }
 

@@ -18,9 +18,23 @@ use wayland_client::{
         wl_surface::WlSurface,
     },
 };
-
 use wayland_protocols::{
-    ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason,
+    ext::{
+        foreign_toplevel_list::v1::client::{
+            ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1,
+            ext_foreign_toplevel_list_v1::ExtForeignToplevelListV1,
+        },
+        image_capture_source::v1::client::ext_foreign_toplevel_image_capture_source_manager_v1::ExtForeignToplevelImageCaptureSourceManagerV1,
+        image_capture_source::v1::client::{
+            ext_image_capture_source_v1::ExtImageCaptureSourceV1,
+            ext_output_image_capture_source_manager_v1::ExtOutputImageCaptureSourceManagerV1,
+        },
+        image_copy_capture::v1::client::{
+            ext_image_copy_capture_frame_v1::{self, ExtImageCopyCaptureFrameV1},
+            ext_image_copy_capture_manager_v1::ExtImageCopyCaptureManagerV1,
+            ext_image_copy_capture_session_v1::{self, ExtImageCopyCaptureSessionV1},
+        },
+    },
     wp::{
         linux_dmabuf::zv1::client::{
             zwp_linux_buffer_params_v1::{self, ZwpLinuxBufferParamsV1},
@@ -46,7 +60,7 @@ use wayland_protocols_wlr::{
 
 use crate::{
     output::OutputInfo,
-    region::{LogicalRegion, Position, Size},
+    region::{LogicalRegion, Position, Size, TopLevel},
     screencopy::{DMAFrameFormat, FrameFormat},
 };
 
@@ -85,7 +99,6 @@ impl Dispatch<WlRegistry, ()> for OutputCaptureState {
                     transform: wl_output::Transform::Normal,
                     physical_size: Size::default(),
                     logical_region: LogicalRegion::default(),
-                    scale: 1,
                 });
             } else {
                 tracing::error!("Ignoring a wl_output with version < 4.");
@@ -134,9 +147,7 @@ impl Dispatch<WlOutput, ()> for OutputCaptureState {
             } => {
                 output.transform = transform;
             }
-            wl_output::Event::Scale { factor } => {
-                output.scale = factor;
-            }
+            wl_output::Event::Scale { .. } => {}
             wl_output::Event::Done => {}
             _ => {}
         }
@@ -183,15 +194,13 @@ impl Dispatch<ZxdgOutputV1, usize> for OutputCaptureState {
     }
 }
 
-/// State of the frame after attempting to copy its data to a buffer.
+/// State of the frame after attempting to copy it's data to a wl_buffer.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum FrameState {
     /// Compositor returned a failed event on calling `frame.copy`.
-    Failed(Option<WEnum<FailureReason>>),
+    Failed,
     /// Compositor sent a Ready event on calling `frame.copy`.
-    Succeeded,
-    /// Capture is still pending (not yet failed or succeeded).
-    Pending,
+    Finished,
 }
 
 pub struct CaptureFrameState {
@@ -199,6 +208,7 @@ pub struct CaptureFrameState {
     pub dmabuf_formats: Vec<DMAFrameFormat>,
     pub state: Option<FrameState>,
     pub buffer_done: AtomicBool,
+    pub toplevels: Vec<TopLevel>,
 }
 
 impl Dispatch<ZwpLinuxDmabufV1, ()> for CaptureFrameState {
@@ -222,6 +232,132 @@ impl Dispatch<ZwpLinuxBufferParamsV1, ()> for CaptureFrameState {
         _conn: &Connection,
         _qhandle: &QueueHandle<Self>,
     ) {
+    }
+}
+
+impl Dispatch<ExtImageCopyCaptureFrameV1, ()> for CaptureFrameState {
+    fn event(
+        state: &mut Self,
+        _proxy: &ExtImageCopyCaptureFrameV1,
+        event: <ExtImageCopyCaptureFrameV1 as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        match event {
+            ext_image_copy_capture_frame_v1::Event::Ready => {
+                state.buffer_done.store(true, Ordering::Relaxed);
+                state.state = Some(FrameState::Finished);
+            }
+            ext_image_copy_capture_frame_v1::Event::Failed { .. } => {
+                state.buffer_done.store(true, Ordering::Relaxed);
+                state.state = Some(FrameState::Failed);
+            }
+            ext_image_copy_capture_frame_v1::Event::Transform { .. } => {}
+            _ => {}
+        }
+    }
+}
+
+impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
+    fn event(
+        state: &mut Self,
+        _proxy: &ExtImageCopyCaptureSessionV1,
+        event: <ExtImageCopyCaptureSessionV1 as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        if state.formats.is_empty() {
+            state.formats.push(FrameFormat {
+                format: wayland_client::protocol::wl_shm::Format::Rgb888A8,
+                size: Size {
+                    width: 0,
+                    height: 0,
+                },
+                stride: 0,
+            });
+        }
+        match event {
+            ext_image_copy_capture_session_v1::Event::BufferSize { width, height } => {
+                let format = state.formats.first_mut().unwrap();
+                format.size = Size { width, height };
+                format.stride = 4 * width;
+                for DMAFrameFormat {
+                    size:
+                        Size {
+                            width: dma_width,
+                            height: dma_height,
+                        },
+                    ..
+                } in &mut state.dmabuf_formats
+                {
+                    *dma_width = width;
+                    *dma_height = height;
+                }
+            }
+            ext_image_copy_capture_session_v1::Event::ShmFormat {
+                format: WEnum::Value(format),
+            } => {
+                let set_format = state.formats.first_mut().unwrap();
+                //set_format.format = format;
+                set_format.format = wayland_client::protocol::wl_shm::Format::Xbgr8888; // <-- Uncomment this
+            }
+            ext_image_copy_capture_session_v1::Event::DmabufFormat { format, .. } => {
+                state.dmabuf_formats.push(DMAFrameFormat {
+                    format,
+                    size: Size {
+                        width: 0,
+                        height: 0,
+                    },
+                });
+            }
+            _ => {}
+        }
+    }
+}
+
+impl Dispatch<ExtForeignToplevelListV1, ()> for CaptureFrameState {
+    fn event(
+        state: &mut Self,
+        _proxy: &ExtForeignToplevelListV1,
+        event: <ExtForeignToplevelListV1 as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        use wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_list_v1::Event;
+
+        if let Event::Toplevel { toplevel } = event {
+            state.toplevels.push(TopLevel::new(toplevel));
+        }
+    }
+
+    wayland_client::event_created_child!(CaptureFrameState, ExtForeignToplevelHandleV1, [
+        wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_list_v1::EVT_TOPLEVEL_OPCODE => (ExtForeignToplevelHandleV1, ())
+    ]);
+}
+
+impl Dispatch<ExtForeignToplevelHandleV1, ()> for CaptureFrameState {
+    fn event(
+        state: &mut Self,
+        toplevel: &ExtForeignToplevelHandleV1,
+        event: <ExtForeignToplevelHandleV1 as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        use wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_handle_v1::Event;
+
+        if let Some(toplevel_obj) = state.toplevels.iter_mut().find(|t| t.handle == *toplevel) {
+            match event {
+                Event::Title { title } => toplevel_obj.title = title,
+                Event::AppId { app_id } => toplevel_obj.app_id = app_id,
+                Event::Identifier { identifier } => toplevel_obj.identifier = identifier,
+                Event::Closed => toplevel_obj.active = false,
+                _ => {}
+            }
+        }
     }
 }
 
@@ -256,10 +392,10 @@ impl Dispatch<ZwlrScreencopyFrameV1, ()> for CaptureFrameState {
             zwlr_screencopy_frame_v1::Event::Ready { .. } => {
                 // If the frame is successfully copied, a “flags” and a “ready” events are sent. Otherwise, a “failed” event is sent.
                 // This is useful when we call .copy on the frame object.
-                frame.state.replace(FrameState::Succeeded);
+                frame.state.replace(FrameState::Finished);
             }
             zwlr_screencopy_frame_v1::Event::Failed => {
-                frame.state.replace(FrameState::Failed(None));
+                frame.state.replace(FrameState::Failed);
             }
             zwlr_screencopy_frame_v1::Event::Damage { .. } => {}
             zwlr_screencopy_frame_v1::Event::LinuxDmabuf {
@@ -287,6 +423,12 @@ delegate_noop!(CaptureFrameState: ignore WlShm);
 delegate_noop!(CaptureFrameState: ignore WlShmPool);
 delegate_noop!(CaptureFrameState: ignore WlBuffer);
 delegate_noop!(CaptureFrameState: ignore ZwlrScreencopyManagerV1);
+delegate_noop!(CaptureFrameState: ignore ExtImageCopyCaptureManagerV1);
+delegate_noop!(CaptureFrameState: ignore ExtOutputImageCaptureSourceManagerV1);
+delegate_noop!(CaptureFrameState: ignore ExtImageCaptureSourceV1);
+delegate_noop!(CaptureFrameState: ignore ExtForeignToplevelImageCaptureSourceManagerV1);
+
+// TODO: Create a xdg-shell surface, check for the enter event, grab the output from it.
 
 pub struct WayshotState {}
 delegate_noop!(WayshotState: ignore ZwpLinuxDmabufV1);
@@ -302,56 +444,9 @@ impl wayland_client::Dispatch<wl_registry::WlRegistry, GlobalListContents> for W
     }
 }
 
-pub(crate) struct Card(std::fs::File);
-
-/// Implementing [`AsFd`] is a prerequisite to implementing the traits found
-/// in this crate. Here, we are just calling [`File::as_fd()`] on the inner
-/// [`File`].
-impl AsFd for Card {
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        self.0.as_fd()
-    }
-}
-impl drm::Device for Card {}
-/// Simple helper methods for opening a `Card`.
-impl Card {
-    pub fn open(path: &str) -> Self {
-        let mut options = std::fs::OpenOptions::new();
-        options.read(true);
-        options.write(true);
-        Card(options.open(path).unwrap())
-    }
-}
-#[derive(Debug)]
-pub(crate) struct DMABUFState {
-    pub linux_dmabuf: ZwpLinuxDmabufV1,
-    pub gbmdev: gbm::Device<Card>,
-}
-
 pub struct LayerShellState {
     pub configured_outputs: HashSet<WlOutput>,
 }
-
-impl LayerShellState {
-    pub(crate) fn new() -> Self {
-        Self {
-            configured_outputs: HashSet::new(),
-        }
-    }
-}
-
-// Here there is another problem for Cosmic Based Compositor
-// Currently LayerShell works flawlessly for wlroots based compositors such as sway or Treeland,
-// However when it comes to compositors like Cosmic, this doesn't seem to work properly..
-// The Layer won't appear on Cosmic similar to other compositors even while Cosmic does indeed support wlr_shell && wlr_layer_surface.
-
-// To Fix this, I have previously implemented XDG based layer shell and Surface which seemingly works fine for Cosmic.
-// However another dilemma here is while the previous scenario,
-// the wlr protocols didn't work, but now this works even while having waysip still uses the very same wlr protocols.
-
-// Aakash and I have deemed this again another one of the quirks of Cosmic Alpha build
-// So I have reverted it back to wlr-based protocols
-// but If anyone believes on converting waysip to xdg based protocols, do let me know I can gladly add Back the xdg protocols code for wayshot again.
 
 delegate_noop!(LayerShellState: ignore WlCompositor);
 delegate_noop!(LayerShellState: ignore WlShm);
@@ -390,190 +485,28 @@ impl wayland_client::Dispatch<ZwlrLayerSurfaceV1, WlOutput> for LayerShellState 
         }
     }
 }
+pub(crate) struct Card(std::fs::File);
 
-use wayland_protocols::ext::image_copy_capture::v1::client::{
-    ext_image_copy_capture_frame_v1::{self, ExtImageCopyCaptureFrameV1},
-    ext_image_copy_capture_manager_v1::ExtImageCopyCaptureManagerV1,
-    ext_image_copy_capture_session_v1::{self, ExtImageCopyCaptureSessionV1},
-};
-
-use wayland_protocols::ext::image_capture_source::v1::client::{
-    ext_foreign_toplevel_image_capture_source_manager_v1::ExtForeignToplevelImageCaptureSourceManagerV1,
-    ext_image_capture_source_v1::ExtImageCaptureSourceV1,
-    ext_output_image_capture_source_manager_v1::ExtOutputImageCaptureSourceManagerV1,
-};
-
-use wayland_protocols::ext::foreign_toplevel_list::v1::client::{
-    ext_foreign_toplevel_handle_v1::{self, ExtForeignToplevelHandleV1},
-    ext_foreign_toplevel_list_v1::{self, ExtForeignToplevelListV1},
-};
-
-use wayland_client::event_created_child;
-
-use crate::WayshotConnection;
-use crate::ext_image_protocols::{CaptureInfo, TopLevel};
-
-delegate_noop!(WayshotConnection: ignore ExtImageCaptureSourceV1);
-delegate_noop!(WayshotConnection: ignore ExtOutputImageCaptureSourceManagerV1);
-delegate_noop!(WayshotConnection: ignore ExtForeignToplevelImageCaptureSourceManagerV1);
-delegate_noop!(WayshotConnection: ignore WlShm);
-delegate_noop!(WayshotConnection: ignore ZxdgOutputManagerV1);
-delegate_noop!(WayshotConnection: ignore ExtImageCopyCaptureManagerV1);
-delegate_noop!(WayshotConnection: ignore WlBuffer);
-delegate_noop!(WayshotConnection: ignore WlShmPool);
-
-impl Dispatch<WlRegistry, GlobalListContents> for WayshotConnection {
-    fn event(
-        _state: &mut Self,
-        _proxy: &WlRegistry,
-        _event: <WlRegistry as wayland_client::Proxy>::Event,
-        _data: &GlobalListContents,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-    ) {
+/// Implementing [`AsFd`] is a prerequisite to implementing the traits found
+/// in this crate. Here, we are just calling [`File::as_fd()`] on the inner
+/// [`File`].
+impl AsFd for Card {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.0.as_fd()
     }
 }
-
-impl Dispatch<ExtForeignToplevelListV1, ()> for WayshotConnection {
-    fn event(
-        state: &mut Self,
-        _proxy: &ExtForeignToplevelListV1,
-        event: <ExtForeignToplevelListV1 as Proxy>::Event,
-        _data: &(),
-        _conn: &Connection,
-        _qhandle: &wayland_client::QueueHandle<Self>,
-    ) {
-        if let ext_foreign_toplevel_list_v1::Event::Toplevel { toplevel } = event {
-            state
-                .ext_image
-                .as_mut()
-                .expect("ext_image should be initialized")
-                .toplevels
-                .push(TopLevel::new(toplevel));
-        }
-    }
-    event_created_child!(WayshotConnection, ExtForeignToplevelHandleV1, [
-        ext_foreign_toplevel_list_v1::EVT_TOPLEVEL_OPCODE => (ExtForeignToplevelHandleV1, ())
-    ]);
-}
-
-impl Dispatch<ExtForeignToplevelHandleV1, ()> for WayshotConnection {
-    fn event(
-        state: &mut Self,
-        toplevel: &ExtForeignToplevelHandleV1,
-        event: <ExtForeignToplevelHandleV1 as Proxy>::Event,
-        _data: &(),
-        _conn: &Connection,
-        _qhandle: &wayland_client::QueueHandle<Self>,
-    ) {
-        // Use ext_image.toplevels for all fields
-        let toplevels = match state.ext_image.as_mut() {
-            Some(ext_image) => &mut ext_image.toplevels,
-            None => return,
-        };
-        match event {
-            ext_foreign_toplevel_handle_v1::Event::Title { title } => {
-                if let Some(current_info) = toplevels
-                    .iter_mut()
-                    .find(|my_toplevel| my_toplevel.handle == *toplevel)
-                {
-                    current_info.title = title;
-                }
-            }
-            ext_foreign_toplevel_handle_v1::Event::AppId { app_id } => {
-                if let Some(current_info) = toplevels
-                    .iter_mut()
-                    .find(|my_toplevel| my_toplevel.handle == *toplevel)
-                {
-                    current_info.app_id = app_id;
-                }
-            }
-            ext_foreign_toplevel_handle_v1::Event::Identifier { identifier } => {
-                if let Some(current_info) = toplevels
-                    .iter_mut()
-                    .find(|my_toplevel| my_toplevel.handle == *toplevel)
-                {
-                    current_info.identifier = identifier;
-                }
-            }
-            ext_foreign_toplevel_handle_v1::Event::Closed => {
-                if let Some(current_info) = toplevels
-                    .iter_mut()
-                    .find(|my_toplevel| my_toplevel.handle == *toplevel)
-                {
-                    current_info.active = false;
-                }
-            }
-            _ => {}
-        }
+impl drm::Device for Card {}
+/// Simple helper methods for opening a `Card`.
+impl Card {
+    pub fn open(path: &str) -> Self {
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true);
+        options.write(true);
+        Card(options.open(path).unwrap())
     }
 }
-
-use std::sync::{Arc, RwLock};
-
-impl Dispatch<ExtImageCopyCaptureFrameV1, Arc<RwLock<CaptureInfo>>> for WayshotConnection {
-    fn event(
-        _state: &mut Self,
-        _proxy: &ExtImageCopyCaptureFrameV1,
-        event: <ExtImageCopyCaptureFrameV1 as Proxy>::Event,
-        data: &Arc<RwLock<CaptureInfo>>,
-        _conn: &Connection,
-        _qhandle: &wayland_client::QueueHandle<Self>,
-    ) {
-        let mut data = data.write().unwrap();
-        match event {
-            ext_image_copy_capture_frame_v1::Event::Ready => {
-                data.state = FrameState::Succeeded;
-            }
-            ext_image_copy_capture_frame_v1::Event::Failed { reason } => {
-                data.state = FrameState::Failed(Some(reason))
-            }
-            ext_image_copy_capture_frame_v1::Event::Transform {
-                transform: WEnum::Value(transform),
-            } => {
-                data.transform = transform;
-            }
-            _ => {}
-        }
-    }
-}
-
-//Currently the below Dispatch function does work
-//however for certain few compositors which doesn't display the format properly
-//such as Cosmic, this protocol will fail,
-//Currently its under assumption that Cosmic still being Alpha is the source of problem
-//Giving benefit of the Doubt that the code works correctly as it works in sway.
-
-// I will try to better explain this later in the blog I will write After my exams, (I will maybe link it here)
-
-//To Try making this work on Cosmic simply Comment the few code statements below.
-
-impl Dispatch<ExtImageCopyCaptureSessionV1, Arc<RwLock<FrameFormat>>> for WayshotConnection {
-    fn event(
-        _state: &mut Self,
-        _proxy: &ExtImageCopyCaptureSessionV1,
-        event: <ExtImageCopyCaptureSessionV1 as Proxy>::Event,
-        data: &Arc<RwLock<FrameFormat>>,
-        _conn: &Connection,
-        _qhandle: &wayland_client::QueueHandle<Self>,
-    ) {
-        let mut frame_info = data.write().unwrap();
-        match event {
-            ext_image_copy_capture_session_v1::Event::BufferSize { width, height } => {
-                frame_info.size = Size { width, height };
-            }
-            ext_image_copy_capture_session_v1::Event::ShmFormat {
-                format: WEnum::Value(fmt),
-            } => {
-                tracing::trace!("Compositor supports shm format: {fmt:?}");
-                if frame_info.format == wayland_client::protocol::wl_shm::Format::Xbgr8888 {
-                    //<-- This
-                    //frame_info.format = wayland_client::protocol::wl_shm::Format::Xbgr8888; // <-- Uncomment this
-                    frame_info.format = fmt; // <-- This
-                } // <-- This
-            }
-            ext_image_copy_capture_session_v1::Event::Done => {}
-            _ => {}
-        }
-    }
+#[derive(Debug)]
+pub(crate) struct DMABUFState {
+    pub linux_dmabuf: ZwpLinuxDmabufV1,
+    pub gbmdev: gbm::Device<Card>,
 }

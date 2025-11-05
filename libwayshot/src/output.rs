@@ -1,6 +1,8 @@
-use crate::region::{LogicalRegion, Size};
 use std::fmt::Display;
+
 use wayland_client::protocol::{wl_output, wl_output::WlOutput};
+
+use crate::region::{LogicalRegion, Size};
 
 /// Represents an accessible wayland output.
 ///
@@ -13,17 +15,7 @@ pub struct OutputInfo {
     pub transform: wl_output::Transform,
     pub physical_size: Size,
     pub logical_region: LogicalRegion,
-    pub scale: i32,
 }
-
-// The scale in OutputInfo is currently not being used anywhere,
-// I originally planned to use it to calculate the stride somehow rather than hard-coding it,
-// But I suppose it went over my head, and I couldn't perform it.
-
-// For whoever is planning to work on it,
-// Be mindful of the scaling as it can break the image structure and wlshm memory.
-// Again As I was testing on Cosmic, Format which are being displayed and do end up working,
-// Don't again necessarily work on Cosmic due to Wl-shm memory handling which could again be Cosmic's Alpha stage issue.
 
 impl Display for OutputInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -33,5 +25,11 @@ impl Display for OutputInfo {
             name = self.name,
             description = self.description
         )
+    }
+}
+
+impl OutputInfo {
+    pub(crate) fn scale(&self) -> f64 {
+        self.physical_size.height as f64 / self.logical_region.inner.size.height as f64
     }
 }

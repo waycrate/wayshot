@@ -9,7 +9,6 @@ use wayland_client::{
 
 pub type Result<T, E = Error> = result::Result<T, E>;
 
-/// Error type for wayshot.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("no outputs supplied")]
@@ -46,8 +45,6 @@ pub enum Error {
     EGLError(#[from] khronos_egl::Error),
     #[error("No EGLImageTargetTexture2DOES function located, this extension may not be supported")]
     EGLImageToTexProcNotFoundError,
-    #[error("Not Support format")]
-    NotSupportFormat,
-    #[error("Capture Failed")]
+    #[error("Capture failed: {0}")]
     CaptureFailed(String),
 }
