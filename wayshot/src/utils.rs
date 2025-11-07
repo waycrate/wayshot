@@ -36,12 +36,13 @@ pub fn waysip_to_region(
 }
 
 /// Supported image encoding formats.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum EncodingFormat {
     /// JPG/JPEG encoder.
     Jpg,
     /// PNG encoder.
+    #[default]
     Png,
     /// PPM encoder.
     Ppm,
@@ -51,12 +52,6 @@ pub enum EncodingFormat {
     Webp,
     /// Avif encoder,
     Avif,
-}
-
-impl Default for EncodingFormat {
-    fn default() -> Self {
-        Self::Png
-    }
 }
 
 impl From<EncodingFormat> for image::ImageFormat {

@@ -10,9 +10,6 @@ pub trait Convert {
 struct ConvertBGR10 {}
 
 #[derive(Default)]
-struct ConvertRGB10 {}
-
-#[derive(Default)]
 struct ConvertNone {}
 
 #[derive(Default)]

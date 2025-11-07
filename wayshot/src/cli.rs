@@ -55,6 +55,10 @@ pub struct Cli {
     #[arg(short, long, alias = "list-outputs")]
     pub list_outputs: bool,
 
+    /// List all valid outputs with their name, description, size, and position
+    #[arg(long)]
+    pub list_outputs_info: bool,
+
     /// List all toplevel windows (applications)
     #[arg(long, alias = "list-windows")]
     pub list_toplevels: bool,

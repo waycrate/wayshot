@@ -96,6 +96,7 @@ pub struct WayshotConnection {
     pub conn: Connection,
     pub globals: GlobalList,
     output_infos: Vec<OutputInfo>,
+    toplevel_infos: Vec<TopLevel>,
     dmabuf_state: Option<DMABUFState>,
 }
 
@@ -111,29 +112,6 @@ impl WayshotConnection {
         Self::from_connection(conn)
     }
 
-    // Remove broken get_all_toplevels/refresh_toplevels, and provide a proper lister instead
-    /// Return the current set of toplevel (window) handles and metadata.
-    pub fn list_toplevels(&self) -> Result<Vec<TopLevel>> {
-        let mut state = CaptureFrameState {
-            formats: Vec::new(),
-            dmabuf_formats: Vec::new(),
-            state: None,
-            buffer_done: AtomicBool::new(false),
-            toplevels: Vec::new(),
-        };
-        let mut event_queue = self.conn.new_event_queue::<CaptureFrameState>();
-        let qh = event_queue.handle();
-        // Bind the toplevel list global so we receive events into CaptureFrameState
-        let _toplevel_list = self
-            .globals
-            .bind::<ExtForeignToplevelListV1, _, _>(&qh, 1..=1, ())?;
-        // Dispatch at least once to receive initial toplevel announcements and properties
-        event_queue.roundtrip(&mut state)?;
-        // An additional roundtrip can pick up titles/app_ids that may arrive after creation
-        let _ = event_queue.roundtrip(&mut state);
-        Ok(state.toplevels)
-    }
-
     /// Recommended if you already have a [`wayland_client::Connection`].
     pub fn from_connection(conn: Connection) -> Result<Self> {
         let (globals, _) = registry_queue_init::<WayshotState>(&conn)?;
@@ -142,10 +120,12 @@ impl WayshotConnection {
             conn,
             globals,
             output_infos: Vec::new(),
+            toplevel_infos: Vec::new(),
             dmabuf_state: None,
         };
 
         initial_state.refresh_outputs()?;
+        initial_state.refresh_toplevels()?;
 
         Ok(initial_state)
     }
@@ -166,6 +146,7 @@ impl WayshotConnection {
             conn,
             globals,
             output_infos: Vec::new(),
+            toplevel_infos: vec![],
             dmabuf_state: Some(DMABUFState {
                 linux_dmabuf,
                 gbmdev: gbm,
@@ -235,6 +216,63 @@ impl WayshotConnection {
 
         Ok(())
     }
+
+    pub fn get_all_toplevels(&self) -> &[TopLevel] {
+        self.toplevel_infos.as_slice()
+    }
+
+    pub fn refresh_toplevels(&mut self) -> Result<()> {
+        let mut state = CaptureFrameState {
+            formats: Vec::new(),
+            dmabuf_formats: Vec::new(),
+            state: None,
+            buffer_done: AtomicBool::new(false),
+            toplevels: Vec::new(),
+        };
+
+        let mut event_queue = self.conn.new_event_queue::<CaptureFrameState>();
+        let qh = event_queue.handle();
+
+        let _toplevel_list = self
+            .globals
+            .bind::<ExtForeignToplevelListV1, _, _>(&qh, 1..=1, ())?;
+
+        event_queue.roundtrip(&mut state)?;
+        event_queue.roundtrip(&mut state)?;
+
+        self.toplevel_infos = state.toplevels;
+        Ok(())
+    }
+
+    /// print the displays' info
+    pub fn print_displays_info(&self) {
+        for OutputInfo {
+            physical_size: Size { width, height },
+            logical_region:
+                LogicalRegion {
+                    inner:
+                        region::Region {
+                            position: region::Position { x, y },
+                            size:
+                                Size {
+                                    width: logical_width,
+                                    height: logical_height,
+                                },
+                        },
+                },
+            name,
+            description,
+            ..
+        } in self.get_all_outputs()
+        {
+            println!("{name}");
+            println!("description: {description}");
+            println!("    Size: {width},{height}");
+            println!("    LogicSize: {logical_width}, {logical_height}");
+            println!("    Position: {x}, {y}");
+        }
+    }
+
     /// Query which `wl_shm::Format` the compositor supports for this output by performing a trial screenshot through wlr-screencopy protocol.
     /// # Parameters
     /// - `output`: Reference to the `WlOutput` to inspect.

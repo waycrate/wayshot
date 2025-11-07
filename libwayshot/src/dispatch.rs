@@ -4,7 +4,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 use wayland_client::{
-    Connection, Dispatch, Proxy, QueueHandle,
+    Connection, Dispatch, QueueHandle,
     WEnum::{self, Value},
     delegate_noop,
     globals::GlobalListContents,
@@ -300,8 +300,8 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
                 format: WEnum::Value(format),
             } => {
                 let set_format = state.formats.first_mut().unwrap();
-                //set_format.format = format;
-                set_format.format = wayland_client::protocol::wl_shm::Format::Xbgr8888; // <-- Uncomment this
+                set_format.format = format;
+                //set_format.format = wayland_client::protocol::wl_shm::Format::Xbgr8888; // <-- For Cosmic
             }
             ext_image_copy_capture_session_v1::Event::DmabufFormat { format, .. } => {
                 state.dmabuf_formats.push(DMAFrameFormat {

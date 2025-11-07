@@ -121,11 +121,14 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    if cli.list_outputs_info {
+        wayshot_conn.print_displays_info();
+        return Ok(());
+    }
+
     if cli.list_toplevels {
-        let toplevels = wayshot_conn
-            .list_toplevels()
-            .map_err(|e| eyre::eyre!("Failed to list toplevels: {e}"))?;
-        for tl in toplevels.into_iter().filter(|t| t.active) {
+        let toplevels = wayshot_conn.get_all_toplevels();
+        for tl in toplevels.iter().filter(|t| t.active) {
             writeln!(writer, "{}", tl.id_and_title())?;
         }
         writer.flush()?;
@@ -148,23 +151,19 @@ fn main() -> Result<()> {
             cursor,
         )?
     } else if let Some(ref name) = cli.toplevel {
-        let toplevels = wayshot_conn
-            .list_toplevels()
-            .map_err(|e| eyre::eyre!("Failed to list toplevels: {e}"))?;
+        let toplevels = wayshot_conn.get_all_toplevels();
         let maybe = toplevels
-            .into_iter()
+            .iter()
             .filter(|t| t.active)
             .find(|t| t.id_and_title() == *name);
         if let Some(toplevel) = maybe {
-            wayshot_conn.screenshot_toplevel(toplevel, cursor)?
+            wayshot_conn.screenshot_toplevel(toplevel.clone(), cursor)?
         } else {
             bail!("No toplevel window matched '{name}'")
         }
     } else if cli.choose_toplevel {
-        let toplevels = wayshot_conn
-            .list_toplevels()
-            .map_err(|e| eyre::eyre!("Failed to list toplevels: {e}"))?;
-        let active: Vec<_> = toplevels.into_iter().filter(|t| t.active).collect();
+        let toplevels = wayshot_conn.get_all_toplevels();
+        let active: Vec<_> = toplevels.iter().filter(|t| t.active).collect();
         if active.is_empty() {
             bail!("No active toplevel windows found!");
         }
