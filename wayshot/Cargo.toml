@@ -44,7 +44,6 @@ toml = { version = "0.8.23", default-features = false, features = ["parse"] }
 serde = { version = "1.0.219", features = ["derive"] }
 dirs = "6.0.0"
 libwaysip = "0.5.0"
-thiserror = "2.0.12"
 notify-rust = "4.11.7"
 
 [[bin]]

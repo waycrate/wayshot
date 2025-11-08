@@ -2524,7 +2524,6 @@ dependencies = [
  "rustix 1.0.7",
  "serde",
  "shellexpand",
- "thiserror 2.0.17",
  "toml",
  "tracing",
  "tracing-subscriber",

@@ -238,7 +238,6 @@ impl WayshotConnection {
             .bind::<ExtForeignToplevelListV1, _, _>(&qh, 1..=1, ())?;
 
         event_queue.roundtrip(&mut state)?;
-        event_queue.roundtrip(&mut state)?;
 
         self.toplevel_infos = state.toplevels;
         Ok(())
