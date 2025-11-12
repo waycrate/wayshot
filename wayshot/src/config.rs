@@ -42,6 +42,7 @@ pub struct Base {
     pub file: Option<bool>,
     pub stdout: Option<bool>,
     pub log_level: Option<String>,
+    pub notifications: Option<bool>,
 }
 
 impl Default for Base {
@@ -53,6 +54,7 @@ impl Default for Base {
             file: Some(true),
             stdout: Some(false),
             log_level: Some("info".to_string()),
+            notifications: Some(true),
         }
     }
 }

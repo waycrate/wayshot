@@ -1,10 +1,10 @@
-use std::cmp;
-
 use crate::{
     WayshotConnection,
     error::{Error, Result},
     output::OutputInfo,
 };
+use std::cmp;
+use wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1;
 
 pub type FreezeCallback = Box<dyn Fn(&WayshotConnection) -> Result<LogicalRegion>>;
 
@@ -14,10 +14,37 @@ pub enum RegionCapturer {
     Outputs(Vec<OutputInfo>),
     /// Capture an already known `LogicalRegion`.
     Region(LogicalRegion),
+    /// Capture a specific toplevel window.
+    TopLevel(TopLevel),
     /// The outputs will be "frozen" to the user at which point the given
     /// callback is called to get the region to capture. This callback is often
     /// a user interaction to let the user select a region.
     Freeze(FreezeCallback),
+}
+
+#[derive(Debug, Clone)]
+pub struct TopLevel {
+    pub handle: ExtForeignToplevelHandleV1,
+    pub title: String,
+    pub app_id: String,
+    pub identifier: String,
+    pub active: bool,
+}
+
+impl TopLevel {
+    pub fn new(handle: ExtForeignToplevelHandleV1) -> Self {
+        Self {
+            handle,
+            title: String::new(),
+            app_id: String::new(),
+            identifier: String::new(),
+            active: true,
+        }
+    }
+
+    pub fn id_and_title(&self) -> String {
+        format!("{} {}", self.app_id, self.title)
+    }
 }
 
 /// `Region` where the coordinate system is the logical coordinate system used
