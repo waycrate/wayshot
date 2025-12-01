@@ -52,9 +52,9 @@ mod tests {
     use super::*;
     use drm::buffer::UnrecognizedFourcc;
     use wayland_client::{
-        backend::{protocol::ProtocolError, WaylandError, InvalidId, ObjectId},
-        globals::{BindError, GlobalError},
         ConnectError, DispatchError,
+        backend::{InvalidId, ObjectId, WaylandError, protocol::ProtocolError},
+        globals::{BindError, GlobalError},
     };
 
     #[test]

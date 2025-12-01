@@ -34,12 +34,14 @@ impl OutputInfo {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use crate::region::{Position, Region};
-    use std::mem::{self, MaybeUninit};
-    use std::ptr;
+    use std::mem;
+    use std::os::unix::net::UnixStream;
+    use wayland_backend::client::Backend;
+    use wayland_client::Proxy;
 
     fn make_output_info(
         name: &str,
@@ -47,20 +49,23 @@ mod tests {
         physical_size: Size,
         logical_region: LogicalRegion,
     ) -> OutputInfo {
-        let dummy_wl_output = unsafe {
-            let mut uninit = MaybeUninit::<WlOutput>::uninit();
-            ptr::write_bytes(uninit.as_mut_ptr(), 1, 1);
-            uninit.assume_init()
-        };
-
         OutputInfo {
-            wl_output: dummy_wl_output,
+            wl_output: dummy_wl_output(),
             name: name.to_string(),
             description: description.to_string(),
             transform: wl_output::Transform::Normal,
             physical_size,
             logical_region,
         }
+    }
+
+    fn dummy_wl_output() -> WlOutput {
+        let (client, server) = UnixStream::pair().expect("unix stream");
+        Box::leak(Box::new(server));
+        let backend = Backend::connect(client).expect("backend");
+        let weak = backend.downgrade();
+        Box::leak(Box::new(backend));
+        WlOutput::inert(weak)
     }
 
     #[test]
@@ -181,4 +186,65 @@ mod tests {
         mem::forget(output_info_1_5);
     }
 
+    #[test]
+    fn debug_format() {
+        let output_info = make_output_info(
+            "HDMI-1",
+            "Debug Display",
+            Size {
+                width: 800,
+                height: 600,
+            },
+            LogicalRegion {
+                inner: Region {
+                    position: Position { x: 0, y: 0 },
+                    size: Size {
+                        width: 800,
+                        height: 600,
+                    },
+                },
+            },
+        );
+
+        let debug_str = format!("{:?}", output_info);
+        assert!(debug_str.contains("OutputInfo"));
+        assert!(debug_str.contains("HDMI-1"));
+        assert!(debug_str.contains("Debug Display"));
+        assert!(debug_str.contains("800"));
+        assert!(debug_str.contains("600"));
+
+        mem::forget(output_info);
+    }
+
+    #[test]
+    fn clone_and_partial_eq() {
+        let output_info_1 = make_output_info(
+            "HDMI-1",
+            "Clone Display",
+            Size {
+                width: 1024,
+                height: 768,
+            },
+            LogicalRegion {
+                inner: Region {
+                    position: Position { x: 0, y: 0 },
+                    size: Size {
+                        width: 1024,
+                        height: 768,
+                    },
+                },
+            },
+        );
+
+        let output_info_2 = output_info_1.clone();
+
+        assert_eq!(output_info_1, output_info_2);
+        assert_eq!(output_info_1.name, output_info_2.name);
+        assert_eq!(output_info_1.description, output_info_2.description);
+        assert_eq!(output_info_1.physical_size, output_info_2.physical_size);
+        assert_eq!(output_info_1.logical_region, output_info_2.logical_region);
+
+        mem::forget(output_info_1);
+        mem::forget(output_info_2);
+    }
 }
