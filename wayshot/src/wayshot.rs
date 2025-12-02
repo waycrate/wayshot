@@ -13,8 +13,8 @@ mod config;
 mod utils;
 
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
-use utils::waysip_to_region;
-
+use libwaysip::WaySip;
+use utils::{ShotResult, send_notification, waysip_to_region};
 use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
 use crate::utils::EncodingFormat;
@@ -22,7 +22,7 @@ use rustix::runtime::{self, Fork};
 
 fn select_output<T>(outputs: &[T]) -> Option<usize>
 where
-    T: ToString,
+    T: ToString + std::fmt::Display,
 {
     let Ok(selection) = FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Choose Screen")
@@ -41,6 +41,7 @@ fn main() -> Result<()> {
     let config = Config::load(&config_path).unwrap_or_default();
     let base = config.base.unwrap_or_default();
     let file = config.file.unwrap_or_default();
+    let notifications_enabled = base.notifications.unwrap_or(true);
 
     let log_level = cli.log_level.unwrap_or(base.get_log_level());
     tracing_subscriber::fmt()
@@ -106,7 +107,7 @@ fn main() -> Result<()> {
 
     let output = cli.output.or(base.output);
 
-    let wayshot_conn = WayshotConnection::new()?;
+    let mut wayshot_conn = WayshotConnection::new()?;
 
     let stdout = io::stdout();
     let mut writer = BufWriter::new(stdout.lock());
@@ -122,76 +123,148 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let image_buffer = if cli.geometry {
-        wayshot_conn.screenshot_freeze(
-            |w_conn| {
-                let info = libwaysip::get_area(
-                    Some(libwaysip::WaysipConnection {
-                        connection: &w_conn.conn,
-                        globals: &w_conn.globals,
-                    }),
-                    libwaysip::SelectionType::Area,
-                )
-                .map_err(|e| libwayshot::Error::FreezeCallbackError(e.to_string()))?
-                .ok_or(libwayshot::Error::FreezeCallbackError(
-                    "Failed to capture the area".to_string(),
-                ))?;
-                waysip_to_region(info.size(), info.left_top_point())
-            },
-            cursor,
-        )?
-    } else if let Some(output_name) = output {
-        let outputs = wayshot_conn.get_all_outputs();
-        if let Some(output) = outputs.iter().find(|output| output.name == output_name) {
-            wayshot_conn.screenshot_single_output(output, cursor)?
-        } else {
-            bail!("No output found!");
-        }
-    } else if cli.choose_output {
-        let outputs = wayshot_conn.get_all_outputs();
-        let output_names: Vec<&str> = outputs
-            .iter()
-            .map(|display| display.name.as_str())
-            .collect();
-        if let Some(index) = select_output(&output_names) {
-            wayshot_conn.screenshot_single_output(&outputs[index], cursor)?
-        } else {
-            bail!("No output found!");
-        }
-    } else {
-        wayshot_conn.screenshot_all(cursor)?
-    };
+    if cli.list_outputs_info {
+        wayshot_conn.print_displays_info();
+        return Ok(());
+    }
 
-    let mut image_buf: Option<Cursor<Vec<u8>>> = None;
-    if let Some(f) = file {
-        if encoding == EncodingFormat::Jxl {
-            if let Err(e) = utils::encode_to_jxl(&image_buffer, &f) {
-                tracing::error!("Failed to encode to JXL: {}", e);
+    if cli.list_toplevels {
+        let toplevels = wayshot_conn.get_all_toplevels();
+        for tl in toplevels.iter().filter(|t| t.active) {
+            writeln!(writer, "{}", tl.id_and_title())?;
+        }
+        writer.flush()?;
+        return Ok(());
+    }
+
+    let result = (|| -> Result<(image::DynamicImage, ShotResult)> {
+        if cli.geometry {
+            Ok((
+                wayshot_conn.screenshot_freeze(
+                    |w_conn| {
+                        let info = WaySip::new()
+                            .with_connection(w_conn.conn.clone())
+                            .with_selection_type(libwaysip::SelectionType::Area)
+                            .get()
+                            .map_err(|e| libwayshot::Error::FreezeCallbackError(e.to_string()))?
+                            .ok_or(libwayshot::Error::FreezeCallbackError(
+                                "Failed to capture the area".to_string(),
+                            ))?;
+                        waysip_to_region(info.size(), info.left_top_point())
+                    },
+                    cursor,
+                )?,
+                ShotResult::Area,
+            ))
+        } else if let Some(ref name) = cli.toplevel {
+            let toplevels = wayshot_conn.get_all_toplevels();
+            let maybe = toplevels
+                .iter()
+                .filter(|t| t.active)
+                .find(|t| t.id_and_title() == *name);
+            if let Some(toplevel) = maybe {
+                Ok((
+                    wayshot_conn.screenshot_toplevel(toplevel.clone(), cursor)?,
+                    ShotResult::Toplevel { name: name.clone() },
+                ))
+            } else {
+                bail!("No toplevel window matched '{name}'")
+            }
+        } else if cli.choose_toplevel {
+            let toplevels = wayshot_conn.get_all_toplevels();
+            let active: Vec<_> = toplevels.iter().filter(|t| t.active).collect();
+            if active.is_empty() {
+                bail!("No active toplevel windows found!");
+            }
+            let names: Vec<String> = active.iter().map(|t| t.id_and_title()).collect();
+            if let Some(idx) = select_output(&names) {
+                Ok((
+                    wayshot_conn.screenshot_toplevel(active[idx].clone(), cursor)?,
+                    ShotResult::Toplevel {
+                        name: names[idx].clone(),
+                    },
+                ))
+            } else {
+                bail!("No toplevel window selected!");
+            }
+        } else if let Some(output_name) = output {
+            let outputs = wayshot_conn.get_all_outputs();
+            if let Some(output) = outputs.iter().find(|output| output.name == output_name) {
+                Ok((
+                    wayshot_conn.screenshot_single_output(output, cursor)?,
+                    ShotResult::Output {
+                        name: output_name.clone(),
+                    },
+                ))
+            } else {
+                bail!("No output found!");
+            }
+        } else if cli.choose_output {
+            let outputs = wayshot_conn.get_all_outputs();
+            let output_names: Vec<&str> = outputs
+                .iter()
+                .map(|display| display.name.as_str())
+                .collect();
+            if let Some(index) = select_output(&output_names) {
+                Ok((
+                    wayshot_conn.screenshot_single_output(&outputs[index], cursor)?,
+                    ShotResult::Output {
+                        name: output_names[index].to_string(),
+                    },
+                ))
+            } else {
+                bail!("No output found!");
             }
         } else {
-            image_buffer.save(f)?;
+            Ok((wayshot_conn.screenshot_all(cursor)?, ShotResult::All))
         }
-    }
+    })();
 
-    if stdout_print {
-        let mut buffer = Cursor::new(Vec::new());
-        image_buffer.write_to(&mut buffer, encoding.into())?;
-        writer.write_all(buffer.get_ref())?;
-        image_buf = Some(buffer);
-    }
+    match result {
+        Ok((image_buffer, shot_result)) => {
+            let mut image_buf: Option<Cursor<Vec<u8>>> = None;
 
-    if clipboard {
-        clipboard_daemonize(match image_buf {
-            Some(buf) => buf,
-            None => {
+            if let Some(f) = file {
+                if encoding == EncodingFormat::Jxl {
+                    if let Err(e) = utils::encode_to_jxl(&image_buffer, &f) {
+                        tracing::error!("Failed to encode to JXL: {}", e);
+                    }
+                } else {
+                    image_buffer.save(f)?;
+                }
+            }
+
+            if stdout_print {
                 let mut buffer = Cursor::new(Vec::new());
                 image_buffer.write_to(&mut buffer, encoding.into())?;
-                buffer
+                writer.write_all(buffer.get_ref())?;
+                image_buf = Some(buffer);
             }
-        })?;
-    }
 
-    Ok(())
+            if clipboard {
+                clipboard_daemonize(match image_buf {
+                    Some(buf) => buf,
+                    None => {
+                        let mut buffer = Cursor::new(Vec::new());
+                        image_buffer.write_to(&mut buffer, encoding.into())?;
+                        buffer
+                    }
+                })?;
+            }
+
+            if notifications_enabled {
+                send_notification(Ok(shot_result));
+            }
+
+            Ok(())
+        }
+        Err(e) => {
+            if notifications_enabled {
+                send_notification(Err(&e));
+            }
+            Err(e)
+        }
+    }
 }
 
 /// Daemonize and copy the given buffer containing the encoded image to the clipboard

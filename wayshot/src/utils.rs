@@ -1,5 +1,6 @@
 use clap::ValueEnum;
 use eyre::{ContextCompat, Error, bail};
+use notify_rust::Notification;
 
 use image::DynamicImage;
 use jpegxl_rs::encode::EncoderResult;
@@ -40,12 +41,13 @@ pub fn waysip_to_region(
 }
 
 /// Supported image encoding formats.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum EncodingFormat {
     /// JPG/JPEG encoder.
     Jpg,
     /// PNG encoder.
+    #[default]
     Png,
     /// PPM encoder.
     Ppm,
@@ -57,12 +59,6 @@ pub enum EncodingFormat {
     Avif,
     /// JPEG-XL encoder,
     Jxl,
-}
-
-impl Default for EncodingFormat {
-    fn default() -> Self {
-        Self::Png
-    }
 }
 
 impl From<EncodingFormat> for image::ImageFormat {
@@ -200,4 +196,43 @@ pub fn encode_to_jxl(
     file.write_all(&data)?;
 
     Ok(())
+}
+
+const TIMEOUT: i32 = 5000;
+
+#[derive(Debug, Clone)]
+pub enum ShotResult {
+    Output { name: String },
+    Toplevel { name: String },
+    Area,
+    All,
+}
+
+pub fn send_notification(shot_result: Result<ShotResult, &Error>) {
+    match shot_result {
+        Ok(result) => {
+            let body = match result {
+                ShotResult::Output { name } => {
+                    format!("Screenshot of output '{}' saved", name)
+                }
+                ShotResult::Toplevel { name } => {
+                    format!("Screenshot of toplevel '{}' saved", name)
+                }
+                ShotResult::Area => "Screenshot of selected area saved".to_string(),
+                ShotResult::All => "Screenshot of all outputs saved".to_string(),
+            };
+            let _ = Notification::new()
+                .summary("Screenshot Taken")
+                .body(&body)
+                .timeout(TIMEOUT)
+                .show();
+        }
+        Err(e) => {
+            let _ = Notification::new()
+                .summary("Screenshot Failed")
+                .body(&e.to_string())
+                .timeout(TIMEOUT)
+                .show();
+        }
+    }
 }

@@ -55,13 +55,29 @@ pub struct Cli {
     #[arg(short, long, alias = "list-outputs")]
     pub list_outputs: bool,
 
+    /// List all valid outputs with their name, description, size, and position
+    #[arg(long)]
+    pub list_outputs_info: bool,
+
+    /// List all toplevel windows (applications)
+    #[arg(long, alias = "list-windows")]
+    pub list_toplevels: bool,
+
     /// Choose a particular output/display to screenshot
     #[arg(short, long, conflicts_with = "geometry")]
     pub output: Option<String>,
 
+    /// Capture a specific toplevel window by name ("app_id title").
+    #[arg(long, alias = "window", conflicts_with_all = ["geometry", "output", "choose_output", "choose_toplevel"])]
+    pub toplevel: Option<String>,
+
     /// Present a fuzzy selector for output/display selection
     #[arg(long, alias = "choose-output", conflicts_with_all = ["geometry", "output"])]
     pub choose_output: bool,
+
+    /// Present a fuzzy selector for toplevel/window selection
+    #[arg(long, alias = "choose-window", conflicts_with_all = ["geometry", "output", "choose_output", "toplevel"])]
+    pub choose_toplevel: bool,
 
     /// Output file name's formatting.
     /// Defaults to config value (`wayshot-%Y_%m_%d-%H_%M_%S`)

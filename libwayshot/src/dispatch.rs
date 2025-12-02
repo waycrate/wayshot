@@ -19,6 +19,22 @@ use wayland_client::{
     },
 };
 use wayland_protocols::{
+    ext::{
+        foreign_toplevel_list::v1::client::{
+            ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1,
+            ext_foreign_toplevel_list_v1::ExtForeignToplevelListV1,
+        },
+        image_capture_source::v1::client::ext_foreign_toplevel_image_capture_source_manager_v1::ExtForeignToplevelImageCaptureSourceManagerV1,
+        image_capture_source::v1::client::{
+            ext_image_capture_source_v1::ExtImageCaptureSourceV1,
+            ext_output_image_capture_source_manager_v1::ExtOutputImageCaptureSourceManagerV1,
+        },
+        image_copy_capture::v1::client::{
+            ext_image_copy_capture_frame_v1::{self, ExtImageCopyCaptureFrameV1},
+            ext_image_copy_capture_manager_v1::ExtImageCopyCaptureManagerV1,
+            ext_image_copy_capture_session_v1::{self, ExtImageCopyCaptureSessionV1},
+        },
+    },
     wp::{
         linux_dmabuf::zv1::client::{
             zwp_linux_buffer_params_v1::{self, ZwpLinuxBufferParamsV1},
@@ -44,7 +60,7 @@ use wayland_protocols_wlr::{
 
 use crate::{
     output::OutputInfo,
-    region::{LogicalRegion, Position, Size},
+    region::{LogicalRegion, Position, Size, TopLevel},
     screencopy::{DMAFrameFormat, FrameFormat},
 };
 
@@ -192,6 +208,7 @@ pub struct CaptureFrameState {
     pub dmabuf_formats: Vec<DMAFrameFormat>,
     pub state: Option<FrameState>,
     pub buffer_done: AtomicBool,
+    pub toplevels: Vec<TopLevel>,
 }
 
 impl Dispatch<ZwpLinuxDmabufV1, ()> for CaptureFrameState {
@@ -215,6 +232,132 @@ impl Dispatch<ZwpLinuxBufferParamsV1, ()> for CaptureFrameState {
         _conn: &Connection,
         _qhandle: &QueueHandle<Self>,
     ) {
+    }
+}
+
+impl Dispatch<ExtImageCopyCaptureFrameV1, ()> for CaptureFrameState {
+    fn event(
+        state: &mut Self,
+        _proxy: &ExtImageCopyCaptureFrameV1,
+        event: <ExtImageCopyCaptureFrameV1 as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        match event {
+            ext_image_copy_capture_frame_v1::Event::Ready => {
+                state.buffer_done.store(true, Ordering::Relaxed);
+                state.state = Some(FrameState::Finished);
+            }
+            ext_image_copy_capture_frame_v1::Event::Failed { .. } => {
+                state.buffer_done.store(true, Ordering::Relaxed);
+                state.state = Some(FrameState::Failed);
+            }
+            ext_image_copy_capture_frame_v1::Event::Transform { .. } => {}
+            _ => {}
+        }
+    }
+}
+
+impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
+    fn event(
+        state: &mut Self,
+        _proxy: &ExtImageCopyCaptureSessionV1,
+        event: <ExtImageCopyCaptureSessionV1 as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        if state.formats.is_empty() {
+            state.formats.push(FrameFormat {
+                format: wayland_client::protocol::wl_shm::Format::Rgb888A8,
+                size: Size {
+                    width: 0,
+                    height: 0,
+                },
+                stride: 0,
+            });
+        }
+        match event {
+            ext_image_copy_capture_session_v1::Event::BufferSize { width, height } => {
+                let format = state.formats.first_mut().unwrap();
+                format.size = Size { width, height };
+                format.stride = 4 * width;
+                for DMAFrameFormat {
+                    size:
+                        Size {
+                            width: dma_width,
+                            height: dma_height,
+                        },
+                    ..
+                } in &mut state.dmabuf_formats
+                {
+                    *dma_width = width;
+                    *dma_height = height;
+                }
+            }
+            ext_image_copy_capture_session_v1::Event::ShmFormat {
+                format: WEnum::Value(format),
+            } => {
+                let set_format = state.formats.first_mut().unwrap();
+                set_format.format = format;
+                //set_format.format = wayland_client::protocol::wl_shm::Format::Xbgr8888; // <-- For Cosmic
+            }
+            ext_image_copy_capture_session_v1::Event::DmabufFormat { format, .. } => {
+                state.dmabuf_formats.push(DMAFrameFormat {
+                    format,
+                    size: Size {
+                        width: 0,
+                        height: 0,
+                    },
+                });
+            }
+            _ => {}
+        }
+    }
+}
+
+impl Dispatch<ExtForeignToplevelListV1, ()> for CaptureFrameState {
+    fn event(
+        state: &mut Self,
+        _proxy: &ExtForeignToplevelListV1,
+        event: <ExtForeignToplevelListV1 as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        use wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_list_v1::Event;
+
+        if let Event::Toplevel { toplevel } = event {
+            state.toplevels.push(TopLevel::new(toplevel));
+        }
+    }
+
+    wayland_client::event_created_child!(CaptureFrameState, ExtForeignToplevelHandleV1, [
+        wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_list_v1::EVT_TOPLEVEL_OPCODE => (ExtForeignToplevelHandleV1, ())
+    ]);
+}
+
+impl Dispatch<ExtForeignToplevelHandleV1, ()> for CaptureFrameState {
+    fn event(
+        state: &mut Self,
+        toplevel: &ExtForeignToplevelHandleV1,
+        event: <ExtForeignToplevelHandleV1 as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        use wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_handle_v1::Event;
+
+        if let Some(toplevel_obj) = state.toplevels.iter_mut().find(|t| t.handle == *toplevel) {
+            match event {
+                Event::Title { title } => toplevel_obj.title = title,
+                Event::AppId { app_id } => toplevel_obj.app_id = app_id,
+                Event::Identifier { identifier } => toplevel_obj.identifier = identifier,
+                Event::Closed => toplevel_obj.active = false,
+                _ => {}
+            }
+        }
     }
 }
 
@@ -280,6 +423,10 @@ delegate_noop!(CaptureFrameState: ignore WlShm);
 delegate_noop!(CaptureFrameState: ignore WlShmPool);
 delegate_noop!(CaptureFrameState: ignore WlBuffer);
 delegate_noop!(CaptureFrameState: ignore ZwlrScreencopyManagerV1);
+delegate_noop!(CaptureFrameState: ignore ExtImageCopyCaptureManagerV1);
+delegate_noop!(CaptureFrameState: ignore ExtOutputImageCaptureSourceManagerV1);
+delegate_noop!(CaptureFrameState: ignore ExtImageCaptureSourceV1);
+delegate_noop!(CaptureFrameState: ignore ExtForeignToplevelImageCaptureSourceManagerV1);
 
 // TODO: Create a xdg-shell surface, check for the enter event, grab the output from it.
 

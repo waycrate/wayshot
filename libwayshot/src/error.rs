@@ -45,4 +45,6 @@ pub enum Error {
     EGLError(#[from] khronos_egl::Error),
     #[error("No EGLImageTargetTexture2DOES function located, this extension may not be supported")]
     EGLImageToTexProcNotFoundError,
+    #[error("Capture failed: {0}")]
+    CaptureFailed(String),
 }
