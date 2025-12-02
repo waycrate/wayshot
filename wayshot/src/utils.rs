@@ -70,8 +70,9 @@ impl From<EncodingFormat> for image::ImageFormat {
             EncodingFormat::Qoi => image::ImageFormat::Qoi,
             EncodingFormat::Webp => image::ImageFormat::WebP,
             EncodingFormat::Avif => image::ImageFormat::Avif,
-            // TODO: this makes clipboard and stdout use pure jpeg instead of jxl while image-rs doesn't support it
-            EncodingFormat::Jxl => image::ImageFormat::Jpeg,
+            // Note: JXL is handled separately via encode_to_jxl_bytes since image-rs doesn't support it yet
+            // This fallback is only used if the code path somehow reaches here (shouldn't happen)
+            EncodingFormat::Jxl => image::ImageFormat::Png,
         }
     }
 }
@@ -176,12 +177,9 @@ pub fn get_full_file_name(path: &Path, filename_format: &str, encoding: Encoding
     }
 }
 
-// This is a temporary solution while jxl is not supported in image-rs crate
-// see: https://github.com/image-rs/image/issues/1765
-pub fn encode_to_jxl(
+pub fn encode_to_jxl_bytes(
     image_buffer: &DynamicImage,
-    path: &PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let width = image_buffer.width();
     let height = image_buffer.height();
 
@@ -192,6 +190,15 @@ pub fn encode_to_jxl(
 
     let mut encoder = jpegxl_rs::encoder_builder().build()?;
     let EncoderResult { data, .. } = encoder.encode::<u8, u8>(pixels, width, height)?;
+
+    Ok(data.to_vec())
+}
+
+pub fn encode_to_jxl(
+    image_buffer: &DynamicImage,
+    path: &PathBuf,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let data = encode_to_jxl_bytes(image_buffer)?;
     let mut file = File::create(path)?;
     file.write_all(&data)?;
 

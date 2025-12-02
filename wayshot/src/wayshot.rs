@@ -235,8 +235,15 @@ fn main() -> Result<()> {
             }
 
             if stdout_print {
-                let mut buffer = Cursor::new(Vec::new());
-                image_buffer.write_to(&mut buffer, encoding.into())?;
+                let buffer = if encoding == EncodingFormat::Jxl {
+                    let data = utils::encode_to_jxl_bytes(&image_buffer)
+                        .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
+                    Cursor::new(data)
+                } else {
+                    let mut buffer = Cursor::new(Vec::new());
+                    image_buffer.write_to(&mut buffer, encoding.into())?;
+                    buffer
+                };
                 writer.write_all(buffer.get_ref())?;
                 image_buf = Some(buffer);
             }
@@ -245,9 +252,15 @@ fn main() -> Result<()> {
                 clipboard_daemonize(match image_buf {
                     Some(buf) => buf,
                     None => {
-                        let mut buffer = Cursor::new(Vec::new());
-                        image_buffer.write_to(&mut buffer, encoding.into())?;
-                        buffer
+                        if encoding == EncodingFormat::Jxl {
+                            let data = utils::encode_to_jxl_bytes(&image_buffer)
+                                .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
+                            Cursor::new(data)
+                        } else {
+                            let mut buffer = Cursor::new(Vec::new());
+                            image_buffer.write_to(&mut buffer, encoding.into())?;
+                            buffer
+                        }
                     }
                 })?;
             }
