@@ -17,6 +17,7 @@ use libwaysip::WaySip;
 use utils::{ShotResult, send_notification, waysip_to_region};
 use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
+use crate::utils::EncodingFormat;
 use rustix::runtime::{self, Fork};
 
 fn select_output<T>(outputs: &[T]) -> Option<usize>
@@ -224,12 +225,25 @@ fn main() -> Result<()> {
             let mut image_buf: Option<Cursor<Vec<u8>>> = None;
 
             if let Some(f) = file {
-                image_buffer.save(f)?;
+                if encoding == EncodingFormat::Jxl {
+                    if let Err(e) = utils::encode_to_jxl(&image_buffer, &f) {
+                        tracing::error!("Failed to encode to JXL: {}", e);
+                    }
+                } else {
+                    image_buffer.save(f)?;
+                }
             }
 
             if stdout_print {
-                let mut buffer = Cursor::new(Vec::new());
-                image_buffer.write_to(&mut buffer, encoding.into())?;
+                let buffer = if encoding == EncodingFormat::Jxl {
+                    let data = utils::encode_to_jxl_bytes(&image_buffer)
+                        .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
+                    Cursor::new(data)
+                } else {
+                    let mut buffer = Cursor::new(Vec::new());
+                    image_buffer.write_to(&mut buffer, encoding.into())?;
+                    buffer
+                };
                 writer.write_all(buffer.get_ref())?;
                 image_buf = Some(buffer);
             }
@@ -238,9 +252,15 @@ fn main() -> Result<()> {
                 clipboard_daemonize(match image_buf {
                     Some(buf) => buf,
                     None => {
-                        let mut buffer = Cursor::new(Vec::new());
-                        image_buffer.write_to(&mut buffer, encoding.into())?;
-                        buffer
+                        if encoding == EncodingFormat::Jxl {
+                            let data = utils::encode_to_jxl_bytes(&image_buffer)
+                                .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
+                            Cursor::new(data)
+                        } else {
+                            let mut buffer = Cursor::new(Vec::new());
+                            image_buffer.write_to(&mut buffer, encoding.into())?;
+                            buffer
+                        }
                     }
                 })?;
             }

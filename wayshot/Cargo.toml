@@ -31,6 +31,7 @@ image = { version = "0.25", default-features = false, features = [
 	"webp",
 	"avif",
 ] }
+jpegxl-rs = "0.11"
 
 dialoguer = { version = "0.11.0", features = ["fuzzy-select"] }
 eyre = "0.6.12"

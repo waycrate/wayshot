@@ -2,10 +2,14 @@ use clap::ValueEnum;
 use eyre::{ContextCompat, Error, bail};
 use notify_rust::Notification;
 
+use image::DynamicImage;
+use jpegxl_rs::encode::EncoderResult;
 use serde::{Deserialize, Serialize};
 use std::{
     env,
     fmt::Display,
+    fs::File,
+    io::Write,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -53,6 +57,8 @@ pub enum EncodingFormat {
     Webp,
     /// Avif encoder,
     Avif,
+    /// JPEG-XL encoder,
+    Jxl,
 }
 
 impl From<EncodingFormat> for image::ImageFormat {
@@ -64,6 +70,9 @@ impl From<EncodingFormat> for image::ImageFormat {
             EncodingFormat::Qoi => image::ImageFormat::Qoi,
             EncodingFormat::Webp => image::ImageFormat::WebP,
             EncodingFormat::Avif => image::ImageFormat::Avif,
+            // Note: JXL is handled separately via encode_to_jxl_bytes since image-rs doesn't support it yet
+            // This fallback is only used if the code path somehow reaches here (shouldn't happen)
+            EncodingFormat::Jxl => image::ImageFormat::Png,
         }
     }
 }
@@ -104,6 +113,7 @@ impl From<EncodingFormat> for &str {
             EncodingFormat::Qoi => "qoi",
             EncodingFormat::Webp => "webp",
             EncodingFormat::Avif => "avif",
+            EncodingFormat::Jxl => "jxl",
         }
     }
 }
@@ -119,6 +129,7 @@ impl FromStr for EncodingFormat {
             "qoi" => Self::Qoi,
             "webp" => Self::Webp,
             "avif" => Self::Avif,
+            "jxl" => Self::Jxl,
             _ => bail!("unsupported extension '{s}'"),
         })
     }
@@ -164,6 +175,34 @@ pub fn get_full_file_name(path: &Path, filename_format: &str, encoding: Encoding
             .to_string_lossy();
         base_dir.join(format!("{stem}.{encoding}"))
     }
+}
+
+pub fn encode_to_jxl_bytes(
+    image_buffer: &DynamicImage,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let width = image_buffer.width();
+    let height = image_buffer.height();
+
+    // using buffer with alpha channel results in bad output and we don't need alpha on screenshot anyway
+    // see: https://github.com/inflation/jpegxl-rs/issues/96
+    let pixels_rgb8 = image_buffer.to_rgb8();
+    let pixels = pixels_rgb8.as_raw();
+
+    let mut encoder = jpegxl_rs::encoder_builder().build()?;
+    let EncoderResult { data, .. } = encoder.encode::<u8, u8>(pixels, width, height)?;
+
+    Ok(data.to_vec())
+}
+
+pub fn encode_to_jxl(
+    image_buffer: &DynamicImage,
+    path: &PathBuf,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let data = encode_to_jxl_bytes(image_buffer)?;
+    let mut file = File::create(path)?;
+    file.write_all(&data)?;
+
+    Ok(())
 }
 
 const TIMEOUT: i32 = 5000;
