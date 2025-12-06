@@ -56,3 +56,32 @@ jobs:
         sudo apt update
         sudo apt install --no-install-recommends scdoc
         for file in $(find . -type f -iwholename "./docs/*.scd"); do scdoc < $file > /dev/null; done
+
+  publish-crate:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    permissions:
+      contents: write
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - build
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy rustfmt
+    - name: Install wayland dependencies
+      run: |
+        pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo
+    - name: Obtain crates.io token
+      uses: rust-lang/crates-io-auth-action@b7e9a28eded4986ec6b1fa40eeee8f8f165559ec # v1.0.3
+      id: auth
+    - name: Publish to crates.io
+      run: |
+        cargo publish -p libwayshot
+        cargo publish -p wayshot
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
