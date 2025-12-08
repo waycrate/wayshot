@@ -63,6 +63,7 @@ jobs:
       image: archlinux:latest
     permissions:
       contents: write
+      id-token: write
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
       - build
