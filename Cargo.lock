@@ -2753,7 +2753,7 @@ dependencies = [
 
 [[package]]
 name = "wayshot"
-version = "1.4.0"
+version = "1.4.0-rc1"
 dependencies = [
  "chrono",
  "clap",
