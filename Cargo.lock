@@ -1414,7 +1414,7 @@ dependencies = [
 
 [[package]]
 name = "libwayshot"
-version = "0.4.0"
+version = "0.4.0-rc1"
 dependencies = [
  "drm",
  "gbm",
