@@ -98,11 +98,22 @@ pub struct WayshotConnection {
     output_infos: Vec<OutputInfo>,
     toplevel_infos: Vec<TopLevel>,
     dmabuf_state: Option<DMABUFState>,
+    toplevel_capture_support: bool,
 }
 
 pub enum WayshotFrame {
     WlrScreenshot(ZwlrScreencopyFrameV1),
     ExtImageCopy(ExtImageCopyCaptureFrameV1),
+}
+
+fn check_toplevel_protocols(globals: &GlobalList, conn: &Connection) -> Result<()> {
+    let event_queue = conn.new_event_queue::<CaptureFrameState>();
+    let qh = event_queue.handle();
+
+    // Bind managers
+    globals.bind::<ExtImageCopyCaptureManagerV1, _, _>(&qh, 1..=1, ())?;
+    globals.bind::<ExtForeignToplevelImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())?;
+    Ok(())
 }
 
 impl WayshotConnection {
@@ -116,12 +127,14 @@ impl WayshotConnection {
     pub fn from_connection(conn: Connection) -> Result<Self> {
         let (globals, _) = registry_queue_init::<WayshotState>(&conn)?;
 
+        let toplevel_capture_support = check_toplevel_protocols(&globals, &conn).is_ok();
         let mut initial_state = Self {
             conn,
             globals,
             output_infos: Vec::new(),
             toplevel_infos: Vec::new(),
             dmabuf_state: None,
+            toplevel_capture_support,
         };
 
         initial_state.refresh_outputs()?;
@@ -142,6 +155,7 @@ impl WayshotConnection {
         let gpu = dispatch::Card::open(device_path);
         // init a GBM device
         let gbm = GBMDevice::new(gpu).unwrap();
+        let toplevel_capture_support = check_toplevel_protocols(&globals, &conn).is_ok();
         let mut initial_state = Self {
             conn,
             globals,
@@ -151,11 +165,17 @@ impl WayshotConnection {
                 linux_dmabuf,
                 gbmdev: gbm,
             }),
+            toplevel_capture_support,
         };
 
         initial_state.refresh_outputs()?;
 
         Ok(initial_state)
+    }
+
+    /// Check if the toplevel_capture is supported
+    pub fn toplevel_capture_support(&self) -> bool {
+        self.toplevel_capture_support
     }
 
     /// Fetch all accessible wayland outputs.
