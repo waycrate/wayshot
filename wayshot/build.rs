@@ -9,6 +9,9 @@ use std::{
 };
 
 fn main() -> Result<()> {
+    if std::env::var("CARGO_PUBLISH").is_ok() {
+        return Ok(());
+    }
     if let Err(e) = Command::new("scdoc")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
