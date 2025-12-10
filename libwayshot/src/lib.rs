@@ -70,9 +70,12 @@ use wayland_protocols_wlr::{
 
 use crate::{
     dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState},
+    screencopy::{FrameCopy, FrameFormat, create_shm_fd},
+};
+
+pub use crate::{
     output::OutputInfo,
     region::{EmbeddedRegion, LogicalRegion, RegionCapturer, Size, TopLevel},
-    screencopy::{FrameCopy, FrameFormat, create_shm_fd},
 };
 
 pub use crate::error::{Error, Result};
