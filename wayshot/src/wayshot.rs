@@ -179,7 +179,7 @@ fn main() -> Result<()> {
             let names: Vec<String> = active.iter().map(|t| t.id_and_title()).collect();
             if let Some(idx) = select_output(&names) {
                 Ok((
-                    wayshot_conn.screenshot_toplevel(&active[idx], cursor)?,
+                    wayshot_conn.screenshot_toplevel(active[idx], cursor)?,
                     ShotResult::Toplevel {
                         name: names[idx].clone(),
                     },
