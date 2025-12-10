@@ -107,7 +107,7 @@ fn main() -> Result<()> {
 
     let output = cli.output.or(base.output);
 
-    let mut wayshot_conn = WayshotConnection::new()?;
+    let wayshot_conn = WayshotConnection::new()?;
 
     let stdout = io::stdout();
     let mut writer = BufWriter::new(stdout.lock());
@@ -164,7 +164,7 @@ fn main() -> Result<()> {
                 .find(|t| t.id_and_title() == *name);
             if let Some(toplevel) = maybe {
                 Ok((
-                    wayshot_conn.screenshot_toplevel(toplevel.clone(), cursor)?,
+                    wayshot_conn.screenshot_toplevel(toplevel, cursor)?,
                     ShotResult::Toplevel { name: name.clone() },
                 ))
             } else {
@@ -179,7 +179,7 @@ fn main() -> Result<()> {
             let names: Vec<String> = active.iter().map(|t| t.id_and_title()).collect();
             if let Some(idx) = select_output(&names) {
                 Ok((
-                    wayshot_conn.screenshot_toplevel(active[idx].clone(), cursor)?,
+                    wayshot_conn.screenshot_toplevel(&active[idx], cursor)?,
                     ShotResult::Toplevel {
                         name: names[idx].clone(),
                     },

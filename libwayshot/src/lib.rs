@@ -1402,11 +1402,14 @@ impl WayshotConnection {
 
     /// Take a screenshot from a specific toplevel (window).
     pub fn screenshot_toplevel(
-        &mut self,
-        toplevel: TopLevel,
+        &self,
+        toplevel: &TopLevel,
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
-        self.screenshot_region_capturer(RegionCapturer::TopLevel(toplevel), cursor_overlay)
+        self.screenshot_region_capturer(
+            RegionCapturer::TopLevel(toplevel.to_owned()),
+            cursor_overlay,
+        )
     }
 
     fn capture_toplevel_using_ext_protocol(
