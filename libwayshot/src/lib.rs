@@ -335,7 +335,7 @@ impl WayshotConnection {
             .copied()
         {
             let frame_guard: FrameGuard =
-                self.capture_output_frame_inner(state, event_queue, frame, format, fd)?;
+                self.image_copy_frame_inner(state, event_queue, frame, format, fd)?;
             Ok(frame_guard)
         } else {
             Err(Error::NoSupportedBufferFormat)
@@ -353,7 +353,7 @@ impl WayshotConnection {
         let (state, event_queue, frame, frame_format) =
             self.capture_output_frame_get_state_shm(cursor_overlay, output, capture_region)?;
         let frame_guard =
-            self.capture_output_frame_inner(state, event_queue, frame, frame_format, fd)?;
+            self.image_copy_frame_inner(state, event_queue, frame, frame_format, fd)?;
 
         Ok((frame_format, frame_guard))
     }
@@ -371,7 +371,7 @@ impl WayshotConnection {
         file.set_len(frame_format.byte_size())?;
 
         let frame_guard =
-            self.capture_output_frame_inner(state, event_queue, frame, frame_format, file)?;
+            self.image_copy_frame_inner(state, event_queue, frame, frame_format, file)?;
 
         Ok((frame_format, frame_guard))
     }
@@ -917,7 +917,7 @@ impl WayshotConnection {
         }
     }
 
-    fn capture_output_frame_inner<T: AsFd>(
+    fn image_copy_frame_inner<T: AsFd>(
         &self,
         state: CaptureFrameState,
         event_queue: EventQueue<CaptureFrameState>,
@@ -927,15 +927,15 @@ impl WayshotConnection {
     ) -> Result<FrameGuard> {
         match frame {
             WayshotFrame::WlrScreenshot(frame) => {
-                self.capture_output_frame_inner_wlr(state, event_queue, frame, frame_format, fd)
+                self.wlr_screencopy_inner(state, event_queue, frame, frame_format, fd)
             }
             WayshotFrame::ExtImageCopy(frame) => {
-                self.capture_output_frame_inner_ext(state, event_queue, frame, frame_format, fd)
+                self.ext_image_copy_frame_inner(state, event_queue, frame, frame_format, fd)
             }
         }
     }
 
-    fn capture_output_frame_inner_wlr<T: AsFd>(
+    fn wlr_screencopy_inner<T: AsFd>(
         &self,
         mut state: CaptureFrameState,
         mut event_queue: EventQueue<CaptureFrameState>,
@@ -988,7 +988,7 @@ impl WayshotConnection {
             event_queue.blocking_dispatch(&mut state)?;
         }
     }
-    fn capture_output_frame_inner_ext<T: AsFd>(
+    fn ext_image_copy_frame_inner<T: AsFd>(
         &self,
         mut state: CaptureFrameState,
         mut event_queue: EventQueue<CaptureFrameState>,
@@ -1256,7 +1256,7 @@ impl WayshotConnection {
                     })
                     .collect(),
                 RegionCapturer::TopLevel(ref toplevel) => {
-                    return self.capture_toplevel_using_ext_protocol(toplevel, cursor_overlay);
+                    return self.capture_toplevel(toplevel, cursor_overlay);
                 }
                 RegionCapturer::Freeze(_) => self
                     .get_all_outputs()
@@ -1416,11 +1416,15 @@ impl WayshotConnection {
         )
     }
 
-    fn capture_toplevel_using_ext_protocol(
+    fn capture_toplevel_frame_get_state(
         &self,
         toplevel: &TopLevel,
         cursor_overlay: bool,
-    ) -> Result<DynamicImage> {
+    ) -> Result<(
+        CaptureFrameState,
+        EventQueue<CaptureFrameState>,
+        ExtImageCopyCaptureFrameV1,
+    )> {
         // Create state and event queue similar to other ext-image flows
         let state = CaptureFrameState {
             formats: Vec::new(),
@@ -1451,18 +1455,46 @@ impl WayshotConnection {
         let session = manager.create_session(&source, options, &qh, ());
         let frame = session.create_frame(&qh, ());
 
-        // Determine a suitable shm FrameFormat for this frame
-        let (state, event_queue, frame, frame_format) =
-            self.capture_output_frame_get_state_shm_for_toplevel(state, event_queue, frame)?;
+        Ok((state, event_queue, frame))
+    }
 
+    pub fn capture_toplevel_frame_shm_fd<T: AsFd>(
+        &self,
+        cursor_overlay: bool,
+        toplevel: &TopLevel,
+        fd: T,
+    ) -> Result<(FrameFormat, FrameGuard)> {
+        let (state, event_queue, frame, frame_format) =
+            self.capture_toplevel_frame_get_state_shm(toplevel, cursor_overlay)?;
+        let frame_guard =
+            self.ext_image_copy_frame_inner(state, event_queue, frame, frame_format, fd)?;
+        Ok((frame_format, frame_guard))
+    }
+
+    fn capture_toplevel_frame_shm_from_file(
+        &self,
+        cursor_overlay: bool,
+        toplevel: &TopLevel,
+        file: &File,
+    ) -> Result<(FrameFormat, FrameGuard)> {
+        let (state, event_queue, frame, frame_format) =
+            self.capture_toplevel_frame_get_state_shm(toplevel, cursor_overlay)?;
+
+        file.set_len(frame_format.byte_size())?;
+
+        let frame_guard =
+            self.ext_image_copy_frame_inner(state, event_queue, frame, frame_format, file)?;
+
+        Ok((frame_format, frame_guard))
+    }
+
+    fn capture_toplevel(&self, toplevel: &TopLevel, cursor_overlay: bool) -> Result<DynamicImage> {
         // Back the buffer with a shm file of the required size
         let fd = create_shm_fd()?;
         let memfile = File::from(fd);
-        memfile.set_len(frame_format.byte_size())?;
-
-        // Perform the copy using the existing ext-image path
-        let _guard =
-            self.capture_output_frame_inner_ext(state, event_queue, frame, frame_format, &memfile)?;
+        // Determine a suitable shm FrameFormat for this frame
+        let (frame_format, _) =
+            self.capture_toplevel_frame_shm_from_file(cursor_overlay, toplevel, &memfile)?;
 
         // Map and convert to image
         let frame_mmap = unsafe { MmapMut::map_mut(&memfile)? };
@@ -1484,11 +1516,10 @@ impl WayshotConnection {
     }
 
     // Helper method to get frame format for toplevel using ext-image session events
-    fn capture_output_frame_get_state_shm_for_toplevel(
+    fn capture_toplevel_frame_get_state_shm(
         &self,
-        mut state: CaptureFrameState,
-        mut event_queue: EventQueue<CaptureFrameState>,
-        frame: ExtImageCopyCaptureFrameV1,
+        toplevel: &TopLevel,
+        cursor_overlay: bool,
     ) -> Result<(
         CaptureFrameState,
         EventQueue<CaptureFrameState>,
@@ -1496,8 +1527,8 @@ impl WayshotConnection {
         FrameFormat,
     )> {
         // Drain events at least once to populate formats from the session
-        event_queue.blocking_dispatch(&mut state)?;
-
+        let (state, event_queue, frame) =
+            self.capture_toplevel_frame_get_state(toplevel, cursor_overlay)?;
         let frame_format = state
             .formats
             .iter()
