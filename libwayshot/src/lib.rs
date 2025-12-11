@@ -109,6 +109,12 @@ pub enum WayshotFrame {
     ExtImageCopy(ExtImageCopyCaptureFrameV1),
 }
 
+#[derive(Debug, Clone)]
+pub enum FormatCheckTarget {
+    Screen(WlOutput),
+    Toplevel(TopLevel),
+}
+
 fn check_toplevel_protocols(globals: &GlobalList, conn: &Connection) -> Result<()> {
     let event_queue = conn.new_event_queue::<CaptureFrameState>();
     let qh = event_queue.handle();
@@ -301,8 +307,21 @@ impl WayshotConnection {
     /// # Returns
     /// - A vector of [`FrameFormat`] if screen capture succeeds.
     /// - [`Error::ProtocolNotFound`] if wlr-screencopy protocol is not found.
-    pub fn get_available_frame_formats(&self, output: &WlOutput) -> Result<Vec<FrameFormat>> {
-        let (state, _event_queue, _frame) = self.capture_output_frame_get_state(0, output, None)?;
+    pub fn get_available_frame_formats(
+        &self,
+        target: &FormatCheckTarget,
+    ) -> Result<Vec<FrameFormat>> {
+        let state = match target {
+            FormatCheckTarget::Screen(output) => {
+                let (state, _, _) = self.capture_output_frame_get_state(0, output, None)?;
+                state
+            }
+            FormatCheckTarget::Toplevel(toplevel) => {
+                let (state, _, _) = self.capture_toplevel_frame_get_state(toplevel, false)?;
+                state
+            }
+        };
+
         Ok(state.formats)
     }
 
