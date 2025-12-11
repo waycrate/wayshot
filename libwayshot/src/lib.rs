@@ -1355,6 +1355,10 @@ impl WayshotConnection {
     }
 
     /// Take a screenshot from the specified region.
+    /// Because ext-image-copy is very different from wlr-screencopy, and it caused bug here
+    /// So deprecate it now
+    /// Maybe we will fix it in the further
+    #[deprecated(since = "0.4.0", note = "use screenshot_freeze instead")]
     pub fn screenshot(
         &self,
         capture_region: LogicalRegion,
