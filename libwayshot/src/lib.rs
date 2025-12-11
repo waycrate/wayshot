@@ -1490,6 +1490,29 @@ impl WayshotConnection {
         Ok((frame_format, frame_guard))
     }
 
+    pub fn capture_toplevel_frame_shm_fd_with_format<T: AsFd>(
+        &self,
+        cursor_overlay: bool,
+        toplevel: &TopLevel,
+        fd: T,
+        frame_format: wl_shm::Format,
+    ) -> Result<FrameGuard> {
+        let (state, event_queue, frame) =
+            self.capture_toplevel_frame_get_state(toplevel, cursor_overlay)?;
+        if let Some(format) = state
+            .formats
+            .iter()
+            .find(|f| f.format == frame_format)
+            .copied()
+        {
+            let frame_guard: FrameGuard =
+                self.ext_image_copy_frame_inner(state, event_queue, frame, format, fd)?;
+            Ok(frame_guard)
+        } else {
+            Err(Error::NoSupportedBufferFormat)
+        }
+    }
+
     fn capture_toplevel_frame_shm_from_file(
         &self,
         cursor_overlay: bool,
