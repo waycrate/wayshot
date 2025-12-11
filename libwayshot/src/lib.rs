@@ -102,6 +102,7 @@ pub struct WayshotConnection {
     toplevel_infos: Vec<TopLevel>,
     dmabuf_state: Option<DMABUFState>,
     toplevel_capture_support: bool,
+    image_copy_support: bool,
 }
 
 pub enum WayshotFrame {
@@ -125,6 +126,15 @@ fn check_toplevel_protocols(globals: &GlobalList, conn: &Connection) -> Result<(
     Ok(())
 }
 
+fn check_ext_image_copy_protocols(globals: &GlobalList, conn: &Connection) -> Result<()> {
+    let event_queue = conn.new_event_queue::<CaptureFrameState>();
+    let qh = event_queue.handle();
+
+    // Bind managers
+    globals.bind::<ExtImageCopyCaptureManagerV1, _, _>(&qh, 1..=1, ())?;
+    Ok(())
+}
+
 impl WayshotConnection {
     pub fn new() -> Result<Self> {
         let conn = Connection::connect_to_env()?;
@@ -136,6 +146,7 @@ impl WayshotConnection {
     pub fn from_connection(conn: Connection) -> Result<Self> {
         let (globals, _) = registry_queue_init::<WayshotState>(&conn)?;
 
+        let image_copy_support = check_ext_image_copy_protocols(&globals, &conn).is_ok();
         let toplevel_capture_support = check_toplevel_protocols(&globals, &conn).is_ok();
         let mut initial_state = Self {
             conn,
@@ -144,6 +155,7 @@ impl WayshotConnection {
             toplevel_infos: Vec::new(),
             dmabuf_state: None,
             toplevel_capture_support,
+            image_copy_support,
         };
 
         initial_state.refresh_outputs()?;
@@ -164,6 +176,7 @@ impl WayshotConnection {
         let gpu = dispatch::Card::open(device_path);
         // init a GBM device
         let gbm = GBMDevice::new(gpu).unwrap();
+        let image_copy_support = check_ext_image_copy_protocols(&globals, &conn).is_ok();
         let toplevel_capture_support = check_toplevel_protocols(&globals, &conn).is_ok();
         let mut initial_state = Self {
             conn,
@@ -175,6 +188,7 @@ impl WayshotConnection {
                 gbmdev: gbm,
             }),
             toplevel_capture_support,
+            image_copy_support,
         };
 
         initial_state.refresh_outputs()?;
@@ -185,6 +199,11 @@ impl WayshotConnection {
     /// Check if the toplevel_capture is supported
     pub fn toplevel_capture_support(&self) -> bool {
         self.toplevel_capture_support
+    }
+
+    /// Check if the image copy is supported
+    pub fn image_copy_support(&self) -> bool {
+        self.image_copy_support
     }
 
     /// Fetch all accessible wayland outputs.
@@ -1251,6 +1270,11 @@ impl WayshotConnection {
                     .get_all_outputs()
                     .iter()
                     .filter_map(|output_info| {
+                        // NOTE: ext-image-copy do not need to compute the location
+                        // So we keep none here
+                        if self.image_copy_support {
+                            return None;
+                        }
                         tracing::span!(
                             tracing::Level::DEBUG,
                             "filter_map",
