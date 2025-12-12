@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{
-    Parser, arg,
+    Parser,
     builder::{
         Styles,
         styling::{AnsiColor, Effects},
