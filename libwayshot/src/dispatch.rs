@@ -24,13 +24,13 @@ use wayland_protocols::{
             ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1,
             ext_foreign_toplevel_list_v1::ExtForeignToplevelListV1,
         },
-        image_capture_source::v1::client::ext_foreign_toplevel_image_capture_source_manager_v1::ExtForeignToplevelImageCaptureSourceManagerV1,
         image_capture_source::v1::client::{
+            ext_foreign_toplevel_image_capture_source_manager_v1::ExtForeignToplevelImageCaptureSourceManagerV1,
             ext_image_capture_source_v1::ExtImageCaptureSourceV1,
             ext_output_image_capture_source_manager_v1::ExtOutputImageCaptureSourceManagerV1,
         },
         image_copy_capture::v1::client::{
-            ext_image_copy_capture_frame_v1::{self, ExtImageCopyCaptureFrameV1},
+            ext_image_copy_capture_frame_v1::{self, ExtImageCopyCaptureFrameV1, FailureReason},
             ext_image_copy_capture_manager_v1::ExtImageCopyCaptureManagerV1,
             ext_image_copy_capture_session_v1::{self, ExtImageCopyCaptureSessionV1},
         },
@@ -199,6 +199,7 @@ impl Dispatch<ZxdgOutputV1, usize> for OutputCaptureState {
 pub enum FrameState {
     /// Compositor returned a failed event on calling `frame.copy`.
     Failed,
+    FailedWithReason(WEnum<FailureReason>),
     /// Compositor sent a Ready event on calling `frame.copy`.
     Finished,
 }
@@ -250,9 +251,9 @@ impl Dispatch<ExtImageCopyCaptureFrameV1, ()> for CaptureFrameState {
                 state.buffer_done.store(true, Ordering::Relaxed);
                 state.state = Some(FrameState::Finished);
             }
-            ext_image_copy_capture_frame_v1::Event::Failed { .. } => {
+            ext_image_copy_capture_frame_v1::Event::Failed { reason } => {
                 state.buffer_done.store(true, Ordering::Relaxed);
-                state.state = Some(FrameState::Failed);
+                state.state = Some(FrameState::FailedWithReason(reason));
             }
             ext_image_copy_capture_frame_v1::Event::Transform { .. } => {}
             _ => {}

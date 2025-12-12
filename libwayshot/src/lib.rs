@@ -82,6 +82,8 @@ pub use crate::error::{Error, Result};
 
 pub mod reexport {
     use wayland_client::protocol::wl_output;
+    pub use wayland_client::WEnum;
+    pub use wayland_protocols::ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason;
     pub use wl_output::{Transform, WlOutput};
 }
 use gbm::{BufferObject, BufferObjectFlags, Device as GBMDevice};
@@ -816,6 +818,7 @@ impl WayshotConnection {
         }
     }
 
+    // TODO: add ext implement
     fn capture_output_frame_get_state_dmabuf(
         &self,
         cursor_overlay: i32,
@@ -944,6 +947,10 @@ impl WayshotConnection {
                         tracing::error!("Frame copy failed");
                         return Err(Error::FramecopyFailed);
                     }
+                    FrameState::FailedWithReason(reason) => {
+                        tracing::error!("Frame copy failed");
+                        return Err(Error::FramecopyFailedWithReason(reason));
+                    }
                     FrameState::Finished => {
                         tracing::trace!("Frame copy finished");
 
@@ -1015,7 +1022,7 @@ impl WayshotConnection {
             // Basically reads, if frame state is not None then...
             if let Some(state) = state.state {
                 match state {
-                    FrameState::Failed => {
+                    FrameState::Failed | FrameState::FailedWithReason(_) => {
                         tracing::error!("Frame copy failed");
                         return Err(Error::FramecopyFailed);
                     }
@@ -1076,6 +1083,10 @@ impl WayshotConnection {
                     FrameState::Failed => {
                         tracing::error!("Frame copy failed");
                         return Err(Error::FramecopyFailed);
+                    }
+                    FrameState::FailedWithReason(reason) => {
+                        tracing::error!("Frame copy failed");
+                        return Err(Error::FramecopyFailedWithReason(reason));
                     }
                     FrameState::Finished => {
                         tracing::trace!("Frame copy finished");

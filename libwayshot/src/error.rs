@@ -3,9 +3,10 @@ use std::{io, result};
 use drm::buffer::UnrecognizedFourcc;
 use thiserror::Error;
 use wayland_client::{
-    ConnectError, DispatchError,
+    ConnectError, DispatchError, WEnum,
     globals::{BindError, GlobalError},
 };
+use wayland_protocols::ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason;
 
 pub type Result<T, E = Error> = result::Result<T, E>;
 
@@ -29,6 +30,8 @@ pub enum Error {
     Connect(#[from] ConnectError),
     #[error("framecopy failed")]
     FramecopyFailed,
+    #[error("framecopy failed with reason {0:?}")]
+    FramecopyFailedWithReason(WEnum<FailureReason>),
     #[error("No supported buffer format")]
     NoSupportedBufferFormat,
     #[error("Cannot find required wayland protocol")]
