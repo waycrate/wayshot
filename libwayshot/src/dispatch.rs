@@ -318,6 +318,7 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
             }
             ext_image_copy_capture_session_v1::Event::Stopped => {
                 state.session_done = true;
+                println!("Seems stopped");
                 state.state = Some(FrameState::Failed);
             }
             _ => {}
