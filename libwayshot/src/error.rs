@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn test_from_io_error() {
         use std::io;
-        let io_error = io::Error::new(io::ErrorKind::Other, "test error");
+        let io_error = io::Error::other("test error");
         let wayshot_error: Error = io_error.into();
 
         match wayshot_error {
