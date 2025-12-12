@@ -1018,7 +1018,11 @@ impl WayshotConnection {
                     }
                     FrameState::Finished => {
                         tracing::trace!("Frame copy finished");
-                        return Ok(FrameGuard { buffer, shm_pool });
+                        return Ok(FrameGuard {
+                            buffer,
+                            shm_pool,
+                            size: frame_format.size,
+                        });
                     }
                 }
             }
@@ -1072,7 +1076,11 @@ impl WayshotConnection {
                     }
                     FrameState::Finished => {
                         tracing::trace!("Frame copy finished");
-                        return Ok(FrameGuard { buffer, shm_pool });
+                        return Ok(FrameGuard {
+                            buffer,
+                            shm_pool,
+                            size: frame_format.size,
+                        });
                     }
                 }
             }

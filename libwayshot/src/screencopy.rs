@@ -24,6 +24,7 @@ use crate::{
 pub struct FrameGuard {
     pub buffer: WlBuffer,
     pub shm_pool: WlShmPool,
+    pub size: Size,
 }
 
 impl Drop for FrameGuard {
