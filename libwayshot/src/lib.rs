@@ -1529,7 +1529,6 @@ impl WayshotConnection {
     ) -> Result<FrameGuard> {
         let (state, event_queue, frame) =
             self.capture_toplevel_frame_get_state(toplevel, cursor_overlay)?;
-        println!("{:?}", state.formats);
         if let Some(format) = state
             .formats
             .iter()
