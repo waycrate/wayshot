@@ -209,6 +209,7 @@ pub struct CaptureFrameState {
     pub state: Option<FrameState>,
     pub buffer_done: AtomicBool,
     pub toplevels: Vec<TopLevel>,
+    pub(crate) session_done: bool,
 }
 
 impl Dispatch<ZwpLinuxDmabufV1, ()> for CaptureFrameState {
@@ -311,6 +312,13 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
                         height: 0,
                     },
                 });
+            }
+            ext_image_copy_capture_session_v1::Event::Done => {
+                state.session_done = true;
+            }
+            ext_image_copy_capture_session_v1::Event::Stopped => {
+                state.session_done = true;
+                state.state = Some(FrameState::Failed);
             }
             _ => {}
         }
