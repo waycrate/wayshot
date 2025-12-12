@@ -1472,14 +1472,14 @@ impl WayshotConnection {
         ExtImageCopyCaptureFrameV1,
     )> {
         // Create state and event queue similar to other ext-image flows
-        let state = CaptureFrameState {
+        let mut state = CaptureFrameState {
             formats: Vec::new(),
             dmabuf_formats: Vec::new(),
             state: None,
             buffer_done: AtomicBool::new(false),
             toplevels: Vec::new(),
         };
-        let event_queue = self.conn.new_event_queue::<CaptureFrameState>();
+        let mut event_queue = self.conn.new_event_queue::<CaptureFrameState>();
         let qh = event_queue.handle();
 
         // Bind managers
@@ -1500,6 +1500,7 @@ impl WayshotConnection {
         };
         let session = manager.create_session(&source, options, &qh, ());
         let frame = session.create_frame(&qh, ());
+        event_queue.blocking_dispatch(&mut state)?;
 
         Ok((state, event_queue, frame))
     }
