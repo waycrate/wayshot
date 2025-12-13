@@ -132,15 +132,16 @@ impl Dispatch<xdg_surface::XdgSurface, ()> for State {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
+        use libwayshot::WayshotTarget;
         if let xdg_surface::Event::Configure { serial, .. } = event {
             xdg_surface.ack_configure(serial);
             state.configured = true;
             let surface = state.base_surface.as_ref().unwrap();
             let (_frame_format, guard, _bo) = state
                 .wayshot
-                .capture_output_frame_dmabuf(
+                .capture_target_frame_dmabuf(
                     true,
-                    &state.wayshot.get_all_outputs()[0].wl_output,
+                    &WayshotTarget::Screen(state.wayshot.get_all_outputs()[0].wl_output.clone()),
                     None,
                 )
                 .unwrap();

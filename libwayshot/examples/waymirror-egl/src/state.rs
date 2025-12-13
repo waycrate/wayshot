@@ -286,10 +286,11 @@ impl WaylandEGLState {
             gl::BindTexture(gl::TEXTURE_2D, self.gl_texture);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
 
+            use libwayshot::WayshotTarget;
             self.wayshot
-                .bind_output_frame_to_gl_texture(
+                .bind_target_frame_to_gl_texture(
                     true,
-                    &self.wayshot.get_all_outputs()[0].wl_output,
+                    &WayshotTarget::Screen(self.wayshot.get_all_outputs()[0].wl_output.clone()),
                     None,
                 )
                 .unwrap();
