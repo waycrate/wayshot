@@ -1505,7 +1505,7 @@ impl WayshotConnection {
 
     #[deprecated(
         since = "0.4.0",
-        note = "use screenshot_freeze instead. We can thinking about a new way to handle the area shot"
+        note = "use screenshot_freeze instead. We are thinking about a new way to handle the area screenshot"
     )]
     pub fn screenshot(
         &self,
