@@ -1341,11 +1341,6 @@ impl WayshotConnection {
                     .get_all_outputs()
                     .iter()
                     .filter_map(|output_info| {
-                        // NOTE: ext-image-copy do not need to compute the location
-                        // So we keep none here
-                        if self.image_copy_support {
-                            return None;
-                        }
                         tracing::span!(
                             tracing::Level::DEBUG,
                             "filter_map",
@@ -1468,6 +1463,10 @@ impl WayshotConnection {
         })
     }
 
+    #[deprecated(
+        since = "0.4.0",
+        note = "use screenshot_freeze instead. We can thinking about a new way to handle the area shot"
+    )]
     pub fn screenshot(
         &self,
         capture_region: LogicalRegion,
