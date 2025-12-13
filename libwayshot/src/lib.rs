@@ -594,11 +594,21 @@ impl WayshotConnection {
         target: &WayshotTarget,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(DMAFrameFormat, DMAFrameGuard, BufferObject<()>)> {
+        let WayshotTarget::Screen(output) = target else {
+            return Err(Error::Unsupported(
+                "ext-image-copy support is on road, so here we restrict it on WlOutput".to_owned(),
+            ));
+        };
         match &self.dmabuf_state {
             Some(dmabuf_state) => {
                 // FIXME: now it won't work on ext-image-copy
-                let (state, event_queue, frame) =
-                    self.capture_target_frame_get_state(cursor_overlay, target, capture_region)?;
+                let (state, event_queue, frame) = self
+                    .capture_output_frame_get_state_wlr_dmabuf_tmp(
+                        cursor_overlay as i32,
+                        output,
+                        capture_region,
+                    )?;
+                //self.capture_target_frame_get_state(cursor_overlay, target, capture_region)?;
                 let frame_format = state.dmabuf_formats()[0];
                 tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
                 let gbm = &dmabuf_state.gbmdev;
@@ -788,6 +798,36 @@ impl WayshotConnection {
         }
     }
 
+    // NOTE: because in 0.4.0, the dmabuf cannot work on ext-image-copy
+    // So here force it go to the wlr-screencopy
+    // Will be deleted in the feature
+    fn capture_output_frame_get_state_wlr_dmabuf_tmp(
+        &self,
+        cursor_overlay: i32,
+        output: &WlOutput,
+        capture_region: Option<EmbeddedRegion>,
+    ) -> Result<(
+        CaptureFrameState,
+        EventQueue<CaptureFrameState>,
+        WayshotFrame,
+    )> {
+        let state = CaptureFrameState {
+            formats: Vec::new(),
+            dmabuf_formats: Vec::new(),
+            state: None,
+            buffer_done: AtomicBool::new(false),
+            toplevels: Vec::new(),
+            session_done: false,
+        };
+        let event_queue = self.conn.new_event_queue::<CaptureFrameState>();
+        self.capture_output_frame_get_state_wlr(
+            state,
+            event_queue,
+            cursor_overlay,
+            output,
+            capture_region,
+        )
+    }
     // This API is exposed to provide users with access to window manager (WM)
     // information. For instance, enabling Vulkan in wlroots alters the display
     // format. Consequently, using PipeWire to capture streams without knowing

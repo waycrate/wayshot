@@ -50,6 +50,8 @@ pub enum Error {
     EGLImageToTexProcNotFoundError,
     #[error("Capture failed: {0}")]
     CaptureFailed(String),
+    #[error("Unsupported for some reason: {0}")]
+    Unsupported(String),
 }
 
 #[cfg(test)]
