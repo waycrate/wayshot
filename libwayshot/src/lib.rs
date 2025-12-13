@@ -15,7 +15,7 @@ use std::{
     collections::HashSet,
     ffi::c_void,
     fs::File,
-    os::fd::{AsFd, IntoRawFd, OwnedFd},
+    os::fd::{AsFd, IntoRawFd},
     sync::atomic::{AtomicBool, Ordering},
     thread,
 };
@@ -599,12 +599,13 @@ impl WayshotConnection {
     ) -> Result<(DMAFrameFormat, DMAFrameGuard, BufferObject<()>)> {
         match &self.dmabuf_state {
             Some(dmabuf_state) => {
-                let (state, event_queue, frame, frame_format) = self
-                    .capture_output_frame_get_state_dmabuf(
-                        cursor_overlay as i32,
-                        output,
-                        capture_region,
-                    )?;
+                let (state, event_queue, frame) = self.capture_output_frame_get_state(
+                    cursor_overlay as i32,
+                    output,
+                    capture_region,
+                )?;
+                let frame_format = state.dmabuf_formats()[0].clone();
+                tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
                 let gbm = &dmabuf_state.gbmdev;
                 let bo = gbm.create_buffer_object::<()>(
                     frame_format.size.width,
@@ -818,82 +819,111 @@ impl WayshotConnection {
         }
     }
 
-    // TODO: add ext implement
-    fn capture_output_frame_get_state_dmabuf(
+    #[allow(clippy::too_many_arguments)]
+    fn capture_output_frame_inner_dmabuf<T: AsFd>(
         &self,
-        cursor_overlay: i32,
-        output: &WlOutput,
-        capture_region: Option<EmbeddedRegion>,
-    ) -> Result<(
-        CaptureFrameState,
-        EventQueue<CaptureFrameState>,
-        ZwlrScreencopyFrameV1,
-        DMAFrameFormat,
-    )> {
-        let mut state = CaptureFrameState {
-            formats: Vec::new(),
-            dmabuf_formats: Vec::new(),
-            state: None,
-            buffer_done: AtomicBool::new(false),
-            toplevels: Vec::new(),
-            session_done: false,
+        state: CaptureFrameState,
+        event_queue: EventQueue<CaptureFrameState>,
+        frame: WayshotFrame,
+        frame_format: DMAFrameFormat,
+        stride: u32,
+        modifier: u64,
+        fd: T,
+    ) -> Result<DMAFrameGuard> {
+        match frame {
+            WayshotFrame::WlrScreenshot(frame) => self.capture_output_frame_inner_dmabuf_wlr(
+                state,
+                event_queue,
+                frame,
+                frame_format,
+                stride,
+                modifier,
+                fd,
+            ),
+            WayshotFrame::ExtImageCopy(frame) => self.ext_image_copy_frame_dmabuf_inner(
+                state,
+                event_queue,
+                frame,
+                frame_format,
+                stride,
+                modifier,
+                fd,
+            ),
+        }
+    }
+    fn ext_image_copy_frame_dmabuf_inner<T: AsFd>(
+        &self,
+        mut state: CaptureFrameState,
+        mut event_queue: EventQueue<CaptureFrameState>,
+        frame: ExtImageCopyCaptureFrameV1,
+        frame_format: DMAFrameFormat,
+        stride: u32,
+        modifier: u64,
+        fd: T,
+    ) -> Result<DMAFrameGuard> {
+        // Connecting to wayland environment.
+        let Some(dmabuf_state) = &self.dmabuf_state else {
+            return Err(Error::NoDMAStateError);
         };
-        let mut event_queue = self.conn.new_event_queue::<CaptureFrameState>();
+        let fd = fd.as_fd();
+
+        // Connecting to wayland environment.
         let qh = event_queue.handle();
 
-        // Instantiating screencopy manager.
-        let screencopy_manager = match self.globals.bind::<ZwlrScreencopyManagerV1, _, _>(
+        let linux_dmabuf = &dmabuf_state.linux_dmabuf;
+        let dma_width = frame_format.size.width;
+        let dma_height = frame_format.size.height;
+
+        let dma_params = linux_dmabuf.create_params(&qh, ());
+
+        dma_params.add(
+            fd.as_fd(),
+            0,
+            0,
+            stride,
+            (modifier >> 32) as u32,
+            (modifier & 0xffffffff) as u32,
+        );
+        tracing::trace!("Called  ZwpLinuxBufferParamsV1::create_params ");
+        let dmabuf_wlbuf = dma_params.create_immed(
+            dma_width as i32,
+            dma_height as i32,
+            frame_format.format,
+            zwp_linux_buffer_params_v1::Flags::empty(),
             &qh,
-            3..=3,
             (),
-        ) {
-            Ok(x) => x,
-            Err(e) => {
-                tracing::error!(
-                    "Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?"
-                );
-                tracing::error!("err: {e}");
-                return Err(Error::ProtocolNotFound(
-                    "ZwlrScreencopy Manager not found".to_string(),
-                ));
+        );
+        // Copy the pixel data advertised by the compositor into the buffer we just created.
+        frame.attach_buffer(&dmabuf_wlbuf);
+        frame.capture();
+        // On copy the Ready / Failed events are fired by the frame object, so here we check for them.
+        loop {
+            // Basically reads, if frame state is not None then...
+            if let Some(state) = state.state {
+                match state {
+                    FrameState::Failed => {
+                        tracing::error!("Frame copy failed");
+                        return Err(Error::FramecopyFailed);
+                    }
+                    FrameState::FailedWithReason(reason) => {
+                        tracing::error!("Frame copy failed");
+                        return Err(Error::FramecopyFailedWithReason(reason));
+                    }
+                    FrameState::Finished => {
+                        tracing::trace!("Frame copy finished");
+                        return Ok(DMAFrameGuard {
+                            buffer: dmabuf_wlbuf,
+                        });
+                    }
+                }
             }
-        };
 
-        tracing::debug!("Capturing output for DMA-BUF API...");
-        let frame = if let Some(embedded_region) = capture_region {
-            screencopy_manager.capture_output_region(
-                cursor_overlay,
-                output,
-                embedded_region.inner.position.x,
-                embedded_region.inner.position.y,
-                embedded_region.inner.size.width as i32,
-                embedded_region.inner.size.height as i32,
-                &qh,
-                (),
-            )
-        } else {
-            screencopy_manager.capture_output(cursor_overlay, output, &qh, ())
-        };
-
-        // Empty internal event buffer until buffer_done is set to true which is when the Buffer done
-        // event is fired, aka the capture from the compositor is successful.
-        while !state.buffer_done.load(Ordering::SeqCst) {
             event_queue.blocking_dispatch(&mut state)?;
         }
-
-        tracing::trace!(
-            "Received compositor frame buffer formats: {:#?}",
-            state.formats
-        );
-        // TODO select appropriate format if there is more than one
-        let frame_format = state.dmabuf_formats[0];
-        tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
-
-        Ok((state, event_queue, frame, frame_format))
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn capture_output_frame_inner_dmabuf(
+    fn capture_output_frame_inner_dmabuf_wlr<T: AsFd>(
         &self,
         mut state: CaptureFrameState,
         mut event_queue: EventQueue<CaptureFrameState>,
@@ -901,11 +931,12 @@ impl WayshotConnection {
         frame_format: DMAFrameFormat,
         stride: u32,
         modifier: u64,
-        fd: OwnedFd,
+        fd: T,
     ) -> Result<DMAFrameGuard> {
         let Some(dmabuf_state) = &self.dmabuf_state else {
             return Err(Error::NoDMAStateError);
         };
+        let fd = fd.as_fd();
 
         // Connecting to wayland environment.
         let qh = event_queue.handle();
@@ -1040,6 +1071,7 @@ impl WayshotConnection {
             event_queue.blocking_dispatch(&mut state)?;
         }
     }
+
     fn ext_image_copy_frame_inner<T: AsFd>(
         &self,
         mut state: CaptureFrameState,
