@@ -309,7 +309,6 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
             } => {
                 let set_format = state.formats.first_mut().unwrap();
                 set_format.format = format;
-                //set_format.format = wayland_client::protocol::wl_shm::Format::Xbgr8888; // <-- For Cosmic
             }
             ext_image_copy_capture_session_v1::Event::DmabufFormat { format, .. } => {
                 state.dmabuf_formats.push(DMAFrameFormat {

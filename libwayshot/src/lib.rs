@@ -596,6 +596,7 @@ impl WayshotConnection {
     ) -> Result<(DMAFrameFormat, DMAFrameGuard, BufferObject<()>)> {
         match &self.dmabuf_state {
             Some(dmabuf_state) => {
+                // FIXME: now it won't work on ext-image-copy
                 let (state, event_queue, frame) =
                     self.capture_target_frame_get_state(cursor_overlay, target, capture_region)?;
                 let frame_format = state.dmabuf_formats()[0];
