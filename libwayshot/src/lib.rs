@@ -731,7 +731,9 @@ impl WayshotConnection {
             .unwrap_or(Options::PaintCursors);
         let session = manager.create_session(&source, options, &qh, ());
         let frame = session.create_frame(&qh, ());
-        event_queue.blocking_dispatch(&mut state)?;
+        while state.formats.is_empty() {
+            event_queue.blocking_dispatch(&mut state)?;
+        }
         tracing::trace!(
             "Received compositor frame buffer formats: {:#?}",
             state.formats
