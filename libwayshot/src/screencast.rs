@@ -15,6 +15,7 @@ use crate::{
 pub struct WayshotScreenCast {
     buffer: wl_buffer::WlBuffer,
     origin_size: Size<i32>,
+    current_size: Size<i32>,
     cursor_overlay: bool,
     target: WayshotTarget,
     capture_region: Option<EmbeddedRegion>,
@@ -30,8 +31,8 @@ impl Drop for WayshotScreenCast {
 }
 
 impl WayshotScreenCast {
-    pub fn size(&self) -> Size<i32> {
-        self.origin_size
+    pub fn current_size(&self) -> Size<i32> {
+        self.current_size
     }
 }
 
@@ -77,12 +78,14 @@ impl WayshotConnection {
             (),
         );
 
+        let origin_size = Size {
+            width: frame_format.size.width as i32,
+            height: frame_format.size.height as i32,
+        };
         Ok(WayshotScreenCast {
             buffer,
-            origin_size: Size {
-                width: frame_format.size.width as i32,
-                height: frame_format.size.height as i32,
-            },
+            origin_size,
+            current_size: origin_size,
             cursor_overlay,
             target,
             capture_region,
@@ -107,7 +110,7 @@ impl WayshotConnection {
             return Err(Error::NoSupportedBufferFormat);
         };
 
-        cast.origin_size = Size {
+        cast.current_size = Size {
             width: frame_format.size.width as i32,
             height: frame_format.size.height as i32,
         };
