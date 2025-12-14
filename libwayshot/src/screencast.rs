@@ -31,12 +31,15 @@ impl Drop for WayshotScreenCast {
 }
 
 impl WayshotScreenCast {
+    /// Get the current_size of the screen or toplevel
     pub fn current_size(&self) -> Size<i32> {
         self.current_size
     }
 }
 
 impl WayshotConnection {
+    /// This will save a screencast status for you
+    /// We suggest you to use this api to do screencast
     pub fn create_screencast_with_format<T: AsFd>(
         &self,
         shm_format: wl_shm::Format,
@@ -94,6 +97,7 @@ impl WayshotConnection {
         })
     }
 
+    /// do screencapture once
     pub fn capture_screen(&self, cast: &mut WayshotScreenCast) -> Result<()> {
         let (mut state, mut event_queue, frame) = self.capture_target_frame_get_state(
             cast.cursor_overlay,
