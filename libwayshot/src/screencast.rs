@@ -1,62 +1,29 @@
 use std::os::fd::AsFd;
 
-use wayland_client::{
-    EventQueue,
-    protocol::{
-        wl_buffer,
-        wl_shm::{self, WlShm},
-    },
+use wayland_client::protocol::{
+    wl_buffer,
+    wl_shm::{self, WlShm},
+    wl_shm_pool::WlShmPool,
 };
 
 use crate::{
     EmbeddedRegion, Error, Result, Size, WayshotConnection, WayshotFrame, WayshotTarget,
-    dispatch::{CaptureFrameState, FrameState},
-    screencopy::FrameFormat,
+    dispatch::FrameState, screencopy::FrameFormat,
 };
 
+#[derive(Debug, Clone)]
 pub struct WayshotScreenCast {
     buffer: wl_buffer::WlBuffer,
-    frame: WayshotFrame,
-    event_queue: EventQueue<CaptureFrameState>,
-    state: CaptureFrameState,
-    frame_format: FrameFormat,
+    origin_size: Size<i32>,
+    cursor_overlay: bool,
+    target: WayshotTarget,
+    capture_region: Option<EmbeddedRegion>,
+    shm_pool: WlShmPool,
 }
 
-impl WayshotScreenCast {
-    fn reset(&mut self) {
-        self.state.state = None;
-        self.state.session_done = false;
-    }
-    pub fn capture(&mut self) -> Result<()> {
-        self.reset();
-        let Size { width, height } = self.frame_format.size;
-        match &self.frame {
-            WayshotFrame::ExtImageCopy(frame) => {
-                frame.attach_buffer(&self.buffer);
-                frame.damage_buffer(0, 0, width as i32, height as i32);
-                frame.capture();
-            }
-            WayshotFrame::WlrScreenshot(frame) => {
-                frame.copy(&self.buffer);
-            }
-        }
-        loop {
-            // Basically reads, if frame state is not None then...
-            if let Some(state) = self.state.state {
-                match state {
-                    FrameState::Failed | FrameState::FailedWithReason(_) => {
-                        tracing::error!("Frame copy failed");
-                        return Err(Error::FramecopyFailed);
-                    }
-                    FrameState::Finished => {
-                        tracing::trace!("Frame copy finished");
-                        return Ok(());
-                    }
-                }
-            }
-
-            self.event_queue.blocking_dispatch(&mut self.state)?;
-        }
+impl Drop for WayshotScreenCast {
+    fn drop(&mut self) {
+        self.shm_pool.destroy();
     }
 }
 
@@ -69,8 +36,8 @@ impl WayshotConnection {
         cursor_overlay: bool,
         fd: T,
     ) -> Result<WayshotScreenCast> {
-        let (state, event_queue, frame) =
-            self.capture_target_frame_get_state(cursor_overlay, &target, capture_region)?;
+        let (state, event_queue, _) =
+            self.capture_target_frame_get_state(cursor_overlay, &target, capture_region.clone())?;
         let Some(frame_format) = state
             .formats
             .iter()
@@ -101,14 +68,56 @@ impl WayshotConnection {
             &qh,
             (),
         );
-        shm_pool.destroy();
 
         Ok(WayshotScreenCast {
             buffer,
-            frame,
-            event_queue,
-            state,
-            frame_format,
+            origin_size: Size {
+                width: frame_format.size.width as i32,
+                height: frame_format.size.height as i32,
+            },
+            cursor_overlay,
+            target,
+            capture_region,
+            shm_pool,
         })
+    }
+    pub fn capture_screen(&self, cast: &WayshotScreenCast) -> Result<()> {
+        let (mut state, mut event_queue, frame) = self.capture_target_frame_get_state(
+            cast.cursor_overlay,
+            &cast.target,
+            cast.capture_region,
+        )?;
+
+        match &frame {
+            WayshotFrame::ExtImageCopy(frame) => {
+                frame.attach_buffer(&cast.buffer);
+                frame.damage_buffer(0, 0, cast.origin_size.width, cast.origin_size.height);
+                frame.capture();
+            }
+            WayshotFrame::WlrScreenshot(frame) => {
+                frame.copy(&cast.buffer);
+            }
+        }
+        loop {
+            // Basically reads, if frame state is not None then...
+            if let Some(state) = state.state {
+                match state {
+                    FrameState::Failed => {
+                        tracing::error!("Frame copy failed");
+                        return Err(Error::FramecopyFailed);
+                    }
+                    FrameState::FailedWithReason(reason) => {
+                        tracing::error!("Frame copy failed");
+                        return Err(Error::FramecopyFailedWithReason(reason));
+                    }
+                    FrameState::Finished => {
+                        tracing::trace!("Frame copy finished");
+                        return Ok(());
+                    }
+                }
+            }
+
+            event_queue.blocking_dispatch(&mut state)?;
+        }
     }
 }
