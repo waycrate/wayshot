@@ -49,7 +49,7 @@ impl WayshotConnection {
         fd: T,
     ) -> Result<WayshotScreenCast> {
         let (state, event_queue, _) =
-            self.capture_target_frame_get_state(cursor_overlay, &target, capture_region.clone())?;
+            self.capture_target_frame_get_state(cursor_overlay, &target, capture_region)?;
         let Some(frame_format) = state
             .formats
             .iter()

@@ -1,5 +1,10 @@
 # Wayshot
 
+## 1.4.1 (libwayshot 0.5.0)
+
+* add api for the screencast
+* fix that outputcapture may not get the frameformat sometime
+
 ## 1.4.0 (libwayshot 0.4.0)
 
 * dmabuf support by @sooraj-satheesh
