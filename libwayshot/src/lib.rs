@@ -9,6 +9,7 @@ mod error;
 mod image_util;
 pub mod output;
 pub mod region;
+pub mod screencast;
 mod screencopy;
 
 use std::{

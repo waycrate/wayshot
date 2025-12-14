@@ -107,11 +107,11 @@ pub struct Position {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
-pub struct Size {
+pub struct Size<T = u32> {
     /// Width.
-    pub width: u32,
+    pub width: T,
     /// Height.
-    pub height: u32,
+    pub height: T,
 }
 
 impl EmbeddedRegion {
