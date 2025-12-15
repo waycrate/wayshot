@@ -727,6 +727,12 @@ impl WayshotConnection {
             .bind::<ExtOutputImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())
             .expect("Should have");
         let source = output_management.create_source(output, &qh, ());
+        // NOTE: when cursor_overlay is 1, as a variable ,the options will also be PaintCursors,
+        // but the cursor won't shown
+        // But if we do the things below. the cursor_overlay is also 1, but it is a new one. Then
+        // the cursor will be shown as normal.
+        // I think maybe it should be a bug of rust. I do not know..
+        // let cursor_overlay: i32 = 1;
         let options = Options::from_bits(cursor_overlay.try_into().unwrap_or(0))
             .unwrap_or(Options::PaintCursors);
         let session = manager.create_session(&source, options, &qh, ());
