@@ -1374,6 +1374,7 @@ impl WayshotConnection {
         region_capturer: RegionCapturer,
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
+        let ext_top_level_support = self.toplevel_capture_support();
         let outputs_capture_regions: Vec<(OutputInfo, Option<EmbeddedRegion>)> =
             match region_capturer {
                 RegionCapturer::Outputs(ref outputs) => outputs
@@ -1384,6 +1385,11 @@ impl WayshotConnection {
                     .get_all_outputs()
                     .iter()
                     .filter_map(|output_info| {
+                        if ext_top_level_support {
+                            // NOTE: ext-image-copy do not have inner region capture support
+                            // So here we should not use the EmbeddedRegion
+                            return Some((output_info.clone(), None));
+                        }
                         tracing::span!(
                             tracing::Level::DEBUG,
                             "filter_map",
@@ -1506,10 +1512,6 @@ impl WayshotConnection {
         })
     }
 
-    #[deprecated(
-        since = "0.4.0",
-        note = "use screenshot_freeze instead. We are thinking about a new way to handle the area screenshot"
-    )]
     pub fn screenshot(
         &self,
         capture_region: LogicalRegion,
