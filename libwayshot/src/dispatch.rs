@@ -213,12 +213,6 @@ pub struct CaptureFrameState {
     pub(crate) session_done: bool,
 }
 
-impl CaptureFrameState {
-    pub(crate) fn dmabuf_formats(&self) -> &[DMAFrameFormat] {
-        &self.dmabuf_formats
-    }
-}
-
 impl Dispatch<ZwpLinuxDmabufV1, ()> for CaptureFrameState {
     fn event(
         _frame: &mut Self,
