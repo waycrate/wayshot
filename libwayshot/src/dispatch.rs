@@ -213,12 +213,6 @@ pub struct CaptureFrameState {
     pub(crate) session_done: bool,
 }
 
-impl CaptureFrameState {
-    pub(crate) fn dmabuf_formats(&self) -> &[DMAFrameFormat] {
-        &self.dmabuf_formats
-    }
-}
-
 impl Dispatch<ZwpLinuxDmabufV1, ()> for CaptureFrameState {
     fn event(
         _frame: &mut Self,
@@ -311,12 +305,16 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
                 set_format.format = format;
             }
             ext_image_copy_capture_session_v1::Event::DmabufFormat { format, .. } => {
+                let mut width = 0;
+                let mut height = 0;
+                if !state.formats.is_empty() {
+                    let format = state.formats[0];
+                    width = format.size.width;
+                    height = format.size.height;
+                }
                 state.dmabuf_formats.push(DMAFrameFormat {
                     format,
-                    size: Size {
-                        width: 0,
-                        height: 0,
-                    },
+                    size: Size { width, height },
                 });
             }
             ext_image_copy_capture_session_v1::Event::Done => {
