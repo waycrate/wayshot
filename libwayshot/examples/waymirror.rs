@@ -1,4 +1,3 @@
-use core::f32;
 use std::time::{Duration, Instant};
 
 use libwayshot::{Size, WayshotConnection, screencast::WayshotScreenCast};
