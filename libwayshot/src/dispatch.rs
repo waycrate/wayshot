@@ -1,9 +1,7 @@
+use drm::node::DrmNode;
 use std::{
     collections::HashSet,
-    os::{
-        fd::{AsFd, BorrowedFd},
-        unix::fs::MetadataExt,
-    },
+    os::fd::{AsFd, BorrowedFd},
     path::Path,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -281,21 +279,6 @@ impl Dispatch<ExtImageCopyCaptureFrameV1, ()> for CaptureFrameState {
         }
     }
 }
-fn find_gbm_device(dev: u64) -> std::io::Result<Option<gbm::Device<Card>>> {
-    for i in std::fs::read_dir("/dev/dri")? {
-        let i = i?;
-        let rdev = i.metadata()?.rdev();
-        if rdev == dev {
-            let file = std::fs::File::options()
-                .read(true)
-                .write(true)
-                .open(i.path())?;
-            tracing::info!("Opened gbm main device '{}'", i.path().display());
-            return Ok(Some(gbm::Device::new(Card(file))?));
-        }
-    }
-    Ok(None)
-}
 
 impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
     fn event(
@@ -345,9 +328,16 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
                     return;
                 }
                 let device = u64::from_le_bytes(device.try_into().unwrap());
-                if let Ok(Some(device)) = find_gbm_device(device) {
-                    state.gbm = Some(device);
-                }
+                let Ok(node) = DrmNode::from_dev_id(device) else {
+                    return;
+                };
+                let Some(pa) = node.dev_path() else {
+                    return;
+                };
+                let Ok(gbm) = gbm::Device::new(Card::open(pa)) else {
+                    return;
+                };
+                state.gbm = Some(gbm);
             }
             ext_image_copy_capture_session_v1::Event::DmabufFormat { format, .. } => {
                 let mut width = 0;
