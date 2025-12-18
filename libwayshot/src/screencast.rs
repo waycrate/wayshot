@@ -19,6 +19,8 @@ use crate::{
     dispatch::{DMABUFState, FrameState, WayshotState},
 };
 
+/// It is a unit to do screencast. It storages used information for screencast
+/// You should use it and related api to do screencast
 #[derive(Debug)]
 pub struct WayshotScreenCast {
     buffer: wl_buffer::WlBuffer,
@@ -52,12 +54,15 @@ impl WayshotScreenCast {
         self.bo.as_ref()
     }
 
+    /// Get the buffer of the unit
     pub fn buffer(&self) -> &WlBuffer {
         &self.buffer
     }
 }
 
 impl WayshotConnection {
+    /// This will run once to get the device provided by ext-image-copy. If you did not init the
+    /// dmabuf at the first, you can try to use this way to init one
     pub fn try_init_dmabuf(&mut self, target: WayshotTarget) -> Result<bool> {
         if self.dmabuf_state.is_some() {
             return Ok(true);
@@ -73,7 +78,7 @@ impl WayshotConnection {
             linux_dmabuf,
             gbmdev: gbm,
         });
-        return Ok(true);
+        Ok(true)
     }
     /// This will save a screencast status for you
     /// We suggest you to use this api to do screencast
