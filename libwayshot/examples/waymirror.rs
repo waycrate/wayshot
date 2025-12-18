@@ -1,24 +1,45 @@
+use core::f32;
 use std::time::{Duration, Instant};
 
 use libwayshot::{Size, WayshotConnection, screencast::WayshotScreenCast};
 use wayland_client::{
     Connection, Dispatch, QueueHandle, WEnum, delegate_noop,
+    globals::{GlobalListContents, registry_queue_init},
     protocol::{
         wl_buffer::{self},
         wl_compositor, wl_keyboard, wl_registry, wl_seat, wl_shm, wl_shm_pool, wl_surface,
     },
 };
 
-use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
+use wayland_protocols::{
+    wp::viewporter::client::{wp_viewport, wp_viewporter},
+    xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base},
+};
 
 fn main() {
     let conn = Connection::connect_to_env().unwrap();
+    let (globals, mut event_queue) = registry_queue_init::<State>(&conn).unwrap();
 
-    let mut event_queue = conn.new_event_queue();
     let qhandle = event_queue.handle();
 
-    let display = conn.display();
-    display.get_registry(&qhandle, ());
+    let compositor = globals
+        .bind::<wl_compositor::WlCompositor, _, _>(&qhandle, 3..=3, ())
+        .unwrap();
+    let base_surface = compositor.create_surface(&qhandle, ());
+
+    globals
+        .bind::<wl_seat::WlSeat, _, _>(&qhandle, 1..=1, ())
+        .unwrap();
+
+    let wm_base = globals
+        .bind::<xdg_wm_base::XdgWmBase, _, _>(&qhandle, 2..=6, ())
+        .unwrap();
+    let xdg_surface = wm_base.get_xdg_surface(&base_surface, &qhandle, ());
+    let toplevel = xdg_surface.get_toplevel(&qhandle, ());
+    toplevel.set_title("DMABuf+wlr-screencopy example!".into());
+
+    base_surface.commit();
+
     let mut wayshot = WayshotConnection::from_connection(conn).unwrap();
 
     use libwayshot::WayshotTarget;
@@ -30,12 +51,18 @@ fn main() {
         .create_screencast_with_dmabuf(None, WayshotTarget::Screen(output), true)
         .unwrap();
 
+    let view_porter = globals
+        .bind::<wp_viewporter::WpViewporter, _, _>(&qhandle, 1..=1, ())
+        .unwrap();
+    let viewport = view_porter.get_viewport(&base_surface, &qhandle, ());
+
     let mut state = State {
         wayshot,
         running: true,
-        base_surface: None,
-        wm_base: None,
-        xdg_surface: None,
+        base_surface,
+        viewport,
+
+        cast_size: libwayshot::Size::default(),
         configured: false,
         cast,
         instant: Instant::now()
@@ -59,9 +86,10 @@ fn main() {
 struct State {
     wayshot: WayshotConnection,
     running: bool,
-    base_surface: Option<wl_surface::WlSurface>,
-    wm_base: Option<xdg_wm_base::XdgWmBase>,
-    xdg_surface: Option<(xdg_surface::XdgSurface, xdg_toplevel::XdgToplevel)>,
+    base_surface: wl_surface::WlSurface,
+    viewport: wp_viewport::WpViewport,
+    cast_size: libwayshot::Size<i32>,
+
     configured: bool,
     cast: WayshotScreenCast,
     instant: Instant,
@@ -70,54 +98,35 @@ struct State {
 impl State {
     fn refresh_surface(&mut self) -> libwayshot::Result<()> {
         self.wayshot.screencast(&mut self.cast)?;
-        let surface = self.base_surface.as_ref().unwrap();
 
-        surface.attach(Some(self.cast.buffer()), 0, 0);
+        self.cast_size = self.cast.current_size();
+        self.base_surface.attach(Some(self.cast.buffer()), 0, 0);
         let Size { width, height } = self.cast.current_size();
-        surface.damage(0, 0, width, height);
-        surface.commit();
+        self.base_surface.damage(0, 0, width, height);
+        self.base_surface.commit();
         Ok(())
     }
-}
-
-impl Dispatch<wl_registry::WlRegistry, ()> for State {
-    fn event(
-        state: &mut Self,
-        registry: &wl_registry::WlRegistry,
-        event: wl_registry::Event,
-        _: &(),
-        _: &Connection,
-        qh: &QueueHandle<Self>,
-    ) {
-        if let wl_registry::Event::Global {
-            name, interface, ..
-        } = event
-        {
-            match &interface[..] {
-                "wl_compositor" => {
-                    let compositor =
-                        registry.bind::<wl_compositor::WlCompositor, _, _>(name, 1, qh, ());
-                    let surface = compositor.create_surface(qh, ());
-                    state.base_surface = Some(surface);
-
-                    if state.wm_base.is_some() && state.xdg_surface.is_none() {
-                        state.init_xdg_surface(qh);
-                    }
-                }
-                "wl_seat" => {
-                    registry.bind::<wl_seat::WlSeat, _, _>(name, 1, qh, ());
-                }
-                "xdg_wm_base" => {
-                    let wm_base = registry.bind::<xdg_wm_base::XdgWmBase, _, _>(name, 1, qh, ());
-                    state.wm_base = Some(wm_base);
-
-                    if state.base_surface.is_some() && state.xdg_surface.is_none() {
-                        state.init_xdg_surface(qh);
-                    }
-                }
-                _ => {}
-            }
+    fn viewport_adjust(&self, width: i32, height: i32) {
+        if self.cast_size.width == 0 || self.cast_size.height == 0 {
+            return;
         }
+        let width_fit = (self.cast_size.width as f32) / (width as f32);
+        let height_fit = (self.cast_size.height as f32) / (height as f32);
+        let fit = width_fit.max(height_fit);
+        let new_width = ((self.cast_size.width as f32) / fit) as i32;
+        let new_height = ((self.cast_size.height as f32) / fit) as i32;
+        self.viewport.set_destination(new_width, new_height);
+    }
+}
+impl wayland_client::Dispatch<wl_registry::WlRegistry, GlobalListContents> for State {
+    fn event(
+        _: &mut State,
+        _: &wl_registry::WlRegistry,
+        _: wl_registry::Event,
+        _: &GlobalListContents,
+        _: &Connection,
+        _: &QueueHandle<State>,
+    ) {
     }
 }
 
@@ -127,21 +136,8 @@ delegate_noop!(State: ignore wl_surface::WlSurface);
 delegate_noop!(State: ignore wl_shm::WlShm);
 delegate_noop!(State: ignore wl_shm_pool::WlShmPool);
 delegate_noop!(State: ignore wl_buffer::WlBuffer);
-
-impl State {
-    fn init_xdg_surface(&mut self, qh: &QueueHandle<State>) {
-        let wm_base = self.wm_base.as_ref().unwrap();
-        let base_surface = self.base_surface.as_ref().unwrap();
-
-        let xdg_surface = wm_base.get_xdg_surface(base_surface, qh, ());
-        let toplevel = xdg_surface.get_toplevel(qh, ());
-        toplevel.set_title("DMABuf+wlr-screencopy example!".into());
-
-        base_surface.commit();
-
-        self.xdg_surface = Some((xdg_surface, toplevel));
-    }
-}
+delegate_noop!(State: ignore wp_viewport::WpViewport);
+delegate_noop!(State: ignore wp_viewporter::WpViewporter);
 
 impl Dispatch<xdg_wm_base::XdgWmBase, ()> for State {
     fn event(
@@ -184,8 +180,14 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for State {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        if let xdg_toplevel::Event::Close = event {
-            state.running = false;
+        match event {
+            xdg_toplevel::Event::Close => {
+                state.running = false;
+            }
+            xdg_toplevel::Event::Configure { width, height, .. } => {
+                state.viewport_adjust(width, height);
+            }
+            _ => {}
         }
     }
 }
