@@ -1,6 +1,7 @@
 use std::{io, result};
 
 use drm::buffer::UnrecognizedFourcc;
+use gbm::InvalidFdError;
 use thiserror::Error;
 use wayland_client::{
     ConnectError, DispatchError, WEnum,
@@ -52,6 +53,8 @@ pub enum Error {
     CaptureFailed(String),
     #[error("Unsupported for some reason: {0}")]
     Unsupported(String),
+    #[error("Fd does not exist")]
+    InvalidFd(#[from] InvalidFdError),
 }
 
 #[cfg(test)]
