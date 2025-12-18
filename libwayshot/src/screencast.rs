@@ -217,7 +217,7 @@ impl WayshotConnection {
 
     /// do screencapture once
     #[must_use = "We need know why failed, and when it failed, you need to do update, for example, for pipewire"]
-    pub fn capture_screen(&self, cast: &mut WayshotScreenCast) -> Result<()> {
+    pub fn cast(&self, cast: &mut WayshotScreenCast) -> Result<()> {
         let (mut state, mut event_queue, frame) = self.capture_target_frame_get_state(
             cast.cursor_overlay,
             &cast.target,

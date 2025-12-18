@@ -69,7 +69,7 @@ struct State {
 
 impl State {
     fn refresh_surface(&mut self) -> libwayshot::Result<()> {
-        self.wayshot.capture_screen(&mut self.cast)?;
+        self.wayshot.cast(&mut self.cast)?;
         let surface = self.base_surface.as_ref().unwrap();
 
         surface.attach(Some(self.cast.buffer()), 0, 0);
