@@ -1,16 +1,22 @@
 use std::os::fd::AsFd;
 
 use gbm::{BufferObject, BufferObjectFlags};
-use wayland_client::protocol::{
-    wl_buffer::{self, WlBuffer},
-    wl_shm::{self, WlShm},
-    wl_shm_pool::WlShmPool,
+use wayland_client::{
+    Proxy,
+    globals::registry_queue_init,
+    protocol::{
+        wl_buffer::{self, WlBuffer},
+        wl_shm::{self, WlShm},
+        wl_shm_pool::WlShmPool,
+    },
 };
-use wayland_protocols::wp::linux_dmabuf::zv1::client::zwp_linux_buffer_params_v1;
+use wayland_protocols::wp::linux_dmabuf::zv1::client::{
+    zwp_linux_buffer_params_v1, zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1,
+};
 
 use crate::{
     EmbeddedRegion, Error, Result, Size, WayshotConnection, WayshotFrame, WayshotTarget,
-    dispatch::FrameState,
+    dispatch::{DMABUFState, FrameState, WayshotState},
 };
 
 #[derive(Debug)]
@@ -52,6 +58,23 @@ impl WayshotScreenCast {
 }
 
 impl WayshotConnection {
+    pub fn try_init_dmabuf(&mut self, target: WayshotTarget) -> Result<bool> {
+        if self.dmabuf_state.is_some() {
+            return Ok(true);
+        }
+        let (mut state, _, _) = self.capture_target_frame_get_state(false, &target, None)?;
+        let (globals, evq) = registry_queue_init::<WayshotState>(&self.conn)?;
+        let Some(gbm) = state.gbm.take() else {
+            return Err(Error::NoDMAStateError);
+        };
+        let linux_dmabuf =
+            globals.bind(&evq.handle(), 4..=ZwpLinuxDmabufV1::interface().version, ())?;
+        self.dmabuf_state = Some(DMABUFState {
+            linux_dmabuf,
+            gbmdev: gbm,
+        });
+        return Ok(true);
+    }
     /// This will save a screencast status for you
     /// We suggest you to use this api to do screencast
     /// Same with create_screencast_with_shm, but now it is with dmabuf

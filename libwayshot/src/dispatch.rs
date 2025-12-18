@@ -1,6 +1,10 @@
 use std::{
     collections::HashSet,
-    os::fd::{AsFd, BorrowedFd},
+    os::{
+        fd::{AsFd, BorrowedFd},
+        unix::fs::MetadataExt,
+    },
+    path::Path,
     sync::atomic::{AtomicBool, Ordering},
 };
 use wayland_client::{
@@ -211,6 +215,23 @@ pub struct CaptureFrameState {
     pub buffer_done: AtomicBool,
     pub toplevels: Vec<TopLevel>,
     pub(crate) session_done: bool,
+    pub(crate) gbm: Option<gbm::Device<Card>>,
+    find_gbm: bool,
+}
+
+impl CaptureFrameState {
+    pub(crate) fn new(find_gbm: bool) -> Self {
+        Self {
+            formats: Vec::new(),
+            dmabuf_formats: Vec::new(),
+            state: None,
+            buffer_done: AtomicBool::new(false),
+            toplevels: Vec::new(),
+            session_done: false,
+            gbm: None,
+            find_gbm,
+        }
+    }
 }
 
 impl Dispatch<ZwpLinuxDmabufV1, ()> for CaptureFrameState {
@@ -260,6 +281,21 @@ impl Dispatch<ExtImageCopyCaptureFrameV1, ()> for CaptureFrameState {
         }
     }
 }
+fn find_gbm_device(dev: u64) -> std::io::Result<Option<gbm::Device<Card>>> {
+    for i in std::fs::read_dir("/dev/dri")? {
+        let i = i?;
+        let rdev = i.metadata()?.rdev();
+        if rdev == dev {
+            let file = std::fs::File::options()
+                .read(true)
+                .write(true)
+                .open(i.path())?;
+            tracing::info!("Opened gbm main device '{}'", i.path().display());
+            return Ok(Some(gbm::Device::new(Card(file))?));
+        }
+    }
+    Ok(None)
+}
 
 impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
     fn event(
@@ -303,6 +339,15 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
             } => {
                 let set_format = state.formats.first_mut().unwrap();
                 set_format.format = format;
+            }
+            ext_image_copy_capture_session_v1::Event::DmabufDevice { device } => {
+                if !state.find_gbm {
+                    return;
+                }
+                let device = u64::from_le_bytes(device.try_into().unwrap());
+                if let Ok(Some(device)) = find_gbm_device(device) {
+                    state.gbm = Some(device);
+                }
             }
             ext_image_copy_capture_session_v1::Event::DmabufFormat { format, .. } => {
                 let mut width = 0;
@@ -510,7 +555,7 @@ impl AsFd for Card {
 impl drm::Device for Card {}
 /// Simple helper methods for opening a `Card`.
 impl Card {
-    pub fn open(path: &str) -> Self {
+    pub fn open<T: AsRef<Path>>(path: T) -> Self {
         let mut options = std::fs::OpenOptions::new();
         options.read(true);
         options.write(true);

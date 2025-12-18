@@ -17,7 +17,7 @@ use std::{
     ffi::c_void,
     fs::File,
     os::fd::{AsFd, IntoRawFd},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::Ordering,
     thread,
 };
 
@@ -167,6 +167,9 @@ impl WayshotConnection {
         Ok(initial_state)
     }
 
+    fn has_gbm(&self) -> bool {
+        self.dmabuf_state.is_some()
+    }
     ///Create a WayshotConnection struct having DMA-BUF support
     /// Using this connection is required to make use of the dmabuf functions
     ///# Parameters
@@ -273,14 +276,7 @@ impl WayshotConnection {
     }
 
     pub fn refresh_toplevels(&mut self) -> Result<()> {
-        let mut state = CaptureFrameState {
-            formats: Vec::new(),
-            dmabuf_formats: Vec::new(),
-            state: None,
-            buffer_done: AtomicBool::new(false),
-            toplevels: Vec::new(),
-            session_done: false,
-        };
+        let mut state = CaptureFrameState::new(!self.has_gbm());
 
         let mut event_queue = self.conn.new_event_queue::<CaptureFrameState>();
         let qh = event_queue.handle();
@@ -807,14 +803,7 @@ impl WayshotConnection {
         EventQueue<CaptureFrameState>,
         WayshotFrame,
     )> {
-        let state = CaptureFrameState {
-            formats: Vec::new(),
-            dmabuf_formats: Vec::new(),
-            state: None,
-            buffer_done: AtomicBool::new(false),
-            toplevels: Vec::new(),
-            session_done: false,
-        };
+        let state = CaptureFrameState::new(!self.has_gbm());
         let event_queue = self.conn.new_event_queue::<CaptureFrameState>();
         let qh = event_queue.handle();
         match self
@@ -1540,14 +1529,7 @@ impl WayshotConnection {
         WayshotFrame,
     )> {
         // Create state and event queue similar to other ext-image flows
-        let mut state = CaptureFrameState {
-            formats: Vec::new(),
-            dmabuf_formats: Vec::new(),
-            state: None,
-            buffer_done: AtomicBool::new(false),
-            toplevels: Vec::new(),
-            session_done: false,
-        };
+        let mut state = CaptureFrameState::new(!self.has_gbm());
         let mut event_queue = self.conn.new_event_queue::<CaptureFrameState>();
         let qh = event_queue.handle();
 

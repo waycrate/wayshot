@@ -19,11 +19,13 @@ fn main() {
 
     let display = conn.display();
     display.get_registry(&qhandle, ());
-    let wayshot =
-        WayshotConnection::from_connection_with_dmabuf(conn, "/dev/dri/renderD128").unwrap();
+    let mut wayshot = WayshotConnection::from_connection(conn).unwrap();
 
     use libwayshot::WayshotTarget;
     let output = wayshot.get_all_outputs()[0].wl_output.clone();
+    wayshot
+        .try_init_dmabuf(WayshotTarget::Screen(output.clone()))
+        .expect("Cannot find a drm");
     let cast = wayshot
         .create_screencast_with_dmabuf(None, WayshotTarget::Screen(output), true)
         .unwrap();
