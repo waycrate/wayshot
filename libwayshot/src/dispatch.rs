@@ -545,7 +545,7 @@ impl AsFd for Card {
 impl drm::Device for Card {}
 /// Simple helper methods for opening a `Card`.
 impl Card {
-    pub fn open<T: AsRef<Path>>(path: T) -> Self {
+    pub fn open<P: AsRef<Path>>(path: P) -> Self {
         let mut options = std::fs::OpenOptions::new();
         options.read(true);
         options.write(true);
