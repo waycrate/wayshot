@@ -220,8 +220,11 @@ impl WayshotConnection {
         })
     }
 
-    /// do screencapture once
-    #[must_use = "We need know why failed, and when it failed, you need to do update, for example, for pipewire"]
+    /// Do screencast once
+    /// Please check the result to see you should update the status
+    ///
+    /// if with [Error::FramecopyFailedWithReason], you need to update the status, for example,
+    /// send the param_changes to pipewire
     pub fn screencast(&self, cast: &mut WayshotScreenCast) -> Result<()> {
         let (mut state, mut event_queue, frame) = self.capture_target_frame_get_state(
             cast.cursor_overlay,
