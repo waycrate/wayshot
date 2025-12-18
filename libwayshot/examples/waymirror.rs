@@ -37,7 +37,7 @@ fn main() {
         configured: false,
         cast,
         instant: Instant::now()
-            .checked_add(Duration::from_millis(100))
+            .checked_add(Duration::from_millis(10))
             .unwrap(),
     };
 
@@ -47,7 +47,7 @@ fn main() {
         event_queue.roundtrip(&mut state).unwrap();
         if state.instant <= Instant::now() && state.configured {
             state.instant = Instant::now()
-                .checked_add(Duration::from_millis(100))
+                .checked_add(Duration::from_millis(10))
                 .unwrap();
             let _ = state.refresh_surface();
         }
