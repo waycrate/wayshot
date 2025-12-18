@@ -9,9 +9,9 @@ description = "Screenshot crate for wlroots based compositors implementing the z
 keywords = ["screenshot", "wayland", "wlroots", "wayshot"]
 license = "BSD-2-Clause"
 repository = "https://github.com/waycrate/wayshot"
-version = "1.4.1"
+version = "1.4.2"
 edition = "2024"
 
 [workspace.dependencies]
-libwayshot = { version = "0.5.0", path = "./libwayshot" }
+libwayshot = { version = "0.6.0", path = "./libwayshot" }
 tracing = "0.1.41"

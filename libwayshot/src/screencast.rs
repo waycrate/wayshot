@@ -1,17 +1,19 @@
 use std::os::fd::AsFd;
 
+use gbm::{BufferObject, BufferObjectFlags};
 use wayland_client::protocol::{
-    wl_buffer,
+    wl_buffer::{self, WlBuffer},
     wl_shm::{self, WlShm},
     wl_shm_pool::WlShmPool,
 };
+use wayland_protocols::wp::linux_dmabuf::zv1::client::zwp_linux_buffer_params_v1;
 
 use crate::{
     EmbeddedRegion, Error, Result, Size, WayshotConnection, WayshotFrame, WayshotTarget,
     dispatch::FrameState,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct WayshotScreenCast {
     buffer: wl_buffer::WlBuffer,
     origin_size: Size<i32>,
@@ -19,13 +21,14 @@ pub struct WayshotScreenCast {
     cursor_overlay: bool,
     target: WayshotTarget,
     capture_region: Option<EmbeddedRegion>,
-    shm_pool: WlShmPool,
-    shm_format: wl_shm::Format,
+    shm_pool: Option<WlShmPool>,
+    shm_format: Option<wl_shm::Format>,
+    bo: Option<BufferObject<()>>,
 }
 
 impl Drop for WayshotScreenCast {
     fn drop(&mut self) {
-        self.shm_pool.destroy();
+        self.shm_pool.take().map(|pool| pool.destroy());
         self.buffer.destroy();
     }
 }
@@ -35,12 +38,98 @@ impl WayshotScreenCast {
     pub fn current_size(&self) -> Size<i32> {
         self.current_size
     }
+
+    /// Get the buffer object
+    pub fn dmabuf_bo(&self) -> Option<&BufferObject<()>> {
+        self.bo.as_ref()
+    }
+
+    pub fn buffer(&self) -> &WlBuffer {
+        &self.buffer
+    }
 }
 
 impl WayshotConnection {
+    pub fn create_screencast_with_dmabuf(
+        &self,
+        capture_region: Option<EmbeddedRegion>,
+        target: WayshotTarget,
+        cursor_overlay: bool,
+    ) -> Result<WayshotScreenCast> {
+        let Some(dmabuf_state) = &self.dmabuf_state else {
+            return Err(Error::NoDMAStateError);
+        };
+        let (state, event_queue, _) =
+            self.capture_target_frame_get_state(cursor_overlay, &target, capture_region)?;
+        if state.dmabuf_formats.is_empty() {
+            return Err(Error::NoSupportedBufferFormat);
+        }
+        let frame_format = state.dmabuf_formats[0];
+        tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
+        let gbm = &dmabuf_state.gbmdev;
+        let bo = gbm.create_buffer_object::<()>(
+            frame_format.size.width,
+            frame_format.size.height,
+            gbm::Format::try_from(frame_format.format)?,
+            BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR,
+        )?;
+
+        let stride = bo.stride();
+        let modifier: u64 = bo.modifier().into();
+        tracing::debug!(
+            "Created GBM Buffer object with input frame format {:#?}, stride {:#?} and modifier {:#?} ",
+            frame_format,
+            stride,
+            modifier
+        );
+
+        let fd = bo.fd_for_plane(0)?;
+        // Connecting to wayland environment.
+        let qh = event_queue.handle();
+
+        let linux_dmabuf = &dmabuf_state.linux_dmabuf;
+        let dma_width = frame_format.size.width;
+        let dma_height = frame_format.size.height;
+
+        let dma_params = linux_dmabuf.create_params(&qh, ());
+
+        dma_params.add(
+            fd.as_fd(),
+            0,
+            0,
+            stride,
+            (modifier >> 32) as u32,
+            (modifier & 0xffffffff) as u32,
+        );
+        tracing::trace!("Called  ZwpLinuxBufferParamsV1::create_params ");
+        let buffer = dma_params.create_immed(
+            dma_width as i32,
+            dma_height as i32,
+            frame_format.format,
+            zwp_linux_buffer_params_v1::Flags::empty(),
+            &qh,
+            (),
+        );
+        let origin_size = Size {
+            width: frame_format.size.width as i32,
+            height: frame_format.size.height as i32,
+        };
+
+        Ok(WayshotScreenCast {
+            buffer,
+            origin_size,
+            current_size: origin_size,
+            cursor_overlay,
+            target,
+            capture_region,
+            shm_pool: None,
+            shm_format: None,
+            bo: Some(bo),
+        })
+    }
     /// This will save a screencast status for you
     /// We suggest you to use this api to do screencast
-    pub fn create_screencast_with_format<T: AsFd>(
+    pub fn create_screencast_with_shm<T: AsFd>(
         &self,
         shm_format: wl_shm::Format,
         capture_region: Option<EmbeddedRegion>,
@@ -92,12 +181,14 @@ impl WayshotConnection {
             cursor_overlay,
             target,
             capture_region,
-            shm_pool,
-            shm_format,
+            shm_pool: Some(shm_pool),
+            shm_format: Some(shm_format),
+            bo: None,
         })
     }
 
     /// do screencapture once
+    #[must_use]
     pub fn capture_screen(&self, cast: &mut WayshotScreenCast) -> Result<()> {
         let (mut state, mut event_queue, frame) = self.capture_target_frame_get_state(
             cast.cursor_overlay,
@@ -105,20 +196,29 @@ impl WayshotConnection {
             cast.capture_region,
         )?;
 
-        let Some(frame_format) = state
-            .formats
-            .iter()
-            .find(|f| f.format == cast.shm_format)
-            .copied()
-        else {
-            return Err(Error::NoSupportedBufferFormat);
-        };
+        if let Some(shm_format) = &cast.shm_format {
+            let Some(frame_format) = state
+                .formats
+                .iter()
+                .find(|f| f.format == *shm_format)
+                .copied()
+            else {
+                return Err(Error::NoSupportedBufferFormat);
+            };
 
-        cast.current_size = Size {
-            width: frame_format.size.width as i32,
-            height: frame_format.size.height as i32,
-        };
-
+            cast.current_size = Size {
+                width: frame_format.size.width as i32,
+                height: frame_format.size.height as i32,
+            };
+        } else {
+            let Some(frame_format) = state.formats.first() else {
+                return Err(Error::NoSupportedBufferFormat);
+            };
+            cast.current_size = Size {
+                width: frame_format.size.width as i32,
+                height: frame_format.size.height as i32,
+            };
+        }
         match &frame {
             WayshotFrame::ExtImageCopy(frame) => {
                 frame.attach_buffer(&cast.buffer);

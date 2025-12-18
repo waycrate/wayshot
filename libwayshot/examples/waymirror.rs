@@ -1,4 +1,6 @@
-use libwayshot::WayshotConnection;
+use std::time::{Duration, Instant};
+
+use libwayshot::{Size, WayshotConnection, screencast::WayshotScreenCast};
 use wayland_client::{
     Connection, Dispatch, QueueHandle, WEnum, delegate_noop,
     protocol::{
@@ -20,6 +22,12 @@ fn main() {
     let wayshot =
         WayshotConnection::from_connection_with_dmabuf(conn, "/dev/dri/renderD128").unwrap();
 
+    use libwayshot::WayshotTarget;
+    let output = wayshot.get_all_outputs()[0].wl_output.clone();
+    let cast = wayshot
+        .create_screencast_with_dmabuf(None, WayshotTarget::Screen(output), true)
+        .unwrap();
+
     let mut state = State {
         wayshot,
         running: true,
@@ -27,12 +35,22 @@ fn main() {
         wm_base: None,
         xdg_surface: None,
         configured: false,
+        cast,
+        instant: Instant::now()
+            .checked_add(Duration::from_millis(100))
+            .unwrap(),
     };
 
     println!("Starting the example wayshot dmabuf demo app, press <ESC> to quit.");
 
     while state.running {
-        event_queue.blocking_dispatch(&mut state).unwrap();
+        event_queue.roundtrip(&mut state).unwrap();
+        if state.instant <= Instant::now() && state.configured {
+            state.instant = Instant::now()
+                .checked_add(Duration::from_millis(100))
+                .unwrap();
+            let _ = state.refresh_surface();
+        }
     }
 }
 
@@ -43,6 +61,21 @@ struct State {
     wm_base: Option<xdg_wm_base::XdgWmBase>,
     xdg_surface: Option<(xdg_surface::XdgSurface, xdg_toplevel::XdgToplevel)>,
     configured: bool,
+    cast: WayshotScreenCast,
+    instant: Instant,
+}
+
+impl State {
+    fn refresh_surface(&mut self) -> libwayshot::Result<()> {
+        self.wayshot.capture_screen(&mut self.cast)?;
+        let surface = self.base_surface.as_ref().unwrap();
+
+        surface.attach(Some(self.cast.buffer()), 0, 0);
+        let Size { width, height } = self.cast.current_size();
+        surface.damage(0, 0, width, height);
+        surface.commit();
+        Ok(())
+    }
 }
 
 impl Dispatch<wl_registry::WlRegistry, ()> for State {
@@ -132,21 +165,10 @@ impl Dispatch<xdg_surface::XdgSurface, ()> for State {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        use libwayshot::WayshotTarget;
         if let xdg_surface::Event::Configure { serial, .. } = event {
             xdg_surface.ack_configure(serial);
             state.configured = true;
-            let surface = state.base_surface.as_ref().unwrap();
-            let (_frame_format, guard, _bo) = state
-                .wayshot
-                .capture_target_frame_dmabuf(
-                    true,
-                    &WayshotTarget::Screen(state.wayshot.get_all_outputs()[0].wl_output.clone()),
-                    None,
-                )
-                .unwrap();
-            surface.attach(Some(&guard.buffer), 0, 0);
-            surface.commit();
+            let _ = state.refresh_surface();
         }
     }
 }
