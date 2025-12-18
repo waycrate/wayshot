@@ -28,7 +28,9 @@ pub struct WayshotScreenCast {
 
 impl Drop for WayshotScreenCast {
     fn drop(&mut self) {
-        self.shm_pool.take().map(|pool| pool.destroy());
+        if let Some(pool) = self.shm_pool.take() {
+            pool.destroy()
+        }
         self.buffer.destroy();
     }
 }
@@ -50,6 +52,9 @@ impl WayshotScreenCast {
 }
 
 impl WayshotConnection {
+    /// This will save a screencast status for you
+    /// We suggest you to use this api to do screencast
+    /// Same with create_screencast_with_shm, but now it is with dmabuf
     pub fn create_screencast_with_dmabuf(
         &self,
         capture_region: Option<EmbeddedRegion>,
@@ -188,7 +193,7 @@ impl WayshotConnection {
     }
 
     /// do screencapture once
-    #[must_use]
+    #[must_use = "We need know why failed, and when it failed, you need to do update, for example, for pipewire"]
     pub fn capture_screen(&self, cast: &mut WayshotScreenCast) -> Result<()> {
         let (mut state, mut event_queue, frame) = self.capture_target_frame_get_state(
             cast.cursor_overlay,
