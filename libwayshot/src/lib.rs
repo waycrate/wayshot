@@ -178,7 +178,7 @@ impl WayshotConnection {
             globals.bind(&evq.handle(), 4..=ZwpLinuxDmabufV1::interface().version, ())?;
         let gpu = dispatch::Card::open(device_path);
         // init a GBM device
-        let gbm = GBMDevice::new(gpu).unwrap();
+        let gbm = GBMDevice::new(gpu)?;
         let image_copy_support = check_ext_image_copy_protocols(&globals, &conn).is_ok();
         let toplevel_capture_support = check_toplevel_protocols(&globals, &conn).is_ok();
         let mut initial_state = Self {
