@@ -63,9 +63,9 @@ impl WayshotScreenCast {
 impl WayshotConnection {
     /// This will run once to get the device provided by ext-image-copy. If you did not init the
     /// dmabuf at the first, you can try to use this way to init one
-    pub fn try_init_dmabuf(&mut self, target: WayshotTarget) -> Result<bool> {
+    pub fn try_init_dmabuf(&mut self, target: WayshotTarget) -> Result<()> {
         if self.dmabuf_state.is_some() {
-            return Ok(true);
+            return Ok(());
         }
         let (mut state, _, _) = self.capture_target_frame_get_state(false, &target, None)?;
         let (globals, evq) = registry_queue_init::<WayshotState>(&self.conn)?;
@@ -78,7 +78,7 @@ impl WayshotConnection {
             linux_dmabuf,
             gbmdev: gbm,
         });
-        Ok(true)
+        Ok(())
     }
     /// This will save a screencast status for you
     /// We suggest you to use this api to do screencast
