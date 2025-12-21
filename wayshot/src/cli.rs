@@ -91,4 +91,8 @@ pub struct Cli {
     ///     3. `None` -- if the config isn't found, the `Config::default()` will be used
     #[arg(long, verbatim_doc_comment)]
     pub config: Option<PathBuf>,
+
+    /// To view taken screen-shot in your image viewer
+    #[arg(long)]
+    pub view: bool,
 }

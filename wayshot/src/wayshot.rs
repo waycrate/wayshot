@@ -2,6 +2,7 @@ use config::Config;
 use std::{
     env,
     io::{self, BufWriter, Cursor, Write},
+    process::{Command, Stdio},
 };
 
 use clap::Parser;
@@ -230,7 +231,14 @@ fn main() -> Result<()> {
                         tracing::error!("Failed to encode to JXL: {}", e);
                     }
                 } else {
-                    image_buffer.save(f)?;
+                    image_buffer.save(&f)?;
+                }
+                if cli.view {
+                    Command::new("xdg-open")
+                        .arg(&f)
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .spawn()?;
                 }
             }
 
