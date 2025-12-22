@@ -712,7 +712,9 @@ impl WayshotConnection {
         let output_management = self
             .globals
             .bind::<ExtOutputImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())
-            .map_err(|_| Error::ProtocolNotFound("ExtOutputImageCaptureSourceManagerV1".to_string()))?;
+            .map_err(|_| {
+                Error::ProtocolNotFound("ExtOutputImageCaptureSourceManagerV1".to_string())
+            })?;
         let source = output_management.create_source(output, &qh, ());
         let options = Options::from_bits(cursor_overlay.try_into().unwrap_or(0))
             .unwrap_or(Options::PaintCursors);
