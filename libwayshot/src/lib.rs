@@ -237,7 +237,7 @@ impl WayshotConnection {
                 tracing::error!(
                     "Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?"
                 );
-                panic!("{e:#?}");
+                return Err(Error::Bind(e));
             }
         };
 
@@ -537,7 +537,7 @@ impl WayshotConnection {
             0x3271, //EGL_LINUX_DRM_FOURCC_EXT
             bo.format() as Attrib,
             0x3272, //EGL_DMA_BUF_PLANE0_FD_EXT
-            bo.fd_for_plane(0).unwrap().into_raw_fd() as Attrib,
+            bo.fd_for_plane(0)?.into_raw_fd() as Attrib,
             0x3273, //EGL_DMA_BUF_PLANE0_OFFSET_EXT
             bo.offset(0) as Attrib,
             0x3274, //EGL_DMA_BUF_PLANE0_PITCH_EXT
@@ -712,7 +712,9 @@ impl WayshotConnection {
         let output_management = self
             .globals
             .bind::<ExtOutputImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())
-            .expect("Should have");
+            .map_err(|_| {
+                Error::ProtocolNotFound("ExtOutputImageCaptureSourceManagerV1".to_string())
+            })?;
         let source = output_management.create_source(output, &qh, ());
         let options = Options::from_bits(cursor_overlay.try_into().unwrap_or(0))
             .unwrap_or(Options::PaintCursors);
