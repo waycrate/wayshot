@@ -233,7 +233,7 @@ fn main() -> Result<()> {
                         &f,
                         jxl_config.get_lossless(),
                         jxl_config.get_distance(),
-                        jxl_config.get_effort(),
+                        jxl_config.get_encoder_speed(),
                     ) {
                         tracing::error!("Failed to encode to JXL: {}", e);
                     }
@@ -248,9 +248,9 @@ fn main() -> Result<()> {
                         &image_buffer,
                         jxl_config.get_lossless(),
                         jxl_config.get_distance(),
-                        jxl_config.get_effort(),
+                        jxl_config.get_encoder_speed(),
                     )
-                        .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
+                    .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
                     Cursor::new(data)
                 } else {
                     let mut buffer = Cursor::new(Vec::new());
@@ -270,9 +270,9 @@ fn main() -> Result<()> {
                                 &image_buffer,
                                 jxl_config.get_lossless(),
                                 jxl_config.get_distance(),
-                                jxl_config.get_effort(),
+                                jxl_config.get_encoder_speed(),
                             )
-                                .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
+                            .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
                             Cursor::new(data)
                         } else {
                             let mut buffer = Cursor::new(Vec::new());

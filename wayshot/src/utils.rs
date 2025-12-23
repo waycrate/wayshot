@@ -3,7 +3,7 @@ use eyre::{ContextCompat, Error, bail};
 use notify_rust::Notification;
 
 use image::DynamicImage;
-use jpegxl_rs::encode::EncoderResult;
+use jpegxl_rs::encode::{EncoderResult, EncoderSpeed};
 use serde::{Deserialize, Serialize};
 use std::{
     env,
@@ -181,7 +181,7 @@ pub fn encode_to_jxl_bytes(
     image_buffer: &DynamicImage,
     lossless: bool,
     distance: f32,
-    effort: u8,
+    speed: EncoderSpeed,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let width = image_buffer.width();
     let height = image_buffer.height();
@@ -194,7 +194,7 @@ pub fn encode_to_jxl_bytes(
     let mut encoder = jpegxl_rs::encoder_builder()
         .lossless(lossless)
         .quality(distance)
-        .speed(effort)
+        .speed(speed)
         .build()?;
     let EncoderResult { data, .. } = encoder.encode::<u8, u8>(pixels, width, height)?;
 
@@ -206,9 +206,9 @@ pub fn encode_to_jxl(
     path: &PathBuf,
     lossless: bool,
     distance: f32,
-    effort: u8,
+    speed: EncoderSpeed,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let data = encode_to_jxl_bytes(image_buffer, lossless, distance, effort)?;
+    let data = encode_to_jxl_bytes(image_buffer, lossless, distance, speed)?;
     let mut file = File::create(path)?;
     file.write_all(&data)?;
 
