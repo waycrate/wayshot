@@ -33,6 +33,40 @@ jobs:
       run: |
         cargo test --verbose
 
+  coverage:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy rustfmt
+
+    - name: Install wayland dependencies
+      run: |
+        pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl
+
+    - name: Install cargo-tarpaulin
+      run: |
+        cargo install cargo-tarpaulin
+
+    - name: Generate coverage report
+      run: |
+        cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./cobertura.xml
+        fail_ci_if_error: false
+        verbose: true
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
   rustfmt:
     runs-on: ubuntu-latest
 
