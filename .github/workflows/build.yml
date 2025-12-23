@@ -48,7 +48,7 @@ jobs:
 
     - name: Install wayland dependencies
       run: |
-        pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl
+        pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl
 
     - name: Install cargo-llvm-cov
       run: |
