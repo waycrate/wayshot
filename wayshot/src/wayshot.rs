@@ -41,6 +41,8 @@ fn main() -> Result<()> {
     let config = Config::load(&config_path).unwrap_or_default();
     let base = config.base.unwrap_or_default();
     let file = config.file.unwrap_or_default();
+    let encoding_config = config.encoding.unwrap_or_default();
+    let jxl_config = encoding_config.jxl.unwrap_or_default();
     let notifications_enabled = base.notifications.unwrap_or(true);
 
     let log_level = cli.log_level.unwrap_or(base.get_log_level());
@@ -226,7 +228,13 @@ fn main() -> Result<()> {
 
             if let Some(f) = file {
                 if encoding == EncodingFormat::Jxl {
-                    if let Err(e) = utils::encode_to_jxl(&image_buffer, &f) {
+                    if let Err(e) = utils::encode_to_jxl(
+                        &image_buffer,
+                        &f,
+                        jxl_config.get_lossless(),
+                        jxl_config.get_distance(),
+                        jxl_config.get_effort(),
+                    ) {
                         tracing::error!("Failed to encode to JXL: {}", e);
                     }
                 } else {
@@ -236,7 +244,12 @@ fn main() -> Result<()> {
 
             if stdout_print {
                 let buffer = if encoding == EncodingFormat::Jxl {
-                    let data = utils::encode_to_jxl_bytes(&image_buffer)
+                    let data = utils::encode_to_jxl_bytes(
+                        &image_buffer,
+                        jxl_config.get_lossless(),
+                        jxl_config.get_distance(),
+                        jxl_config.get_effort(),
+                    )
                         .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
                     Cursor::new(data)
                 } else {
@@ -253,7 +266,12 @@ fn main() -> Result<()> {
                     Some(buf) => buf,
                     None => {
                         if encoding == EncodingFormat::Jxl {
-                            let data = utils::encode_to_jxl_bytes(&image_buffer)
+                            let data = utils::encode_to_jxl_bytes(
+                                &image_buffer,
+                                jxl_config.get_lossless(),
+                                jxl_config.get_distance(),
+                                jxl_config.get_effort(),
+                            )
                                 .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
                             Cursor::new(data)
                         } else {

@@ -179,6 +179,9 @@ pub fn get_full_file_name(path: &Path, filename_format: &str, encoding: Encoding
 
 pub fn encode_to_jxl_bytes(
     image_buffer: &DynamicImage,
+    lossless: bool,
+    distance: f32,
+    effort: u8,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let width = image_buffer.width();
     let height = image_buffer.height();
@@ -188,7 +191,11 @@ pub fn encode_to_jxl_bytes(
     let pixels_rgb8 = image_buffer.to_rgb8();
     let pixels = pixels_rgb8.as_raw();
 
-    let mut encoder = jpegxl_rs::encoder_builder().build()?;
+    let mut encoder = jpegxl_rs::encoder_builder()
+        .lossless(lossless)
+        .quality(distance)
+        .speed(effort)
+        .build()?;
     let EncoderResult { data, .. } = encoder.encode::<u8, u8>(pixels, width, height)?;
 
     Ok(data.to_vec())
@@ -197,8 +204,11 @@ pub fn encode_to_jxl_bytes(
 pub fn encode_to_jxl(
     image_buffer: &DynamicImage,
     path: &PathBuf,
+    lossless: bool,
+    distance: f32,
+    effort: u8,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let data = encode_to_jxl_bytes(image_buffer)?;
+    let data = encode_to_jxl_bytes(image_buffer, lossless, distance, effort)?;
     let mut file = File::create(path)?;
     file.write_all(&data)?;
 
