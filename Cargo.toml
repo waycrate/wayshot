@@ -14,4 +14,4 @@ edition = "2024"
 
 [workspace.dependencies]
 libwayshot = { version = "0.7.0", path = "./libwayshot" }
-tracing = "0.1.41"
+tracing = "0.1.44"
