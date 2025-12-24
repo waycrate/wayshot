@@ -1,4 +1,5 @@
 use crate::utils::EncodingFormat;
+use jpegxl_rs::encode::EncoderSpeed;
 use serde::{Deserialize, Serialize};
 use std::{env, io::Read, path::PathBuf};
 use tracing::Level;
@@ -7,6 +8,7 @@ use tracing::Level;
 pub struct Config {
     pub base: Option<Base>,
     pub file: Option<File>,
+    pub encoding: Option<Encoding>,
 }
 
 impl Default for Config {
@@ -14,6 +16,7 @@ impl Default for Config {
         Config {
             base: Some(Base::default()),
             file: Some(File::default()),
+            encoding: Some(Encoding::default()),
         }
     }
 }
@@ -87,6 +90,66 @@ impl Default for File {
             path: Some(env::current_dir().unwrap_or_default()),
             name_format: Some("wayshot-%Y_%m_%d-%H_%M_%S".to_string()),
             encoding: Some(EncodingFormat::Png),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Encoding {
+    pub jxl: Option<Jxl>,
+}
+
+impl Default for Encoding {
+    fn default() -> Self {
+        Encoding {
+            jxl: Some(Jxl::default()),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Jxl {
+    pub lossless: Option<bool>,
+    pub distance: Option<f32>,
+    pub effort: Option<u8>,
+}
+
+impl Default for Jxl {
+    fn default() -> Self {
+        Jxl {
+            lossless: Some(false),
+            distance: Some(1.0),
+            effort: Some(7),
+        }
+    }
+}
+
+impl Jxl {
+    pub fn get_lossless(&self) -> bool {
+        self.lossless.unwrap_or(false)
+    }
+
+    pub fn get_distance(&self) -> f32 {
+        self.distance.unwrap_or(1.0)
+    }
+
+    pub fn get_effort(&self) -> u8 {
+        self.effort.unwrap_or(7)
+    }
+
+    pub fn get_encoder_speed(&self) -> EncoderSpeed {
+        match self.get_effort() {
+            1 => EncoderSpeed::Lightning,
+            2 => EncoderSpeed::Thunder,
+            3 => EncoderSpeed::Falcon,
+            4 => EncoderSpeed::Cheetah,
+            5 => EncoderSpeed::Hare,
+            6 => EncoderSpeed::Wombat,
+            7 => EncoderSpeed::Squirrel,
+            8 => EncoderSpeed::Kitten,
+            9 => EncoderSpeed::Tortoise,
+            10 => EncoderSpeed::Glacier,
+            _ => EncoderSpeed::Squirrel,
         }
     }
 }

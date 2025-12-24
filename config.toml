@@ -22,3 +22,24 @@ name_format = "wayshot-%Y_%m_%d-%H_%M_%S"
 # screenshot file encoding
 # possible values: jpg, png, ppm, qui, webp, avif, jxl
 encoding = "png"
+
+[encoding.jxl]
+# Since wayshot uses bindings to libjxl, this section
+# follows cjxl encoder parameter names and default values.
+# For more info, run `cjxl -h`
+
+# Set lossless
+lossless = false
+
+# Target visual distance in JND units, lower = higher quality.
+# 0.0 = mathematically lossless. Default for already-lossy input (JPEG/GIF).
+# 1.0 = visually lossless. Default for other input.
+# Recommended range: 0.5 .. 3.0. Allowed range: 0.0 ... 25.0. Mutually exclusive with --quality.
+# If `lossless` is set to `true`, this value is unused and implied to be 0.
+distance = 1
+
+# Encoder effort setting. Range: 1 .. 10.
+# Default: 7. Higher numbers allow more computation at the expense of time.
+# For lossless, generally it will produce smaller files.
+# For lossy, higher effort should more accurately reach the target quality.
+effort = 7
