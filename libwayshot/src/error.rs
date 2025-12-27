@@ -31,6 +31,8 @@ pub enum Error {
     Connect(#[from] ConnectError),
     #[error("framecopy failed")]
     FramecopyFailed,
+    #[error("framecopy target dead")]
+    FramecopyTargetDead,
     #[error("framecopy failed with reason {0:?}")]
     FramecopyFailedWithReason(WEnum<FailureReason>),
     #[error("No supported buffer format")]

@@ -119,6 +119,17 @@ pub enum WayshotTarget {
     Toplevel(TopLevel),
 }
 
+impl WayshotTarget {
+    /// Check if the target is alive or dead
+    /// During screencast, we need to know if the failure is from the dead target or something else
+    pub fn is_alive(&self) -> bool {
+        match self {
+            Self::Screen(screen) => screen.is_alive(),
+            Self::Toplevel(toplevel) => toplevel.handle.is_alive(),
+        }
+    }
+}
+
 fn check_toplevel_protocols(globals: &GlobalList, conn: &Connection) -> Result<()> {
     let event_queue = conn.new_event_queue::<CaptureFrameState>();
     let qh = event_queue.handle();
