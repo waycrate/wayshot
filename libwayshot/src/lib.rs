@@ -38,7 +38,10 @@ use wayland_client::{
 };
 use wayland_protocols::{
     ext::{
-        foreign_toplevel_list::v1::client::ext_foreign_toplevel_list_v1::ExtForeignToplevelListV1,
+        foreign_toplevel_list::v1::client::{
+            ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1,
+            ext_foreign_toplevel_list_v1::ExtForeignToplevelListV1,
+        },
         image_capture_source::v1::client::{
             ext_foreign_toplevel_image_capture_source_manager_v1::ExtForeignToplevelImageCaptureSourceManagerV1,
             ext_output_image_capture_source_manager_v1::ExtOutputImageCaptureSourceManagerV1,
@@ -116,7 +119,19 @@ pub enum WayshotFrame {
 #[derive(Debug, Clone)]
 pub enum WayshotTarget {
     Screen(WlOutput),
-    Toplevel(TopLevel),
+    Toplevel(ExtForeignToplevelHandleV1),
+}
+
+impl From<OutputInfo> for WayshotTarget {
+    fn from(value: OutputInfo) -> Self {
+        Self::Screen(value.wl_output.clone())
+    }
+}
+
+impl From<TopLevel> for WayshotTarget {
+    fn from(value: TopLevel) -> Self {
+        Self::Toplevel(value.handle.clone())
+    }
 }
 
 impl WayshotTarget {
@@ -125,7 +140,7 @@ impl WayshotTarget {
     pub fn is_alive(&self) -> bool {
         match self {
             Self::Screen(screen) => screen.is_alive(),
-            Self::Toplevel(toplevel) => toplevel.handle.is_alive(),
+            Self::Toplevel(toplevel) => toplevel.is_alive(),
         }
     }
 }
@@ -1377,7 +1392,7 @@ impl WayshotConnection {
                     })
                     .collect(),
                 RegionCapturer::TopLevel(ref toplevel) => {
-                    return self.capture_toplevel(toplevel, cursor_overlay);
+                    return self.capture_toplevel(toplevel.as_ref(), cursor_overlay);
                 }
                 RegionCapturer::Freeze(_) => self
                     .get_all_outputs()
@@ -1534,7 +1549,7 @@ impl WayshotConnection {
 
     fn capture_toplevel_frame_get_state(
         &self,
-        toplevel: &TopLevel,
+        toplevel: &ExtForeignToplevelHandleV1,
         cursor_overlay: bool,
     ) -> Result<(
         CaptureFrameState,
@@ -1554,7 +1569,7 @@ impl WayshotConnection {
             .globals
             .bind::<ExtForeignToplevelImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())?;
 
-        let source = toplevel_source_manager.create_source(&toplevel.handle, &qh, ());
+        let source = toplevel_source_manager.create_source(toplevel, &qh, ());
 
         // Options follow the same pattern as output capture
         let options = if cursor_overlay {
@@ -1574,7 +1589,7 @@ impl WayshotConnection {
     pub fn capture_toplevel_frame_shm_fd<T: AsFd>(
         &self,
         cursor_overlay: bool,
-        toplevel: &TopLevel,
+        toplevel: &ExtForeignToplevelHandleV1,
         fd: T,
     ) -> Result<(FrameFormat, FrameGuard)> {
         let (state, event_queue, frame, frame_format) =
@@ -1590,7 +1605,7 @@ impl WayshotConnection {
     pub fn capture_toplevel_frame_shm_fd_with_format<T: AsFd>(
         &self,
         cursor_overlay: bool,
-        toplevel: &TopLevel,
+        toplevel: &ExtForeignToplevelHandleV1,
         fd: T,
         frame_format: wl_shm::Format,
     ) -> Result<FrameGuard> {
@@ -1617,7 +1632,7 @@ impl WayshotConnection {
     fn capture_toplevel_frame_shm_from_file(
         &self,
         cursor_overlay: bool,
-        toplevel: &TopLevel,
+        toplevel: &ExtForeignToplevelHandleV1,
         file: &File,
     ) -> Result<(FrameFormat, FrameGuard)> {
         let (state, event_queue, frame, frame_format) =
@@ -1634,7 +1649,11 @@ impl WayshotConnection {
         Ok((frame_format, frame_guard))
     }
 
-    fn capture_toplevel(&self, toplevel: &TopLevel, cursor_overlay: bool) -> Result<DynamicImage> {
+    fn capture_toplevel(
+        &self,
+        toplevel: &ExtForeignToplevelHandleV1,
+        cursor_overlay: bool,
+    ) -> Result<DynamicImage> {
         // Back the buffer with a shm file of the required size
         let fd = create_shm_fd()?;
         let memfile = File::from(fd);
@@ -1664,7 +1683,7 @@ impl WayshotConnection {
     // Helper method to get frame format for toplevel using ext-image session events
     pub fn capture_toplevel_frame_get_state_shm(
         &self,
-        toplevel: &TopLevel,
+        toplevel: &ExtForeignToplevelHandleV1,
         cursor_overlay: bool,
     ) -> Result<(
         CaptureFrameState,

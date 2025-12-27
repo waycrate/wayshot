@@ -17,6 +17,12 @@ pub struct OutputInfo {
     pub logical_region: LogicalRegion,
 }
 
+impl AsRef<WlOutput> for OutputInfo {
+    fn as_ref(&self) -> &WlOutput {
+        &self.wl_output
+    }
+}
+
 impl Display for OutputInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

@@ -31,6 +31,12 @@ pub struct TopLevel {
     pub active: bool,
 }
 
+impl AsRef<ExtForeignToplevelHandleV1> for TopLevel {
+    fn as_ref(&self) -> &ExtForeignToplevelHandleV1 {
+        &self.handle
+    }
+}
+
 impl TopLevel {
     pub fn new(handle: ExtForeignToplevelHandleV1) -> Self {
         Self {
