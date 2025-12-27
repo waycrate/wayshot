@@ -271,11 +271,7 @@ impl WayshotConnection {
                 match state {
                     FrameState::Failed => {
                         tracing::error!("Frame copy failed");
-                        if !cast.target.is_alive() {
-                            return Err(Error::FramecopyTargetDead);
-                        } else {
-                            return Err(Error::FramecopyFailed);
-                        }
+                        return Err(Error::FramecopyFailed);
                     }
                     FrameState::FailedWithReason(reason) => {
                         tracing::error!("Frame copy failed");
