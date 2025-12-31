@@ -20,7 +20,7 @@ avif = ["image/avif"]
 tracing.workspace = true
 image = { version = "0.25", default-features = false }
 memmap2 = "0.9.5"
-rustix = { version = "1.0", features = ["fs", "shm"] }
+rustix = { version = "1.1", features = ["fs", "shm"] }
 thiserror = "2"
 
 wayland-client = "0.31.8"
