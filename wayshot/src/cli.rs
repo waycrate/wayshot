@@ -67,6 +67,10 @@ pub struct Cli {
     #[arg(short, long, conflicts_with = "geometry")]
     pub output: Option<String>,
 
+    /// Grasp a point in screen and get its color
+    #[arg(long, conflicts_with_all = ["geometry", "output", "choose_output"])]
+    pub color: bool,
+
     /// Capture a specific toplevel window by name ("app_id title").
     #[arg(long, alias = "window", conflicts_with_all = ["geometry", "output", "choose_output", "choose_toplevel"])]
     pub toplevel: Option<String>,

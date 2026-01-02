@@ -138,6 +138,40 @@ fn main() -> Result<()> {
         writer.flush()?;
         return Ok(());
     }
+    if cli.color {
+        let image = wayshot_conn
+            .screenshot_freeze(
+                |w_conn| {
+                    let info = WaySip::new()
+                        .with_connection(w_conn.conn.clone())
+                        .with_selection_type(libwaysip::SelectionType::Point)
+                        .get()
+                        .map_err(|e| libwayshot::Error::FreezeCallbackError(e.to_string()))?
+                        .ok_or(libwayshot::Error::FreezeCallbackError(
+                            "Failed to capture the area".to_string(),
+                        ))?;
+                    waysip_to_region(
+                        libwaysip::Size {
+                            width: 1,
+                            height: 1,
+                        },
+                        info.left_top_point(),
+                    )
+                },
+                false,
+            )?
+            .to_rgba8();
+        let pixel = image.get_pixel(0, 0);
+        let [r, g, b, a] = pixel.0;
+        let r_f = r as f32 / 255.;
+        let g_f = g as f32 / 255.;
+        let b_f = b as f32 / 255.;
+        let a_f = a as f32 / 255.;
+        println!("RGBA       : R:{r}, G:{g}, B{b}, A{a}");
+        println!("RGBA(float): R:{r_f:.2}, G:{g_f:.2}, B:{b_f:.2}, A:{a_f:.2}");
+        println!("16hex      : #{:02x}{:02x}{:02x}{:02x}", r, g, b, a);
+        return Ok(());
+    }
 
     let result = (|| -> Result<(image::DynamicImage, ShotResult)> {
         if cli.geometry {
