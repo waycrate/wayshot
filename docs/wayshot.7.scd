@@ -28,6 +28,10 @@ wayshot --clipboard
 wayshot -l # Pick any output name from the following. We use eDP-1 for this example.
 wayshot -o eDP-1
 
+# PICK A COLOR WITH INFORMATION
+
+wayshot --color
+
 # PICK A HEX COLOR CODE, USING IMAGEMAGICk
 
 wayshot -g - | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o

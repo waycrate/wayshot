@@ -44,6 +44,12 @@ Screenshot and copy to clipboard:
 wayshot --clipboard
 ```
 
+Pick color with information
+
+```bash
+wayshot --color
+```
+
 Pick a hex color code, using ImageMagick:
 
 ```bash
