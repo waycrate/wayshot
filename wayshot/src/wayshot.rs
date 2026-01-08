@@ -43,6 +43,7 @@ fn main() -> Result<()> {
     let file = config.file.unwrap_or_default();
     let encoding_config = config.encoding.unwrap_or_default();
     let jxl_config = encoding_config.jxl.unwrap_or_default();
+    let png_config = encoding_config.png.unwrap_or_default();
     let notifications_enabled = base.notifications.unwrap_or(true);
 
     let log_level = cli.log_level.unwrap_or(base.get_log_level());
@@ -271,6 +272,15 @@ fn main() -> Result<()> {
                     ) {
                         tracing::error!("Failed to encode to JXL: {}", e);
                     }
+                } else if encoding == EncodingFormat::Png {
+                    if let Err(e) = utils::encode_to_png(
+                        &image_buffer,
+                        &f,
+                        png_config.get_compression(),
+                        png_config.get_filter(),
+                    ) {
+                        tracing::error!("Failed to encode to PNG: {}", e);
+                    }
                 } else {
                     image_buffer.save(f)?;
                 }
@@ -285,6 +295,14 @@ fn main() -> Result<()> {
                         jxl_config.get_encoder_speed(),
                     )
                     .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
+                    Cursor::new(data)
+                } else if encoding == EncodingFormat::Png {
+                    let data = utils::encode_to_png_bytes(
+                        &image_buffer,
+                        png_config.get_compression(),
+                        png_config.get_filter(),
+                    )
+                    .map_err(|e| eyre::eyre!("Failed to encode PNG: {}", e))?;
                     Cursor::new(data)
                 } else {
                     let mut buffer = Cursor::new(Vec::new());
@@ -307,6 +325,14 @@ fn main() -> Result<()> {
                                 jxl_config.get_encoder_speed(),
                             )
                             .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
+                            Cursor::new(data)
+                        } else if encoding == EncodingFormat::Png {
+                            let data = utils::encode_to_png_bytes(
+                                &image_buffer,
+                                png_config.get_compression(),
+                                png_config.get_filter(),
+                            )
+                            .map_err(|e| eyre::eyre!("Failed to encode PNG: {}", e))?;
                             Cursor::new(data)
                         } else {
                             let mut buffer = Cursor::new(Vec::new());

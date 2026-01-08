@@ -2,9 +2,13 @@ use clap::ValueEnum;
 use eyre::{ContextCompat, Error, bail};
 use notify_rust::Notification;
 
-use image::DynamicImage;
+use image::{
+    DynamicImage,
+    codecs::png::{CompressionType, FilterType, PngEncoder},
+};
 use jpegxl_rs::encode::{EncoderResult, EncoderSpeed};
 use serde::{Deserialize, Serialize};
+use std::io::Cursor;
 use std::{
     env,
     fmt::Display,
@@ -212,6 +216,29 @@ pub fn encode_to_jxl(
     let mut file = File::create(path)?;
     file.write_all(&data)?;
 
+    Ok(())
+}
+
+pub fn encode_to_png_bytes(
+    image_buffer: &DynamicImage,
+    compression: CompressionType,
+    filter: FilterType,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let mut buffer = Cursor::new(Vec::new());
+    let encoder = PngEncoder::new_with_quality(&mut buffer, compression, filter);
+    image_buffer.write_with_encoder(encoder)?;
+    Ok(buffer.into_inner())
+}
+
+pub fn encode_to_png(
+    image_buffer: &DynamicImage,
+    path: &PathBuf,
+    compression: CompressionType,
+    filter: FilterType,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let data = encode_to_png_bytes(image_buffer, compression, filter)?;
+    let mut file = File::create(path)?;
+    file.write_all(&data)?;
     Ok(())
 }
 

@@ -97,12 +97,14 @@ impl Default for File {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Encoding {
     pub jxl: Option<Jxl>,
+    pub png: Option<Png>,
 }
 
 impl Default for Encoding {
     fn default() -> Self {
         Encoding {
             jxl: Some(Jxl::default()),
+            png: Some(Png::default()),
         }
     }
 }
@@ -150,6 +152,70 @@ impl Jxl {
             9 => EncoderSpeed::Tortoise,
             10 => EncoderSpeed::Glacier,
             _ => EncoderSpeed::Squirrel,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PngCompression {
+    Level(u8),
+    Named(String),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Png {
+    pub compression: Option<PngCompression>,
+    pub filter: Option<String>,
+}
+
+impl Default for Png {
+    fn default() -> Self {
+        Png {
+            compression: Some(PngCompression::Named("default".to_string())),
+            filter: Some("adaptive".to_string()),
+        }
+    }
+}
+
+impl Png {
+    pub fn get_compression(&self) -> image::codecs::png::CompressionType {
+        match self
+            .compression
+            .as_ref()
+            .unwrap_or(&PngCompression::Named("default".to_string()))
+        {
+            PngCompression::Level(level) => {
+                if *level <= 9 {
+                    image::codecs::png::CompressionType::Level(*level)
+                } else {
+                    image::codecs::png::CompressionType::Default
+                }
+            }
+            PngCompression::Named(name) => match name.as_str() {
+                "default" => image::codecs::png::CompressionType::Default,
+                "best" => image::codecs::png::CompressionType::Best,
+                "fast" => image::codecs::png::CompressionType::Fast,
+                "none" | "uncompressed" => image::codecs::png::CompressionType::Uncompressed,
+                _ => image::codecs::png::CompressionType::Default,
+            },
+        }
+    }
+
+    pub fn get_filter(&self) -> image::codecs::png::FilterType {
+        match self
+            .filter
+            .as_ref()
+            .map(|s| s.as_str())
+            .unwrap_or("default")
+        {
+            "none" => image::codecs::png::FilterType::NoFilter,
+            "sub" => image::codecs::png::FilterType::Sub,
+            "up" => image::codecs::png::FilterType::Up,
+            "avg" => image::codecs::png::FilterType::Avg,
+            "paeth" => image::codecs::png::FilterType::Paeth,
+            "adaptive" => image::codecs::png::FilterType::Adaptive,
+            _ => image::codecs::png::FilterType::Adaptive,
         }
     }
 }
