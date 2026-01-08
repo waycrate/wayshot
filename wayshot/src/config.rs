@@ -203,12 +203,7 @@ impl Png {
     }
 
     pub fn get_filter(&self) -> image::codecs::png::FilterType {
-        match self
-            .filter
-            .as_ref()
-            .map(|s| s.as_str())
-            .unwrap_or("default")
-        {
+        match self.filter.as_deref().unwrap_or("default") {
             "none" => image::codecs::png::FilterType::NoFilter,
             "sub" => image::codecs::png::FilterType::Sub,
             "up" => image::codecs::png::FilterType::Up,
