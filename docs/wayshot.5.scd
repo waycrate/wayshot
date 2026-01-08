@@ -118,7 +118,7 @@ This section documents the *[file]* table of the configuration file
 
 	Encoding-specific configuration options.
 
-### PNG
+## PNG
 
 *[encoding.png] compression* = _"default"_ | _"fast"_ | _"best"_ | _"none"_ | _"uncompressed"_ | _0-9_
 
@@ -147,7 +147,7 @@ This section documents the *[file]* table of the configuration file
 
 	Default: _"adaptive"_
 
-### JXL
+## JXL
 
 *[encoding.jxl] lossless* = _true_ | _false_
 
