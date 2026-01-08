@@ -188,7 +188,7 @@ impl WayshotConnection {
         };
 
         initial_state.refresh_outputs()?;
-        initial_state.refresh_toplevels()?;
+        let _ = initial_state.refresh_toplevels();
 
         Ok(initial_state)
     }
@@ -224,6 +224,7 @@ impl WayshotConnection {
         };
 
         initial_state.refresh_outputs()?;
+        let _ = initial_state.refresh_toplevels();
 
         Ok(initial_state)
     }
