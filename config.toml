@@ -23,7 +23,34 @@ name_format = "wayshot-%Y_%m_%d-%H_%M_%S"
 # possible values: jpg, png, ppm, qui, webp, avif, jxl
 encoding = "png"
 
+[encoding.png]
+# PNG encoder settings
+# For detailed documentation, see: https://docs.rs/image/latest/image/codecs/png/struct.PngEncoder.html
+
+# Compression level for PNG encoding
+# Documentation: https://docs.rs/image/latest/image/codecs/png/enum.CompressionType.html
+# possible values: default, fast, best, none, uncompressed, or numeric level (0-9)
+# - default: balanced compression and speed
+# - fast: faster encoding, larger files (minimal compression)
+# - best: slower encoding, smaller files (high compression level)
+# - none/uncompressed: no compression whatsoever
+# - 0-9: detailed compression level (0=no compression, 9=maximum compression)
+compression = "default"
+
+# Filter type for PNG encoding (FilterType)
+# Documentation: https://docs.rs/image/latest/image/codecs/png/enum.FilterType.html
+# Filters process image data to improve compression
+# possible values: none, sub, up, avg, paeth, adaptive
+# - none: no filtering (best for low bit depth grayscale or low color count)
+# - sub: filters based on previous pixel in the same scanline
+# - up: filters based on the scanline above
+# - avg: filters based on average of left and right neighbor pixels
+# - paeth: algorithm using left, upper left, and above pixels
+# - adaptive: heuristic selection of filters per scanline
+filter = "adaptive"
+
 [encoding.jxl]
+# JPEG-XL encoder settings
 # Since wayshot uses bindings to libjxl, this section
 # follows cjxl encoder parameter names and default values.
 # For more info, run `cjxl -h`
