@@ -2,13 +2,13 @@ use std::{io, result};
 
 use drm::buffer::UnrecognizedFourcc;
 use gbm::InvalidFdError;
+use r_egl_wayland::r_egl as egl;
 use thiserror::Error;
 use wayland_client::{
     ConnectError, DispatchError, WEnum,
     globals::{BindError, GlobalError},
 };
 use wayland_protocols::ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason;
-
 pub type Result<T, E = Error> = result::Result<T, E>;
 
 #[derive(Error, Debug)]
@@ -46,7 +46,7 @@ pub enum Error {
     #[error("dmabuf color format provided by compositor is invalid")]
     UnrecognizedColorCode(#[from] UnrecognizedFourcc),
     #[error("dmabuf device has been destroyed")]
-    EGLError(#[from] khronos_egl::Error),
+    EGLError(#[from] egl::Error),
     #[error("No EGLImageTargetTexture2DOES function located, this extension may not be supported")]
     EGLImageToTexProcNotFoundError,
     #[error("Capture failed: {0}")]
@@ -264,11 +264,11 @@ mod tests {
 
     #[test]
     fn test_from_egl_error() {
-        let egl_error = khronos_egl::Error::ContextLost;
+        let egl_error = egl::Error::ContextLost;
         let wayshot_error: Error = egl_error.into();
 
         match wayshot_error {
-            Error::EGLError(khronos_egl::Error::ContextLost) => {}
+            Error::EGLError(egl::Error::ContextLost) => {}
             _ => panic!("Expected Error::EGLError(khronos_egl::Error::ContextLost)"),
         }
     }

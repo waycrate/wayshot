@@ -14,7 +14,6 @@ mod screencopy;
 
 use std::{
     collections::HashSet,
-    ffi::c_void,
     fs::File,
     os::fd::{AsFd, IntoRawFd},
     sync::atomic::Ordering,
@@ -23,8 +22,9 @@ use std::{
 
 use dispatch::{DMABUFState, LayerShellState};
 use image::{DynamicImage, imageops::replace};
-use khronos_egl::{self as egl, Instance};
 use memmap2::MmapMut;
+use r_egl_wayland::r_egl as egl;
+use r_egl_wayland::{EGL_INSTALCE, WayEglTrait};
 use screencopy::{DMAFrameFormat, DMAFrameGuard, EGLImageGuard, FrameData, FrameGuard};
 use tracing::debug;
 use wayland_client::{
@@ -465,7 +465,7 @@ impl WayshotConnection {
         target: &WayshotTarget,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<()> {
-        let egl = khronos_egl::Instance::new(egl::Static);
+        let egl = &EGL_INSTALCE;
         let eglimage_guard =
             self.capture_target_frame_eglimage(&egl, cursor_overlay, target, capture_region)?;
         unsafe {
@@ -504,18 +504,16 @@ impl WayshotConnection {
     /// # Returns
     /// If successful, an EGLImageGuard which contains a pointer 'image' to the created EGLImage
     /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
-    pub fn capture_target_frame_eglimage<'a, T: khronos_egl::api::EGL1_5>(
+    pub fn capture_target_frame_eglimage<'a, T: r_egl_wayland::EGL1_5>(
         &self,
-        egl_instance: &'a Instance<T>,
+        egl_instance: &'a egl::Instance<T>,
         cursor_overlay: bool,
         target: &WayshotTarget,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<EGLImageGuard<'a, T>> {
-        let egl_display = unsafe {
-            match egl_instance.get_display(self.conn.display().id().as_ptr() as *mut c_void) {
-                Some(disp) => disp,
-                None => return Err(egl_instance.get_error().unwrap().into()),
-            }
+        let egl_display = match egl_instance.get_display_wl(&self.conn.display()) {
+            Some(disp) => disp,
+            None => return Err(egl_instance.get_error().unwrap().into()),
         };
         tracing::trace!("eglDisplay obtained from Wayland connection's display");
 
@@ -544,9 +542,9 @@ impl WayshotConnection {
     /// # Returns
     /// If successful, an EGLImageGuard which contains a pointer 'image' to the created EGLImage
     /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
-    pub fn capture_target_frame_eglimage_on_display<'a, T: khronos_egl::api::EGL1_5>(
+    pub fn capture_target_frame_eglimage_on_display<'a, T: egl::api::EGL1_5>(
         &self,
-        egl_instance: &'a Instance<T>,
+        egl_instance: &'a egl::Instance<T>,
         egl_display: egl::Display,
         cursor_overlay: bool,
         target: &WayshotTarget,
@@ -582,9 +580,9 @@ impl WayshotConnection {
         unsafe {
             match egl_instance.create_image(
                 egl_display,
-                khronos_egl::Context::from_ptr(egl::NO_CONTEXT),
-                0x3270, // EGL_LINUX_DMA_BUF_EXT
-                khronos_egl::ClientBuffer::from_ptr(std::ptr::null_mut()), //NULL
+                egl::Context::from_ptr(egl::NO_CONTEXT),
+                0x3270,                                            // EGL_LINUX_DMA_BUF_EXT
+                egl::ClientBuffer::from_ptr(std::ptr::null_mut()), //NULL
                 &image_attribs,
             ) {
                 Ok(image) => Ok(EGLImageGuard {

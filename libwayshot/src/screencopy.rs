@@ -4,6 +4,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use r_egl_wayland::r_egl as egl;
 use gbm::BufferObject;
 use image::{ColorType, DynamicImage, ImageBuffer, Pixel};
 use memmap2::MmapMut;
@@ -43,13 +44,13 @@ impl Drop for DMAFrameGuard {
     }
 }
 
-pub struct EGLImageGuard<'a, T: khronos_egl::api::EGL1_5> {
-    pub image: khronos_egl::Image,
-    pub(crate) egl_instance: &'a khronos_egl::Instance<T>,
-    pub(crate) egl_display: khronos_egl::Display,
+pub struct EGLImageGuard<'a, T: r_egl_wayland::EGL1_5> {
+    pub image: egl::Image,
+    pub(crate) egl_instance: &'a egl::Instance<T>,
+    pub(crate) egl_display: egl::Display,
 }
 
-impl<T: khronos_egl::api::EGL1_5> Drop for EGLImageGuard<'_, T> {
+impl<T: egl::api::EGL1_5> Drop for EGLImageGuard<'_, T> {
     fn drop(&mut self) {
         self.egl_instance
             .destroy_image(self.egl_display, self.image)

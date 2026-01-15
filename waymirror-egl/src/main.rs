@@ -4,6 +4,7 @@ mod state;
 mod utils;
 
 use error::Result;
+use r_egl_wayland::EGL_INSTALCE;
 use state::WaylandEGLState;
 
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -55,9 +56,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     while state.running {
         event_queue.dispatch_pending(&mut state)?;
         state.draw();
-        state
-            .egl_instance
-            .swap_buffers(state.egl_display.unwrap(), state.egl_surface.unwrap())?;
+        EGL_INSTALCE.swap_buffers(state.egl_display.unwrap(), state.egl_surface.unwrap())?;
 
         tracing::trace!("eglSwapBuffers called");
     }

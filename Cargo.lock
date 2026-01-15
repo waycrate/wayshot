@@ -708,7 +708,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330c60081dcc4c72131f8eb70510f1ac07223e5d4163db481a04a0befcffa412"
 dependencies = [
- "libloading",
+ "libloading 0.8.9",
 ]
 
 [[package]]
@@ -1095,6 +1095,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gl_loader"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e32d96dd5f881490e537041d5532320812ba096097f07fccb4626578da0b99d3"
+dependencies = [
+ "cc",
+ "libc",
+]
+
+[[package]]
 name = "glib"
 version = "0.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1344,16 +1354,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "khronos-egl"
-version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6aae1df220ece3c0ada96b8153459b67eebe9ae9212258bb0134ae60416fdf76"
-dependencies = [
- "libc",
- "pkg-config",
-]
-
-[[package]]
 name = "khronos_api"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1392,6 +1392,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "libloading"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "754ca22de805bb5744484a5b151a9e1a8e837d5dc232c2d7d8c2e3492edc8b60"
+dependencies = [
+ "cfg-if",
+ "windows-link 0.2.1",
+]
+
+[[package]]
 name = "libredox"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1409,8 +1419,8 @@ dependencies = [
  "gbm",
  "gl",
  "image",
- "khronos-egl",
  "memmap2",
+ "r-egl-wayland",
  "rustix 1.1.3",
  "thiserror",
  "tracing",
@@ -1960,6 +1970,28 @@ name = "r-efi"
 version = "5.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
+
+[[package]]
+name = "r-egl"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f0080d251576b81e14514e1a72eb863bd536a3b5c6f4168485264ca6ffc0625"
+dependencies = [
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
+name = "r-egl-wayland"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2839a183d1d5897c3070c744a588f5d53fea6ef6c2f3a523a44c1a949d2ddcee"
+dependencies = [
+ "r-egl",
+ "wayland-backend",
+ "wayland-client",
+ "wayland-protocols",
+]
 
 [[package]]
 name = "rand"
@@ -2631,6 +2663,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "wayland-egl"
+version = "0.32.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d36232ee23ba3ea34a6835d68ca1af91d3ca3d6eddcf9c7147c4e0e66901b9fd"
+dependencies = [
+ "wayland-backend",
+ "wayland-sys",
+]
+
+[[package]]
 name = "wayland-protocols"
 version = "0.32.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2690,6 +2732,23 @@ dependencies = [
  "log",
  "memoffset",
  "pkg-config",
+]
+
+[[package]]
+name = "waymirror-egl"
+version = "0.1.0"
+dependencies = [
+ "gl",
+ "gl_loader",
+ "libloading 0.9.0",
+ "libwayshot",
+ "r-egl-wayland",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+ "wayland-client",
+ "wayland-egl",
+ "wayland-protocols",
 ]
 
 [[package]]

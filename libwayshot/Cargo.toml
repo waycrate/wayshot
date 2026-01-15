@@ -32,4 +32,4 @@ gbm = "0.18.0"
 drm = "0.14.1"
 
 gl = "0.14.0"
-khronos-egl = { version = "6.0.0", features = ["static"] }
+r-egl-wayland = "0.1.0"

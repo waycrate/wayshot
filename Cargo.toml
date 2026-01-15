@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["wayshot", "libwayshot"]
+members = ["wayshot", "libwayshot", "./waymirror-egl"]
 
 [workspace.package]
 authors = ["Shinyzenith <https://aakash.is-a.dev>"]
@@ -15,3 +15,4 @@ edition = "2024"
 [workspace.dependencies]
 libwayshot = { version = "0.7.0", path = "./libwayshot" }
 tracing = "0.1.44"
+r-egl-wayland = "0.1.0"
