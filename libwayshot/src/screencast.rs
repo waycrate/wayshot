@@ -174,7 +174,7 @@ impl WayshotConnection {
             bo: Some(bo),
             egl: Some(EglCapture {
                 instance: egl_instance.clone(),
-                egl_display: egl_display,
+                egl_display,
             }),
         })
     }
