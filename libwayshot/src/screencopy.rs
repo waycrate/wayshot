@@ -4,10 +4,10 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use r_egl_wayland::r_egl as egl;
 use gbm::BufferObject;
 use image::{ColorType, DynamicImage, ImageBuffer, Pixel};
 use memmap2::MmapMut;
+use r_egl_wayland::r_egl as egl;
 use rustix::{
     fs::{self, SealFlags},
     io, shm,

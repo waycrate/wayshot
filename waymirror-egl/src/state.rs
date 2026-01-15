@@ -1,6 +1,7 @@
 use crate::error::{Result, WaylandEGLStateError};
 use crate::utils::load_shader;
 
+use libwayshot::screencast::WayshotScreenCast;
 use libwayshot::{WayshotConnection, WayshotTarget};
 
 use gl::types::GLuint;
@@ -34,10 +35,24 @@ pub struct WaylandEGLState {
     pub gl_texture: GLuint,
 
     pub xdg_surface: xdg_surface::XdgSurface,
-    target: WayshotTarget,
 
     wayshot: WayshotConnection,
+    cast: WayshotScreenCast,
     pub instant: Instant,
+}
+
+fn init_cast(
+    connection: &libwayshot::WayshotConnection,
+    target: WayshotTarget,
+    gl_texture: GLuint,
+) -> WayshotScreenCast {
+    unsafe {
+        gl::BindTexture(gl::TEXTURE_2D, gl_texture);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+    }
+    connection
+        .create_screencast_with_egl(&EGL_INSTALCE, None, target, true)
+        .unwrap()
 }
 
 impl WaylandEGLState {
@@ -119,6 +134,7 @@ impl WaylandEGLState {
         )
         .unwrap();
         let target = WayshotTarget::Screen(wayshot.get_all_outputs()[0].wl_output.clone());
+        let cast = init_cast(&wayshot, target, 0);
         Ok((
             Self {
                 width: 1920,
@@ -135,10 +151,10 @@ impl WaylandEGLState {
 
                 xdg_surface,
                 wayshot,
-                target,
                 instant: Instant::now()
                     .checked_add(Duration::from_millis(10))
                     .unwrap(),
+                cast,
             },
             event_queue,
         ))
@@ -214,8 +230,6 @@ impl WaylandEGLState {
         unsafe {
             gl::GenTextures(1, &mut self.gl_texture);
 
-            self.dmabuf_to_texture();
-
             gl::GenVertexArrays(1, &mut vao as *mut u32);
             gl::GenBuffers(1, &mut vbo as *mut u32);
             gl::GenBuffers(1, &mut ebo as *mut u32);
@@ -279,13 +293,7 @@ impl WaylandEGLState {
         }
     }
 
-    pub fn dmabuf_to_texture(&self) {
-        unsafe {
-            gl::BindTexture(gl::TEXTURE_2D, self.gl_texture);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
-        }
-        self.wayshot
-            .bind_target_frame_to_gl_texture(&EGL_INSTALCE, true, &self.target, None)
-            .unwrap();
+    pub fn cast(&mut self) {
+        let _ = self.wayshot.screencast(&mut self.cast);
     }
 }

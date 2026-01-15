@@ -446,7 +446,7 @@ impl WayshotConnection {
     /// wayshot_conn
     ///     .bind_output_frame_to_gl_texture(
     ///         true,
-    ///        &wayshot_conn.get_all_outputs()[0].wl_output,
+    ///        &WayshotTarget::Screen(wayshot_conn.get_all_outputs()[0].wl_output),
     ///        None)
     ///```
     /// # Parameters

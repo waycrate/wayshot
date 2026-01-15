@@ -11,7 +11,7 @@ use state::WaylandEGLState;
 
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
+        .with_max_level(tracing::Level::INFO)
         .with_writer(std::io::stderr)
         .init();
 
@@ -27,8 +27,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             state.instant = Instant::now()
                 .checked_add(Duration::from_millis(10))
                 .unwrap();
-            state.dmabuf_to_texture();
             state.draw();
+            state.cast();
             EGL_INSTALCE.swap_buffers(state.egl_display, state.egl_surface)?;
             tracing::trace!("eglSwapBuffers called");
         }
