@@ -23,8 +23,8 @@ use std::{
 use dispatch::{DMABUFState, LayerShellState};
 use image::{DynamicImage, imageops::replace};
 use memmap2::MmapMut;
+use r_egl_wayland::WayEglTrait;
 use r_egl_wayland::r_egl as egl;
-use r_egl_wayland::{EGL_INSTALCE, WayEglTrait};
 use screencopy::{DMAFrameFormat, DMAFrameGuard, EGLImageGuard, FrameData, FrameGuard};
 use tracing::debug;
 use wayland_client::{
@@ -437,8 +437,6 @@ impl WayshotConnection {
 
         Ok((frame_format, frame_guard))
     }
-    /// # Safety
-    ///
     /// Helper function/wrapper that uses the OpenGL extension OES_EGL_image to convert the EGLImage obtained from [`WayshotConnection::capture_output_frame_eglimage`]
     /// into a OpenGL texture.
     /// - The caller is supposed to setup everything required for the texture binding. An example call may look like:
@@ -459,21 +457,25 @@ impl WayshotConnection {
     /// - If the function was found and called, an OK(()), note that this does not necessarily mean that binding was successful, only that the function was called.
     ///   The caller may check for any OpenGL errors using the standard routes.
     /// - If the function was not found, [`Error::EGLImageToTexProcNotFoundError`] is returned
-    pub unsafe fn bind_target_frame_to_gl_texture(
+    pub fn bind_target_frame_to_gl_texture<T: egl::api::EGL1_5>(
         &self,
+        egl_instance: &egl::Instance<T>,
         cursor_overlay: bool,
         target: &WayshotTarget,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<()> {
-        let egl = &EGL_INSTALCE;
-        let eglimage_guard =
-            self.capture_target_frame_eglimage(&egl, cursor_overlay, target, capture_region)?;
+        let eglimage_guard = self.capture_target_frame_eglimage(
+            egl_instance,
+            cursor_overlay,
+            target,
+            capture_region,
+        )?;
         unsafe {
             let gl_egl_image_texture_target_2d_oes: unsafe extern "system" fn(
                 target: gl::types::GLenum,
                 image: gl::types::GLeglImageOES,
-            ) -> () =
-                std::mem::transmute(match egl.get_proc_address("glEGLImageTargetTexture2DOES") {
+            ) -> () = std::mem::transmute(
+                match egl_instance.get_proc_address("glEGLImageTargetTexture2DOES") {
                     Some(f) => {
                         tracing::debug!("glEGLImageTargetTexture2DOES found at address {:#?}", f);
                         f
@@ -482,7 +484,8 @@ impl WayshotConnection {
                         tracing::error!("glEGLImageTargetTexture2DOES not found");
                         return Err(Error::EGLImageToTexProcNotFoundError);
                     }
-                });
+                },
+            );
 
             gl_egl_image_texture_target_2d_oes(gl::TEXTURE_2D, eglimage_guard.image.as_ptr());
             tracing::trace!("glEGLImageTargetTexture2DOES called");

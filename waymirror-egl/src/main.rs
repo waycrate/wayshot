@@ -3,6 +3,8 @@ mod error;
 mod state;
 mod utils;
 
+use std::time::{Duration, Instant};
+
 use error::Result;
 use r_egl_wayland::EGL_INSTALCE;
 use state::WaylandEGLState;
@@ -13,52 +15,23 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_writer(std::io::stderr)
         .init();
 
-    let mut state = WaylandEGLState::new()?;
-    let mut event_queue = state.wl_connection.new_event_queue();
+    let (mut state, mut event_queue) = WaylandEGLState::new()?;
 
-    let queue_handle = event_queue.handle();
-    let _registry = state.wl_display.get_registry(&queue_handle, ());
-
-    event_queue.roundtrip(&mut state)?;
-    state.validate_globals()?;
-
-    state.wl_surface = Some(
-        state
-            .wl_compositor
-            .as_ref()
-            .unwrap()
-            .create_surface(&queue_handle, ()),
-    );
-
-    state.xdg_surface = Some(state.xdg_wm_base.clone().unwrap().get_xdg_surface(
-        &state.wl_surface.clone().unwrap(),
-        &queue_handle,
-        (),
-    ));
-    state.xdg_toplevel = Some(
-        state
-            .xdg_surface
-            .clone()
-            .unwrap()
-            .get_toplevel(&queue_handle, ()),
-    );
-    state
-        .xdg_toplevel
-        .clone()
-        .unwrap()
-        .set_title(state.title.clone());
-    state.wl_surface.clone().unwrap().commit();
-
-    state.init_egl()?;
+    state.init_program()?;
 
     println!("Starting the example EGL-enabled wayshot dmabuf demo app, press <ESC> to quit.");
 
     while state.running {
-        event_queue.dispatch_pending(&mut state)?;
-        state.draw();
-        EGL_INSTALCE.swap_buffers(state.egl_display.unwrap(), state.egl_surface.unwrap())?;
-
-        tracing::trace!("eglSwapBuffers called");
+        event_queue.roundtrip(&mut state)?;
+        if state.instant <= Instant::now() {
+            state.instant = Instant::now()
+                .checked_add(Duration::from_millis(10))
+                .unwrap();
+            state.dmabuf_to_texture();
+            state.draw();
+            EGL_INSTALCE.swap_buffers(state.egl_display, state.egl_surface)?;
+            tracing::trace!("eglSwapBuffers called");
+        }
     }
     state.deinit()?;
 
