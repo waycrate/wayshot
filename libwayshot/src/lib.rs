@@ -16,6 +16,7 @@ use std::{
     collections::HashSet,
     fs::File,
     os::fd::{AsFd, IntoRawFd},
+    path::Path,
     sync::atomic::Ordering,
     thread,
 };
@@ -201,7 +202,10 @@ impl WayshotConnection {
     ///# Parameters
     /// - conn: a Wayland connection
     /// - device_path: string pointing to the DRI device that is to be used for creating the DMA-BUFs on. For example: "/dev/dri/renderD128"
-    pub fn from_connection_with_dmabuf(conn: Connection, device_path: &str) -> Result<Self> {
+    pub fn from_connection_with_dmabuf<P: AsRef<Path>>(
+        conn: Connection,
+        device_path: P,
+    ) -> Result<Self> {
         let (globals, evq) = registry_queue_init::<WayshotState>(&conn)?;
         let linux_dmabuf =
             globals.bind(&evq.handle(), 4..=ZwpLinuxDmabufV1::interface().version, ())?;
