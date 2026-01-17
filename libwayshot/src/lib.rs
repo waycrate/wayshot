@@ -353,7 +353,7 @@ impl WayshotConnection {
 
     /// Query which `wl_shm::Format` the compositor supports for this output by performing a trial screenshot through wlr-screencopy protocol.
     /// # Parameters
-    /// - `output`: Reference to the `WlOutput` to inspect.
+    /// - `output`: Reference to the [WayshotTarget] to inspect.
     /// # Returns
     /// - A vector of [`FrameFormat`] if screen capture succeeds.
     /// - [`Error::ProtocolNotFound`] if wlr-screencopy protocol is not found.
@@ -375,8 +375,8 @@ impl WayshotConnection {
     /// Captures a screenshot into a shared memory buffer using a specified format, if available, and writes pixel data in the provided file descriptor.
     /// This function uses wlr-screencopy protocol to capture pixel data from a `WlOutput`.
     /// # Parameters
+    /// - `output`: Reference to the [WlOutput] from which the frame is to be captured.
     /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
-    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
     /// - `fd`: file descriptor where the capture buffer will be written.
     /// - `frame_format`: `wl_shm::Format` to use for screen capture.
     /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
@@ -386,8 +386,8 @@ impl WayshotConnection {
     /// - [`Error::NoSupportedBufferFormat`] if frame_format is not supported for the given output.
     pub fn capture_output_frame_shm_fd_with_format<T: AsFd>(
         &self,
-        cursor_overlay: i32,
         output: &WlOutput,
+        cursor_overlay: i32,
         fd: T,
         frame_format: wl_shm::Format,
         capture_region: Option<EmbeddedRegion>,
@@ -417,7 +417,7 @@ impl WayshotConnection {
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(FrameFormat, FrameGuard)> {
         let (state, event_queue, frame, frame_format) =
-            self.capture_output_frame_get_state_shm(cursor_overlay, output, capture_region)?;
+            self.capture_output_frame_get_state_shm(output, cursor_overlay, capture_region)?;
         let frame_guard =
             self.image_copy_frame_inner(state, event_queue, frame, frame_format, fd)?;
 
@@ -432,7 +432,7 @@ impl WayshotConnection {
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(FrameFormat, FrameGuard)> {
         let (state, event_queue, frame, frame_format) =
-            self.capture_output_frame_get_state_shm(cursor_overlay as i32, output, capture_region)?;
+            self.capture_output_frame_get_state_shm(output, cursor_overlay as i32, capture_region)?;
 
         file.set_len(frame_format.byte_size())?;
 
@@ -455,7 +455,7 @@ impl WayshotConnection {
     ///```
     /// # Parameters
     /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
-    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
+    /// - `target`: Reference to the [WayshotTarget] from which the frame is to be captured.
     /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
     /// # Returns
     /// - If the function was found and called, an OK(()), note that this does not necessarily mean that binding was successful, only that the function was called.
@@ -498,9 +498,8 @@ impl WayshotConnection {
     /// It returns the captured frame as an `EGLImage`, wrapped in an `EGLImageGuard`
     /// for safe handling and cleanup.
     /// # Parameters
-    /// - `egl_instance`: Reference to an egl API instance obtained from the khronos_egl crate, which is used to create the `EGLImage`.
+    /// - `target`: Reference to the [WayshotTarget] from which the frame is to be captured.
     /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
-    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
     /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
     ///
     /// # Returns
@@ -518,8 +517,8 @@ impl WayshotConnection {
         EGL_INSTALCE.initialize(egl_display)?;
         self.capture_target_frame_eglimage_on_display(
             egl_display,
-            cursor_overlay,
             target,
+            cursor_overlay,
             capture_region,
         )
     }
@@ -542,13 +541,13 @@ impl WayshotConnection {
     pub fn capture_target_frame_eglimage_on_display(
         &self,
         egl_display: egl::Display,
-        cursor_overlay: bool,
         target: &WayshotTarget,
+        cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<EGLImageGuard> {
         type Attrib = egl::Attrib;
         let (frame_format, _guard, bo) =
-            self.capture_target_frame_dmabuf(cursor_overlay, target, capture_region)?;
+            self.capture_target_frame_dmabuf(target, cursor_overlay, capture_region)?;
         let modifier: u64 = bo.modifier().into();
 
         let image_attribs = [
@@ -605,15 +604,15 @@ impl WayshotConnection {
     /// - Returns `NoDMAStateError` if the DMA-BUF state is not initialized a the time of initialization of this struct.
     pub fn capture_target_frame_dmabuf(
         &self,
-        cursor_overlay: bool,
         target: &WayshotTarget,
+        cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(DMAFrameFormat, DMAFrameGuard, BufferObject<()>)> {
         let Some(dmabuf_state) = &self.dmabuf_state else {
             return Err(Error::NoDMAStateError);
         };
         let (state, event_queue, frame) =
-            self.capture_target_frame_get_state(cursor_overlay, target, capture_region)?;
+            self.capture_target_frame_get_state(target, cursor_overlay, capture_region)?;
         if state.dmabuf_formats.is_empty() {
             return Err(Error::NoSupportedBufferFormat);
         }
@@ -657,8 +656,8 @@ impl WayshotConnection {
         &self,
         mut state: CaptureFrameState,
         mut event_queue: EventQueue<CaptureFrameState>,
-        cursor_overlay: i32,
         output: &WlOutput,
+        cursor_overlay: i32,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(
         CaptureFrameState,
@@ -751,8 +750,8 @@ impl WayshotConnection {
 
     fn capture_output_frame_get_state_shm(
         &self,
-        cursor_overlay: i32,
         output: &WlOutput,
+        cursor_overlay: i32,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(
         CaptureFrameState,
@@ -788,10 +787,12 @@ impl WayshotConnection {
         Ok((state, event_queue, frame, frame_format))
     }
 
+    /// Capture the target the the current state, the result include [CaptureFrameState],
+    /// [EventQueue<CaptureFrameState>] and a [WayshotFrame]
     pub fn capture_target_frame_get_state(
         &self,
-        cursor_overlay: bool,
         target: &WayshotTarget,
+        cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(
         CaptureFrameState,
@@ -840,8 +841,8 @@ impl WayshotConnection {
             Err(_) => self.capture_output_frame_get_state_wlr(
                 state,
                 event_queue,
-                cursor_overlay,
                 output,
+                cursor_overlay,
                 capture_region,
             ),
         }
@@ -1169,8 +1170,8 @@ impl WayshotConnection {
     #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{r:}")).unwrap_or("fullscreen".to_string())))]
     fn capture_frame_copy(
         &self,
-        cursor_overlay: bool,
         output_info: &OutputInfo,
+        cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(FrameCopy, FrameGuard)> {
         // Create an in memory file and return it's file descriptor.
@@ -1218,7 +1219,7 @@ impl WayshotConnection {
         output_capture_regions
             .iter()
             .map(|(output_info, capture_region)| {
-                self.capture_frame_copy(cursor_overlay, output_info, *capture_region)
+                self.capture_frame_copy(output_info, cursor_overlay, *capture_region)
                     .map(|(frame_copy, frame_guard)| (frame_copy, frame_guard, output_info.clone()))
             })
             .collect()
@@ -1505,7 +1506,7 @@ impl WayshotConnection {
         output_info: &OutputInfo,
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
-        let (mut frame_copy, _) = self.capture_frame_copy(cursor_overlay, output_info, None)?;
+        let (mut frame_copy, _) = self.capture_frame_copy(output_info, cursor_overlay, None)?;
         frame_copy.get_image()
     }
 
@@ -1580,8 +1581,8 @@ impl WayshotConnection {
 
     pub fn capture_toplevel_frame_shm_fd<T: AsFd>(
         &self,
-        cursor_overlay: bool,
         toplevel: &ExtForeignToplevelHandleV1,
+        cursor_overlay: bool,
         fd: T,
     ) -> Result<(FrameFormat, FrameGuard)> {
         let (state, event_queue, frame, frame_format) =
@@ -1596,8 +1597,8 @@ impl WayshotConnection {
 
     pub fn capture_toplevel_frame_shm_fd_with_format<T: AsFd>(
         &self,
-        cursor_overlay: bool,
         toplevel: &ExtForeignToplevelHandleV1,
+        cursor_overlay: bool,
         fd: T,
         frame_format: wl_shm::Format,
     ) -> Result<FrameGuard> {

@@ -69,7 +69,7 @@ impl WayshotConnection {
         if self.dmabuf_state.is_some() {
             return Ok(());
         }
-        let (mut state, _, _) = self.capture_target_frame_get_state(false, &target, None)?;
+        let (mut state, _, _) = self.capture_target_frame_get_state(&target, false, None)?;
         let (globals, evq) = registry_queue_init::<WayshotState>(&self.conn)?;
         let Some(gbm) = state.gbm.take() else {
             return Err(Error::NoDMAStateError);
@@ -95,7 +95,7 @@ impl WayshotConnection {
         };
 
         let (state, event_queue, _) =
-            self.capture_target_frame_get_state(cursor_overlay, &target, capture_region)?;
+            self.capture_target_frame_get_state(&target, cursor_overlay, capture_region)?;
         if state.dmabuf_formats.is_empty() {
             return Err(Error::NoSupportedBufferFormat);
         }
@@ -176,7 +176,7 @@ impl WayshotConnection {
             return Err(Error::NoDMAStateError);
         };
         let (state, event_queue, _) =
-            self.capture_target_frame_get_state(cursor_overlay, &target, capture_region)?;
+            self.capture_target_frame_get_state(&target, cursor_overlay, capture_region)?;
         if state.dmabuf_formats.is_empty() {
             return Err(Error::NoSupportedBufferFormat);
         }
@@ -255,7 +255,7 @@ impl WayshotConnection {
         fd: T,
     ) -> Result<WayshotScreenCast> {
         let (state, event_queue, _) =
-            self.capture_target_frame_get_state(cursor_overlay, &target, capture_region)?;
+            self.capture_target_frame_get_state(&target, cursor_overlay, capture_region)?;
         let Some(frame_format) = state
             .formats
             .iter()
@@ -312,8 +312,8 @@ impl WayshotConnection {
     /// send the param_changes to pipewire
     pub fn screencast(&self, cast: &mut WayshotScreenCast) -> Result<()> {
         let (mut state, mut event_queue, frame) = self.capture_target_frame_get_state(
-            cast.cursor_overlay,
             &cast.target,
+            cast.cursor_overlay,
             cast.capture_region,
         )?;
 
