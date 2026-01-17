@@ -445,10 +445,12 @@ impl WayshotConnection {
     /// into a OpenGL texture.
     /// - The caller is supposed to setup everything required for the texture binding. An example call may look like:
     /// ```no_run, ignore
+    /// use r_egl_wayland::EGL_INSTALCE;
     /// gl::BindTexture(gl::TEXTURE_2D, self.gl_texture);
     /// gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
     /// wayshot_conn
     ///     .bind_output_frame_to_gl_texture(
+    ///         EGL_INSTALCE,
     ///         true,
     ///        &WayshotTarget::Screen(wayshot_conn.get_all_outputs()[0].wl_output),
     ///        None)
@@ -512,7 +514,7 @@ impl WayshotConnection {
     /// # Returns
     /// If successful, an EGLImageGuard which contains a pointer 'image' to the created EGLImage
     /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
-    pub fn capture_target_frame_eglimage<T: r_egl_wayland::EGL1_5>(
+    pub fn capture_target_frame_eglimage<T: egl::api::EGL1_5>(
         &self,
         egl_instance: egl::Instance<T>,
         cursor_overlay: bool,
