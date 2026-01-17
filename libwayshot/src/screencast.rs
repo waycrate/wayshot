@@ -92,10 +92,9 @@ impl WayshotConnection {
         let Some(dmabuf_state) = &self.dmabuf_state else {
             return Err(Error::NoDMAStateError);
         };
-        let egl_display = match EGL_INSTALCE.get_display_wl(&self.conn.display()) {
-            Some(disp) => disp,
-            None => return Err(EGL_INSTALCE.get_error().into()),
-        };
+
+        let egl_display = EGL_INSTALCE.get_display_wl(&self.conn.display())?;
+
         tracing::trace!("eglDisplay obtained from Wayland connection's display");
 
         EGL_INSTALCE.initialize(egl_display)?;
