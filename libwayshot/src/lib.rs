@@ -449,8 +449,8 @@ impl WayshotConnection {
     /// gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
     /// wayshot_conn
     ///     .bind_output_frame_to_gl_texture(
-    ///         true,
     ///        &WayshotTarget::Screen(wayshot_conn.get_all_outputs()[0].wl_output),
+    ///         true,
     ///        None)
     ///```
     /// # Parameters
@@ -463,12 +463,12 @@ impl WayshotConnection {
     /// - If the function was not found, [`Error::EGLImageToTexProcNotFoundError`] is returned
     pub fn bind_target_frame_to_gl_texture(
         &self,
-        cursor_overlay: bool,
         target: &WayshotTarget,
+        cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<()> {
         let eglimage_guard =
-            self.capture_target_frame_eglimage(cursor_overlay, target, capture_region)?;
+            self.capture_target_frame_eglimage(target, cursor_overlay, capture_region)?;
         unsafe {
             let gl_egl_image_texture_target_2d_oes: unsafe extern "system" fn(
                 target: gl::types::GLenum,
@@ -508,8 +508,8 @@ impl WayshotConnection {
     /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
     pub fn capture_target_frame_eglimage(
         &self,
-        cursor_overlay: bool,
         target: &WayshotTarget,
+        cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<EGLImageGuard> {
         let egl_display = EGL_INSTALCE.get_display_wl(&self.conn.display())?;

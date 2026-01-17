@@ -18,7 +18,7 @@ use crate::{
     EmbeddedRegion, Error, Result, Size, WayshotConnection, WayshotFrame, WayshotTarget,
     dispatch::{DMABUFState, FrameState, WayshotState},
 };
-use r_egl_wayland::{EGL_INSTALCE, WayEglTrait, r_egl as egl};
+use r_egl_wayland::{EGL_INSTALCE, r_egl as egl};
 
 /// It is a unit to do screencast. It storages used information for screencast
 /// You should use it and related api to do screencast
@@ -85,19 +85,15 @@ impl WayshotConnection {
 
     pub fn create_screencast_with_egl(
         &self,
-        capture_region: Option<EmbeddedRegion>,
         target: WayshotTarget,
         cursor_overlay: bool,
+        capture_region: Option<EmbeddedRegion>,
+        egl_display: egl::Display,
     ) -> Result<WayshotScreenCast> {
         let Some(dmabuf_state) = &self.dmabuf_state else {
             return Err(Error::NoDMAStateError);
         };
 
-        let egl_display = EGL_INSTALCE.get_display_wl(&self.conn.display())?;
-
-        tracing::trace!("eglDisplay obtained from Wayland connection's display");
-
-        EGL_INSTALCE.initialize(egl_display)?;
         let (state, event_queue, _) =
             self.capture_target_frame_get_state(cursor_overlay, &target, capture_region)?;
         if state.dmabuf_formats.is_empty() {
@@ -172,9 +168,9 @@ impl WayshotConnection {
     /// Same with create_screencast_with_shm, but now it is with dmabuf
     pub fn create_screencast_with_dmabuf(
         &self,
-        capture_region: Option<EmbeddedRegion>,
         target: WayshotTarget,
         cursor_overlay: bool,
+        capture_region: Option<EmbeddedRegion>,
     ) -> Result<WayshotScreenCast> {
         let Some(dmabuf_state) = &self.dmabuf_state else {
             return Err(Error::NoDMAStateError);

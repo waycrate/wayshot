@@ -45,13 +45,14 @@ fn init_cast(
     connection: &libwayshot::WayshotConnection,
     target: WayshotTarget,
     gl_texture: GLuint,
+    egl_display: egl::Display,
 ) -> WayshotScreenCast {
     unsafe {
         gl::BindTexture(gl::TEXTURE_2D, gl_texture);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
     }
     connection
-        .create_screencast_with_egl(None, target, true)
+        .create_screencast_with_egl(target, true, None, egl_display)
         .unwrap()
 }
 
@@ -134,7 +135,7 @@ impl WaylandEGLState {
         )
         .unwrap();
         let target = WayshotTarget::Screen(wayshot.get_all_outputs()[0].wl_output.clone());
-        let cast = init_cast(&wayshot, target, 0);
+        let cast = init_cast(&wayshot, target, 0, egl_display);
         Ok((
             Self {
                 width: 1920,
