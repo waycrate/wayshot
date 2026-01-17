@@ -25,7 +25,7 @@ use dispatch::{DMABUFState, LayerShellState};
 use image::{DynamicImage, imageops::replace};
 use memmap2::MmapMut;
 use r_egl_wayland::WayEglTrait;
-use r_egl_wayland::r_egl as egl;
+use r_egl_wayland::{EGL_INSTALCE, r_egl as egl};
 use screencopy::{DMAFrameFormat, DMAFrameGuard, EGLImageGuard, FrameData, FrameGuard};
 use tracing::debug;
 use wayland_client::{
@@ -445,12 +445,10 @@ impl WayshotConnection {
     /// into a OpenGL texture.
     /// - The caller is supposed to setup everything required for the texture binding. An example call may look like:
     /// ```no_run, ignore
-    /// use r_egl_wayland::EGL_INSTALCE;
     /// gl::BindTexture(gl::TEXTURE_2D, self.gl_texture);
     /// gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
     /// wayshot_conn
     ///     .bind_output_frame_to_gl_texture(
-    ///         EGL_INSTALCE,
     ///         true,
     ///        &WayshotTarget::Screen(wayshot_conn.get_all_outputs()[0].wl_output),
     ///        None)
@@ -463,26 +461,20 @@ impl WayshotConnection {
     /// - If the function was found and called, an OK(()), note that this does not necessarily mean that binding was successful, only that the function was called.
     ///   The caller may check for any OpenGL errors using the standard routes.
     /// - If the function was not found, [`Error::EGLImageToTexProcNotFoundError`] is returned
-    pub fn bind_target_frame_to_gl_texture<T: egl::api::EGL1_5 + Copy>(
+    pub fn bind_target_frame_to_gl_texture(
         &self,
-        // NOTE: when using Instance, it will always be COPY
-        egl_instance: egl::Instance<T>,
         cursor_overlay: bool,
         target: &WayshotTarget,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<()> {
-        let eglimage_guard = self.capture_target_frame_eglimage(
-            egl_instance,
-            cursor_overlay,
-            target,
-            capture_region,
-        )?;
+        let eglimage_guard =
+            self.capture_target_frame_eglimage(cursor_overlay, target, capture_region)?;
         unsafe {
             let gl_egl_image_texture_target_2d_oes: unsafe extern "system" fn(
                 target: gl::types::GLenum,
                 image: gl::types::GLeglImageOES,
             ) -> () = std::mem::transmute(
-                match egl_instance.get_proc_address("glEGLImageTargetTexture2DOES") {
+                match EGL_INSTALCE.get_proc_address("glEGLImageTargetTexture2DOES") {
                     Some(f) => {
                         tracing::debug!("glEGLImageTargetTexture2DOES found at address {:#?}", f);
                         f
@@ -514,22 +506,20 @@ impl WayshotConnection {
     /// # Returns
     /// If successful, an EGLImageGuard which contains a pointer 'image' to the created EGLImage
     /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
-    pub fn capture_target_frame_eglimage<T: egl::api::EGL1_5>(
+    pub fn capture_target_frame_eglimage(
         &self,
-        egl_instance: egl::Instance<T>,
         cursor_overlay: bool,
         target: &WayshotTarget,
         capture_region: Option<EmbeddedRegion>,
-    ) -> Result<EGLImageGuard<T>> {
-        let egl_display = match egl_instance.get_display_wl(&self.conn.display()) {
+    ) -> Result<EGLImageGuard> {
+        let egl_display = match EGL_INSTALCE.get_display_wl(&self.conn.display()) {
             Some(disp) => disp,
-            None => return Err(egl_instance.get_error().into()),
+            None => return Err(EGL_INSTALCE.get_error().into()),
         };
         tracing::trace!("eglDisplay obtained from Wayland connection's display");
 
-        egl_instance.initialize(egl_display)?;
+        EGL_INSTALCE.initialize(egl_display)?;
         self.capture_target_frame_eglimage_on_display(
-            egl_instance,
             egl_display,
             cursor_overlay,
             target,
@@ -552,14 +542,13 @@ impl WayshotConnection {
     /// # Returns
     /// If successful, an EGLImageGuard which contains a pointer 'image' to the created EGLImage
     /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
-    pub fn capture_target_frame_eglimage_on_display<T: egl::api::EGL1_5>(
+    pub fn capture_target_frame_eglimage_on_display(
         &self,
-        egl_instance: egl::Instance<T>,
         egl_display: egl::Display,
         cursor_overlay: bool,
         target: &WayshotTarget,
         capture_region: Option<EmbeddedRegion>,
-    ) -> Result<EGLImageGuard<T>> {
+    ) -> Result<EGLImageGuard> {
         type Attrib = egl::Attrib;
         let (frame_format, _guard, bo) =
             self.capture_target_frame_dmabuf(cursor_overlay, target, capture_region)?;
@@ -589,18 +578,14 @@ impl WayshotConnection {
             image_attribs
         );
         unsafe {
-            match egl_instance.create_image(
+            match EGL_INSTALCE.create_image(
                 egl_display,
                 egl::Context::from_ptr(egl::NO_CONTEXT),
                 egl::LINUX_DMA_BUF_EXT as u32,
                 egl::ClientBuffer::from_ptr(std::ptr::null_mut()), //NULL
                 &image_attribs,
             ) {
-                Ok(image) => Ok(EGLImageGuard {
-                    image,
-                    egl_instance,
-                    egl_display,
-                }),
+                Ok(image) => Ok(EGLImageGuard { image, egl_display }),
                 Err(e) => {
                     tracing::error!("eglCreateImage call failed with error {e}");
                     Err(e.into())

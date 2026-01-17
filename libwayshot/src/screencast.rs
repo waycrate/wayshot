@@ -18,13 +18,7 @@ use crate::{
     EmbeddedRegion, Error, Result, Size, WayshotConnection, WayshotFrame, WayshotTarget,
     dispatch::{DMABUFState, FrameState, WayshotState},
 };
-use r_egl_wayland::{WayEglTrait, r_egl as egl};
-
-#[derive(Debug)]
-struct EglCapture {
-    egl_instance: egl::Instance<egl::Static>,
-    egl_display: egl::Display,
-}
+use r_egl_wayland::{EGL_INSTALCE, WayEglTrait, r_egl as egl};
 
 /// It is a unit to do screencast. It storages used information for screencast
 /// You should use it and related api to do screencast
@@ -39,7 +33,7 @@ pub struct WayshotScreenCast {
     shm_pool: Option<WlShmPool>,
     shm_format: Option<wl_shm::Format>,
     bo: Option<BufferObject<()>>,
-    egl: Option<EglCapture>,
+    egl_display: Option<egl::Display>,
 }
 
 impl Drop for WayshotScreenCast {
@@ -91,7 +85,6 @@ impl WayshotConnection {
 
     pub fn create_screencast_with_egl(
         &self,
-        egl_instance: egl::Instance<egl::Static>,
         capture_region: Option<EmbeddedRegion>,
         target: WayshotTarget,
         cursor_overlay: bool,
@@ -99,13 +92,13 @@ impl WayshotConnection {
         let Some(dmabuf_state) = &self.dmabuf_state else {
             return Err(Error::NoDMAStateError);
         };
-        let egl_display = match egl_instance.get_display_wl(&self.conn.display()) {
+        let egl_display = match EGL_INSTALCE.get_display_wl(&self.conn.display()) {
             Some(disp) => disp,
-            None => return Err(egl_instance.get_error().into()),
+            None => return Err(EGL_INSTALCE.get_error().into()),
         };
         tracing::trace!("eglDisplay obtained from Wayland connection's display");
 
-        egl_instance.initialize(egl_display)?;
+        EGL_INSTALCE.initialize(egl_display)?;
         let (state, event_queue, _) =
             self.capture_target_frame_get_state(cursor_overlay, &target, capture_region)?;
         if state.dmabuf_formats.is_empty() {
@@ -172,10 +165,7 @@ impl WayshotConnection {
             shm_pool: None,
             shm_format: None,
             bo: Some(bo),
-            egl: Some(EglCapture {
-                egl_instance,
-                egl_display,
-            }),
+            egl_display: Some(egl_display),
         })
     }
     /// This will save a screencast status for you
@@ -256,7 +246,7 @@ impl WayshotConnection {
             shm_pool: None,
             shm_format: None,
             bo: Some(bo),
-            egl: None,
+            egl_display: None,
         })
     }
     /// This will save a screencast status for you
@@ -316,7 +306,7 @@ impl WayshotConnection {
             shm_pool: Some(shm_pool),
             shm_format: Some(shm_format),
             bo: None,
-            egl: None,
+            egl_display: None,
         })
     }
 
@@ -387,14 +377,7 @@ impl WayshotConnection {
             event_queue.blocking_dispatch(&mut state)?;
         }
 
-        if let (
-            Some(EglCapture {
-                egl_instance,
-                egl_display,
-            }),
-            Some(bo),
-        ) = (&cast.egl, cast.dmabuf_bo())
-        {
+        if let (Some(egl_display), Some(bo)) = (cast.egl_display, cast.dmabuf_bo()) {
             type Attrib = egl::Attrib;
             if state.dmabuf_formats.is_empty() {
                 return Err(Error::NoDMAStateError);
@@ -421,8 +404,8 @@ impl WayshotConnection {
                 egl::ATTRIB_NONE as Attrib,
             ];
             unsafe {
-                let image = egl_instance.create_image(
-                    *egl_display,
+                let image = EGL_INSTALCE.create_image(
+                    egl_display,
                     egl::Context::from_ptr(egl::NO_CONTEXT),
                     egl::LINUX_DMA_BUF_EXT as u32,
                     egl::ClientBuffer::from_ptr(std::ptr::null_mut()), //NULL
@@ -433,7 +416,7 @@ impl WayshotConnection {
                     image: gl::types::GLeglImageOES,
                 )
                     -> () = std::mem::transmute(
-                    match egl_instance.get_proc_address("glEGLImageTargetTexture2DOES") {
+                    match EGL_INSTALCE.get_proc_address("glEGLImageTargetTexture2DOES") {
                         Some(f) => {
                             tracing::debug!(
                                 "glEGLImageTargetTexture2DOES found at address {:#?}",
