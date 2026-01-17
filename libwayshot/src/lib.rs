@@ -561,22 +561,23 @@ impl WayshotConnection {
         let (frame_format, _guard, bo) =
             self.capture_target_frame_dmabuf(cursor_overlay, target, capture_region)?;
         let modifier: u64 = bo.modifier().into();
+
         let image_attribs = [
             egl::WIDTH as Attrib,
             frame_format.size.width as Attrib,
             egl::HEIGHT as Attrib,
             frame_format.size.height as Attrib,
-            0x3271, //EGL_LINUX_DRM_FOURCC_EXT
+            egl::LINUX_DRM_FOURCC_EXT as Attrib,
             bo.format() as Attrib,
-            0x3272, //EGL_DMA_BUF_PLANE0_FD_EXT
+            egl::DMA_BUF_PLANE0_FD_EXT as Attrib,
             bo.fd_for_plane(0)?.into_raw_fd() as Attrib,
-            0x3273, //EGL_DMA_BUF_PLANE0_OFFSET_EXT
+            egl::DMA_BUF_PLANE0_OFFSET_EXT as Attrib,
             bo.offset(0) as Attrib,
-            0x3274, //EGL_DMA_BUF_PLANE0_PITCH_EXT
+            egl::DMA_BUF_PLANE0_PITCH_EXT as Attrib,
             bo.stride_for_plane(0) as Attrib,
-            0x3443, //EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT
+            egl::DMA_BUF_PLANE0_MODIFIER_LO_EXT as Attrib,
             (modifier as u32) as Attrib,
-            0x3444, //EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT
+            egl::DMA_BUF_PLANE0_MODIFIER_HI_EXT as Attrib,
             (modifier >> 32) as Attrib,
             egl::ATTRIB_NONE as Attrib,
         ];

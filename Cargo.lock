@@ -1973,9 +1973,9 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "r-egl"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d924b6cca9ed6236e6667af509a686fcb7cb9df48ea381b2e55fbfa4d747089"
+checksum = "e3cfa4ebd197ac18ec7cc1f572c1a0c3266a16bb575aee11378fba0c2e46aa22"
 dependencies = [
  "libc",
  "pkg-config",
@@ -1983,9 +1983,9 @@ dependencies = [
 
 [[package]]
 name = "r-egl-wayland"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34f94986bcdc9e77b2e5db1fc5cba17391eefbbde46f58d41ae9e72ed3515c2e"
+checksum = "7827e783d05454554b6e9347ad1961097177ef375801c0a2312cbb0c065ab5c5"
 dependencies = [
  "r-egl",
  "wayland-backend",
