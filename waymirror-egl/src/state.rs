@@ -51,7 +51,7 @@ fn init_cast(
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
     }
     connection
-        .create_screencast_with_egl(&EGL_INSTALCE, None, target, true)
+        .create_screencast_with_egl(EGL_INSTALCE, None, target, true)
         .unwrap()
 }
 

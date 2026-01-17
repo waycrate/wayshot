@@ -44,13 +44,13 @@ impl Drop for DMAFrameGuard {
     }
 }
 
-pub struct EGLImageGuard<'a, T: r_egl_wayland::EGL1_5> {
+pub struct EGLImageGuard<T: egl::api::EGL1_5> {
     pub image: egl::Image,
-    pub(crate) egl_instance: &'a egl::Instance<T>,
+    pub(crate) egl_instance: egl::Instance<T>,
     pub(crate) egl_display: egl::Display,
 }
 
-impl<T: egl::api::EGL1_5> Drop for EGLImageGuard<'_, T> {
+impl<T: egl::api::EGL1_5> Drop for EGLImageGuard<T> {
     fn drop(&mut self) {
         self.egl_instance
             .destroy_image(self.egl_display, self.image)

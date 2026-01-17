@@ -22,7 +22,7 @@ use r_egl_wayland::{WayEglTrait, r_egl as egl};
 
 #[derive(Debug)]
 struct EglCapture {
-    instance: egl::Instance<egl::Static>,
+    egl_instance: egl::Instance<egl::Static>,
     egl_display: egl::Display,
 }
 
@@ -91,7 +91,7 @@ impl WayshotConnection {
 
     pub fn create_screencast_with_egl(
         &self,
-        egl_instance: &egl::Instance<egl::Static>,
+        egl_instance: egl::Instance<egl::Static>,
         capture_region: Option<EmbeddedRegion>,
         target: WayshotTarget,
         cursor_overlay: bool,
@@ -173,7 +173,7 @@ impl WayshotConnection {
             shm_format: None,
             bo: Some(bo),
             egl: Some(EglCapture {
-                instance: egl_instance.clone(),
+                egl_instance,
                 egl_display,
             }),
         })
@@ -389,7 +389,7 @@ impl WayshotConnection {
 
         if let (
             Some(EglCapture {
-                instance,
+                egl_instance,
                 egl_display,
             }),
             Some(bo),
@@ -421,7 +421,7 @@ impl WayshotConnection {
                 egl::ATTRIB_NONE as Attrib,
             ];
             unsafe {
-                let image = instance.create_image(
+                let image = egl_instance.create_image(
                     *egl_display,
                     egl::Context::from_ptr(egl::NO_CONTEXT),
                     egl::LINUX_DMA_BUF_EXT as u32,
@@ -433,7 +433,7 @@ impl WayshotConnection {
                     image: gl::types::GLeglImageOES,
                 )
                     -> () = std::mem::transmute(
-                    match instance.get_proc_address("glEGLImageTargetTexture2DOES") {
+                    match egl_instance.get_proc_address("glEGLImageTargetTexture2DOES") {
                         Some(f) => {
                             tracing::debug!(
                                 "glEGLImageTargetTexture2DOES found at address {:#?}",
