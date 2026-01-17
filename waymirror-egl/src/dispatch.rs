@@ -1,3 +1,5 @@
+use std::fs::File;
+
 use crate::state::WaylandEGLState;
 use wayland_client::{
     Connection, Dispatch, QueueHandle, WEnum, delegate_noop,
@@ -126,11 +128,19 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for WaylandEGLState {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        if let wl_keyboard::Event::Key { key, .. } = event
-            && key == 1
-        {
-            // ESC key
-            state.running = false;
+        match event {
+            wl_keyboard::Event::Key { key, .. } => {
+                if key == 1 {
+                    state.running = false;
+                }
+            }
+            // FIXME: the keyboard will panic whole thread
+            wl_keyboard::Event::Keymap { fd, .. } => {
+                // https://github.com/Smithay/smithay-clipboard/pull/24
+                // Prevent fd leaking.
+                let _ = File::from(fd);
+            }
+            _ => {}
         }
     }
 }
