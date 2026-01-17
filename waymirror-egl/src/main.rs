@@ -22,7 +22,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting the example EGL-enabled wayshot dmabuf demo app, press <ESC> to quit.");
 
     while state.running {
-        event_queue.roundtrip(&mut state)?;
+        let _ = event_queue.roundtrip(&mut state);
         if state.instant <= Instant::now() {
             state.instant = Instant::now()
                 .checked_add(Duration::from_millis(10))
