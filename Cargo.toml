@@ -15,4 +15,4 @@ edition = "2024"
 [workspace.dependencies]
 libwayshot = { version = "0.7.0", path = "./libwayshot" }
 tracing = "0.1.44"
-r-egl-wayland = "0.6.0"
+r-egl-wayland = "0.6.1"
