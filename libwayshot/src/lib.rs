@@ -589,7 +589,7 @@ impl WayshotConnection {
             match egl_instance.create_image(
                 egl_display,
                 egl::Context::from_ptr(egl::NO_CONTEXT),
-                0x3270,                                            // EGL_LINUX_DMA_BUF_EXT
+                egl::LINUX_DMA_BUF_EXT as u32,
                 egl::ClientBuffer::from_ptr(std::ptr::null_mut()), //NULL
                 &image_attribs,
             ) {
