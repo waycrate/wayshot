@@ -83,6 +83,10 @@ impl WayshotConnection {
         Ok(())
     }
 
+    /// This will save a screencast status for you
+    /// We suggest you to use this api to do screencast
+    /// Same with create_screencast_with_shm, but now it is with dmabuf
+    /// And bind the a [egl::Display], to support the egl
     pub fn create_screencast_with_egl(
         &self,
         target: WayshotTarget,
@@ -90,78 +94,10 @@ impl WayshotConnection {
         capture_region: Option<EmbeddedRegion>,
         egl_display: egl::Display,
     ) -> Result<WayshotScreenCast> {
-        let Some(dmabuf_state) = &self.dmabuf_state else {
-            return Err(Error::NoDMAStateError);
-        };
-
-        let (state, event_queue, _) =
-            self.capture_target_frame_get_state(&target, cursor_overlay, capture_region)?;
-        if state.dmabuf_formats.is_empty() {
-            return Err(Error::NoSupportedBufferFormat);
-        }
-        let frame_format = state.dmabuf_formats[0];
-        tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
-        let gbm = &dmabuf_state.gbmdev;
-        let bo = gbm.create_buffer_object::<()>(
-            frame_format.size.width,
-            frame_format.size.height,
-            gbm::Format::try_from(frame_format.format)?,
-            BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR,
-        )?;
-
-        let stride = bo.stride();
-        let modifier: u64 = bo.modifier().into();
-        tracing::debug!(
-            "Created GBM Buffer object with input frame format {:#?}, stride {:#?} and modifier {:#?} ",
-            frame_format,
-            stride,
-            modifier
-        );
-
-        let fd = bo.fd_for_plane(0)?;
-        // Connecting to wayland environment.
-        let qh = event_queue.handle();
-
-        let linux_dmabuf = &dmabuf_state.linux_dmabuf;
-        let dma_width = frame_format.size.width;
-        let dma_height = frame_format.size.height;
-
-        let dma_params = linux_dmabuf.create_params(&qh, ());
-
-        dma_params.add(
-            fd.as_fd(),
-            0,
-            0,
-            stride,
-            (modifier >> 32) as u32,
-            (modifier & 0xffffffff) as u32,
-        );
-        tracing::trace!("Called  ZwpLinuxBufferParamsV1::create_params ");
-        let buffer = dma_params.create_immed(
-            dma_width as i32,
-            dma_height as i32,
-            frame_format.format,
-            zwp_linux_buffer_params_v1::Flags::empty(),
-            &qh,
-            (),
-        );
-        let origin_size = Size {
-            width: frame_format.size.width as i32,
-            height: frame_format.size.height as i32,
-        };
-
-        Ok(WayshotScreenCast {
-            buffer,
-            origin_size,
-            current_size: origin_size,
-            cursor_overlay,
-            target,
-            capture_region,
-            shm_pool: None,
-            shm_format: None,
-            bo: Some(bo),
-            egl_display: Some(egl_display),
-        })
+        let mut cast =
+            self.create_screencast_with_dmabuf(target, cursor_overlay, capture_region)?;
+        cast.egl_display = Some(egl_display);
+        Ok(cast)
     }
     /// This will save a screencast status for you
     /// We suggest you to use this api to do screencast
