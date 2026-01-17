@@ -397,7 +397,7 @@ impl WayshotConnection {
         {
             type Attrib = egl::Attrib;
             if state.dmabuf_formats.is_empty() {
-                return Ok(());
+                return Err(Error::NoDMAStateError);
             }
             let frame_format = state.dmabuf_formats[0];
             let modifier: u64 = bo.modifier().into();
@@ -421,15 +421,13 @@ impl WayshotConnection {
                 egl::ATTRIB_NONE as Attrib,
             ];
             unsafe {
-                let Ok(image) = instance.create_image(
+                let image = instance.create_image(
                     *egl_display,
                     egl::Context::from_ptr(egl::NO_CONTEXT),
                     0x3270,                                            // EGL_LINUX_DMA_BUF_EXT
                     egl::ClientBuffer::from_ptr(std::ptr::null_mut()), //NULL
                     &image_attribs,
-                ) else {
-                    return Ok(());
-                };
+                )?;
                 let gl_egl_image_texture_target_2d_oes: unsafe extern "system" fn(
                     target: gl::types::GLenum,
                     image: gl::types::GLeglImageOES,
