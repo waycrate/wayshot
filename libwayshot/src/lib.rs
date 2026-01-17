@@ -520,7 +520,7 @@ impl WayshotConnection {
     ) -> Result<EGLImageGuard<'a, T>> {
         let egl_display = match egl_instance.get_display_wl(&self.conn.display()) {
             Some(disp) => disp,
-            None => return Err(egl_instance.get_error().unwrap().into()),
+            None => return Err(egl_instance.get_error().into()),
         };
         tracing::trace!("eglDisplay obtained from Wayland connection's display");
 

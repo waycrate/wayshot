@@ -29,7 +29,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .unwrap();
             state.draw();
             state.cast();
-            EGL_INSTALCE.swap_buffers(state.egl_display, state.egl_surface)?;
+            let _ = EGL_INSTALCE.swap_buffers(state.egl_display, state.egl_surface);
             tracing::trace!("eglSwapBuffers called");
         }
     }
