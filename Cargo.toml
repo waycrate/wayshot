@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["wayshot", "libwayshot", "./waymirror-egl"]
+default-members = ["wayshot", "libwayshot"]
 
 [workspace.package]
 authors = ["Shinyzenith <https://aakash.is-a.dev>"]
