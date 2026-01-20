@@ -184,10 +184,10 @@ impl WayshotConnection {
     /// We suggest you to use this api to do screencast
     pub fn create_screencast_with_shm<T: AsFd>(
         &self,
-        shm_format: wl_shm::Format,
-        capture_region: Option<EmbeddedRegion>,
         target: WayshotTarget,
         cursor_overlay: bool,
+        shm_format: wl_shm::Format,
+        capture_region: Option<EmbeddedRegion>,
         fd: T,
     ) -> Result<WayshotScreenCast> {
         let (state, event_queue, _) =

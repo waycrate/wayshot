@@ -361,7 +361,7 @@ impl WayshotConnection {
     pub fn get_available_frame_formats(&self, target: &WayshotTarget) -> Result<Vec<FrameFormat>> {
         let state = match target {
             WayshotTarget::Screen(output) => {
-                let (state, _, _) = self.capture_output_frame_get_state(0, output, None)?;
+                let (state, _, _) = self.capture_output_frame_get_state(output, 0, None)?;
                 state
             }
             WayshotTarget::Toplevel(toplevel) => {
@@ -394,7 +394,7 @@ impl WayshotConnection {
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<FrameGuard> {
         let (state, event_queue, frame) =
-            self.capture_output_frame_get_state(cursor_overlay, output, capture_region)?;
+            self.capture_output_frame_get_state(output, cursor_overlay, capture_region)?;
         if let Some(format) = state
             .formats
             .iter()
@@ -427,8 +427,8 @@ impl WayshotConnection {
 
     fn capture_output_frame_shm_from_file(
         &self,
-        cursor_overlay: bool,
         output: &WlOutput,
+        cursor_overlay: bool,
         file: &File,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(FrameFormat, FrameGuard)> {
@@ -761,7 +761,7 @@ impl WayshotConnection {
         FrameFormat,
     )> {
         let (state, event_queue, frame) =
-            self.capture_output_frame_get_state(cursor_overlay, output, capture_region)?;
+            self.capture_output_frame_get_state(output, cursor_overlay, capture_region)?;
         // Filter advertised wl_shm formats and select the first one that matches.
         let frame_format = state
             .formats
@@ -802,7 +802,7 @@ impl WayshotConnection {
     )> {
         match target {
             WayshotTarget::Screen(output) => {
-                self.capture_output_frame_get_state(cursor_overlay as i32, output, capture_region)
+                self.capture_output_frame_get_state(output, cursor_overlay as i32, capture_region)
             }
             WayshotTarget::Toplevel(toplevel) => {
                 self.capture_toplevel_frame_get_state(toplevel, cursor_overlay)
@@ -817,8 +817,8 @@ impl WayshotConnection {
     // a trial screenshot to determine the screen's properties.
     pub fn capture_output_frame_get_state(
         &self,
-        cursor_overlay: i32,
         output: &WlOutput,
+        cursor_overlay: i32,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(
         CaptureFrameState,
@@ -1181,8 +1181,8 @@ impl WayshotConnection {
         let mem_file = File::from(fd);
 
         let (frame_format, frame_guard) = self.capture_output_frame_shm_from_file(
-            cursor_overlay,
             &output_info.wl_output,
+            cursor_overlay,
             &mem_file,
             capture_region,
         )?;
