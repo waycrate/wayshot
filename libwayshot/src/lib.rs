@@ -90,6 +90,7 @@ pub mod reexport {
     pub use wayland_client::WEnum;
     pub use wayland_protocols::ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason;
     pub use wl_output::{Transform, WlOutput};
+    pub use wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_list_v1::ExtForeignToplevelListV1;
 }
 use gbm::{BufferObject, BufferObjectFlags, Device as GBMDevice};
 
@@ -411,8 +412,8 @@ impl WayshotConnection {
     ///  Data will be written to fd.
     pub fn capture_output_frame_shm_fd<T: AsFd>(
         &self,
-        cursor_overlay: i32,
         output: &WlOutput,
+        cursor_overlay: i32,
         fd: T,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(FrameFormat, FrameGuard)> {

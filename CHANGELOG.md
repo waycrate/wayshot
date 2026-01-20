@@ -1,5 +1,9 @@
 # Wayshot
 
+## [1.4.4] (libwayshot 0.7.1)
+
+### Hot fix: reexport ExtForeignToplevelHandle
+
 ## [1.4.3] (libwayshot 0.7.0)
 
 ### There is Breaking changes in libwayshot, but it is just some tidy up for the api, mainly the order of params
