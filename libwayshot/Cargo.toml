@@ -30,7 +30,7 @@ wayland-protocols = { workspace = true, features = [
 	"unstable",
 ] }
 wayland-protocols-wlr = { version = "0.3.6", features = ["client"] }
-wayland-backend = { version = "0.3.10", features = ["client_system"] }
+wayland-backend = { version = "0.3.12", features = ["client_system"] }
 
 gbm = "0.18.0"
 drm = "0.14.1"
