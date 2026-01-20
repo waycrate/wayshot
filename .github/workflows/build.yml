@@ -121,3 +121,11 @@ jobs:
       env:
         CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         CARGO_PUBLISH: true
+    - name: Publish github release
+      run: |
+        if [[ $(echo "${GTIHUB_REF#refs/tags/v}" | grep '-' > /dev/null) ]]; then
+          gh release edit "${GITHUB_REF#refs/tags/}" --prerelease
+        fi
+        gh release edit "${GITHUB_REF#refs/tags/}" --draft=false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
