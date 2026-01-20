@@ -1,5 +1,9 @@
 # Wayshot
 
+## [1.4.5] (libwayshot 0.7.2)
+
+### Hot fix: reexport ExtForeignToplevelHandle and fix ci
+
 ## [1.4.4] (libwayshot 0.7.1)
 
 ### Hot fix: reexport ExtForeignToplevelHandle
