@@ -7,6 +7,7 @@ use std::{
 use gbm::BufferObject;
 use image::{ColorType, DynamicImage, ImageBuffer, Pixel};
 use memmap2::MmapMut;
+use r_egl_wayland::{EGL_INSTALCE, r_egl as egl};
 use rustix::{
     fs::{self, SealFlags},
     io, shm,
@@ -43,15 +44,14 @@ impl Drop for DMAFrameGuard {
     }
 }
 
-pub struct EGLImageGuard<'a, T: khronos_egl::api::EGL1_5> {
-    pub image: khronos_egl::Image,
-    pub(crate) egl_instance: &'a khronos_egl::Instance<T>,
-    pub(crate) egl_display: khronos_egl::Display,
+pub struct EGLImageGuard {
+    pub image: egl::Image,
+    pub(crate) egl_display: egl::Display,
 }
 
-impl<T: khronos_egl::api::EGL1_5> Drop for EGLImageGuard<'_, T> {
+impl Drop for EGLImageGuard {
     fn drop(&mut self) {
-        self.egl_instance
+        EGL_INSTALCE
             .destroy_image(self.egl_display, self.image)
             .unwrap_or_else(|e| {
                 tracing::error!("EGLimage destruction had error: {e}");

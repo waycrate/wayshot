@@ -25,7 +25,7 @@ jobs:
     - name: Build
       run: |
         rm Cargo.lock
-        cargo build --release
+        cargo build --workspace --release
     - name: Clippy check
       run:
         cargo clippy -- -D warnings

@@ -1,4 +1,4 @@
-use std::os::fd::AsFd;
+use std::os::fd::{AsFd, IntoRawFd};
 
 use gbm::{BufferObject, BufferObjectFlags};
 use wayland_client::{
@@ -18,6 +18,7 @@ use crate::{
     EmbeddedRegion, Error, Result, Size, WayshotConnection, WayshotFrame, WayshotTarget,
     dispatch::{DMABUFState, FrameState, WayshotState},
 };
+use r_egl_wayland::{EGL_INSTALCE, r_egl as egl};
 
 /// It is a unit to do screencast. It storages used information for screencast
 /// You should use it and related api to do screencast
@@ -32,6 +33,7 @@ pub struct WayshotScreenCast {
     shm_pool: Option<WlShmPool>,
     shm_format: Option<wl_shm::Format>,
     bo: Option<BufferObject<()>>,
+    egl_display: Option<egl::Display>,
 }
 
 impl Drop for WayshotScreenCast {
@@ -67,7 +69,7 @@ impl WayshotConnection {
         if self.dmabuf_state.is_some() {
             return Ok(());
         }
-        let (mut state, _, _) = self.capture_target_frame_get_state(false, &target, None)?;
+        let (mut state, _, _) = self.capture_target_frame_get_state(&target, false, None)?;
         let (globals, evq) = registry_queue_init::<WayshotState>(&self.conn)?;
         let Some(gbm) = state.gbm.take() else {
             return Err(Error::NoDMAStateError);
@@ -80,20 +82,37 @@ impl WayshotConnection {
         });
         Ok(())
     }
+
+    /// This will save a screencast status for you
+    /// We suggest you to use this api to do screencast
+    /// Same with create_screencast_with_shm, but now it is with dmabuf
+    /// And bind the a [egl::Display], to support the egl
+    pub fn create_screencast_with_egl(
+        &self,
+        target: WayshotTarget,
+        cursor_overlay: bool,
+        capture_region: Option<EmbeddedRegion>,
+        egl_display: egl::Display,
+    ) -> Result<WayshotScreenCast> {
+        let mut cast =
+            self.create_screencast_with_dmabuf(target, cursor_overlay, capture_region)?;
+        cast.egl_display = Some(egl_display);
+        Ok(cast)
+    }
     /// This will save a screencast status for you
     /// We suggest you to use this api to do screencast
     /// Same with create_screencast_with_shm, but now it is with dmabuf
     pub fn create_screencast_with_dmabuf(
         &self,
-        capture_region: Option<EmbeddedRegion>,
         target: WayshotTarget,
         cursor_overlay: bool,
+        capture_region: Option<EmbeddedRegion>,
     ) -> Result<WayshotScreenCast> {
         let Some(dmabuf_state) = &self.dmabuf_state else {
             return Err(Error::NoDMAStateError);
         };
         let (state, event_queue, _) =
-            self.capture_target_frame_get_state(cursor_overlay, &target, capture_region)?;
+            self.capture_target_frame_get_state(&target, cursor_overlay, capture_region)?;
         if state.dmabuf_formats.is_empty() {
             return Err(Error::NoSupportedBufferFormat);
         }
@@ -158,6 +177,7 @@ impl WayshotConnection {
             shm_pool: None,
             shm_format: None,
             bo: Some(bo),
+            egl_display: None,
         })
     }
     /// This will save a screencast status for you
@@ -171,7 +191,7 @@ impl WayshotConnection {
         fd: T,
     ) -> Result<WayshotScreenCast> {
         let (state, event_queue, _) =
-            self.capture_target_frame_get_state(cursor_overlay, &target, capture_region)?;
+            self.capture_target_frame_get_state(&target, cursor_overlay, capture_region)?;
         let Some(frame_format) = state
             .formats
             .iter()
@@ -217,6 +237,7 @@ impl WayshotConnection {
             shm_pool: Some(shm_pool),
             shm_format: Some(shm_format),
             bo: None,
+            egl_display: None,
         })
     }
 
@@ -227,8 +248,8 @@ impl WayshotConnection {
     /// send the param_changes to pipewire
     pub fn screencast(&self, cast: &mut WayshotScreenCast) -> Result<()> {
         let (mut state, mut event_queue, frame) = self.capture_target_frame_get_state(
-            cast.cursor_overlay,
             &cast.target,
+            cast.cursor_overlay,
             cast.capture_region,
         )?;
 
@@ -279,12 +300,72 @@ impl WayshotConnection {
                     }
                     FrameState::Finished => {
                         tracing::trace!("Frame copy finished");
-                        return Ok(());
+                        break;
                     }
                 }
             }
 
             event_queue.blocking_dispatch(&mut state)?;
         }
+
+        if let (Some(egl_display), Some(bo)) = (cast.egl_display, cast.dmabuf_bo()) {
+            type Attrib = egl::Attrib;
+            if state.dmabuf_formats.is_empty() {
+                return Err(Error::NoDMAStateError);
+            }
+            let frame_format = state.dmabuf_formats[0];
+            let modifier: u64 = bo.modifier().into();
+            let image_attribs = [
+                egl::WIDTH as Attrib,
+                frame_format.size.width as Attrib,
+                egl::HEIGHT as Attrib,
+                frame_format.size.height as Attrib,
+                egl::LINUX_DRM_FOURCC_EXT as Attrib,
+                bo.format() as Attrib,
+                egl::DMA_BUF_PLANE0_FD_EXT as Attrib,
+                bo.fd_for_plane(0)?.into_raw_fd() as Attrib,
+                egl::DMA_BUF_PLANE0_OFFSET_EXT as Attrib,
+                bo.offset(0) as Attrib,
+                egl::DMA_BUF_PLANE0_PITCH_EXT as Attrib,
+                bo.stride_for_plane(0) as Attrib,
+                egl::DMA_BUF_PLANE0_MODIFIER_LO_EXT as Attrib,
+                (modifier as u32) as Attrib,
+                egl::DMA_BUF_PLANE0_MODIFIER_HI_EXT as Attrib,
+                (modifier >> 32) as Attrib,
+                egl::ATTRIB_NONE as Attrib,
+            ];
+            unsafe {
+                let image = EGL_INSTALCE.create_image(
+                    egl_display,
+                    egl::Context::from_ptr(egl::NO_CONTEXT),
+                    egl::LINUX_DMA_BUF_EXT as u32,
+                    egl::ClientBuffer::from_ptr(std::ptr::null_mut()), //NULL
+                    &image_attribs,
+                )?;
+                let gl_egl_image_texture_target_2d_oes: unsafe extern "system" fn(
+                    target: gl::types::GLenum,
+                    image: gl::types::GLeglImageOES,
+                )
+                    -> () = std::mem::transmute(
+                    match EGL_INSTALCE.get_proc_address("glEGLImageTargetTexture2DOES") {
+                        Some(f) => {
+                            tracing::debug!(
+                                "glEGLImageTargetTexture2DOES found at address {:#?}",
+                                f
+                            );
+                            f
+                        }
+                        None => {
+                            tracing::error!("glEGLImageTargetTexture2DOES not found");
+                            return Err(Error::EGLImageToTexProcNotFoundError);
+                        }
+                    },
+                );
+
+                gl_egl_image_texture_target_2d_oes(gl::TEXTURE_2D, image.as_ptr());
+            }
+        }
+
+        Ok(())
     }
 }

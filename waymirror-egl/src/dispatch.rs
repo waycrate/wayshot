@@ -1,49 +1,22 @@
+use std::fs::File;
+
 use crate::state::WaylandEGLState;
 use wayland_client::{
     Connection, Dispatch, QueueHandle, WEnum, delegate_noop,
+    globals::GlobalListContents,
     protocol::{wl_compositor, wl_keyboard, wl_registry, wl_seat, wl_surface},
 };
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
 
-impl Dispatch<wl_registry::WlRegistry, ()> for WaylandEGLState {
-    #[tracing::instrument(skip(registry, queue_handle, state), ret, level = "trace")]
+impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for WaylandEGLState {
     fn event(
-        state: &mut Self,
-        registry: &wl_registry::WlRegistry,
-        event: wl_registry::Event,
-        _: &(),
-        _: &Connection,
-        queue_handle: &QueueHandle<Self>,
+        _state: &mut Self,
+        _proxy: &wl_registry::WlRegistry,
+        _event: <wl_registry::WlRegistry as wayland_client::Proxy>::Event,
+        _data: &GlobalListContents,
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
     ) {
-        if let wl_registry::Event::Global {
-            name,
-            interface,
-            version,
-        } = event
-        {
-            match interface.as_str() {
-                "xdg_wm_base" => {
-                    state.xdg_wm_base = Some(registry.bind::<xdg_wm_base::XdgWmBase, _, _>(
-                        name,
-                        version,
-                        queue_handle,
-                        (),
-                    ));
-                }
-                "wl_seat" => {
-                    registry.bind::<wl_seat::WlSeat, _, _>(name, 1, queue_handle, ());
-                }
-                "wl_compositor" => {
-                    state.wl_compositor = Some(registry.bind::<wl_compositor::WlCompositor, _, _>(
-                        name,
-                        version,
-                        queue_handle,
-                        (),
-                    ));
-                }
-                _ => {}
-            }
-        }
     }
 }
 
@@ -99,16 +72,12 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for WaylandEGLState {
                     state.width = width;
                     state.height = height;
 
-                    state
-                        .egl_window
-                        .clone()
-                        .unwrap()
-                        .resize(state.width, state.height, 0, 0);
+                    state.egl_window.resize(state.width, state.height, 0, 0);
 
                     unsafe {
                         gl::Viewport(0, 0, state.width, state.height);
                     }
-                    state.wl_surface.clone().unwrap().commit();
+                    state.wl_surface.commit();
                 }
             }
             xdg_toplevel::Event::Close => {
@@ -159,11 +128,19 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for WaylandEGLState {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        if let wl_keyboard::Event::Key { key, .. } = event
-            && key == 1
-        {
-            // ESC key
-            state.running = false;
+        match event {
+            wl_keyboard::Event::Key { key, .. } => {
+                if key == 1 {
+                    state.running = false;
+                }
+            }
+            // FIXME: the keyboard will panic whole thread
+            wl_keyboard::Event::Keymap { fd, .. } => {
+                // https://github.com/Smithay/smithay-clipboard/pull/24
+                // Prevent fd leaking.
+                let _ = File::from(fd);
+            }
+            _ => {}
         }
     }
 }

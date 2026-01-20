@@ -47,7 +47,7 @@ fn main() {
         .try_init_dmabuf(WayshotTarget::Screen(output.clone()))
         .expect("Cannot find a drm");
     let cast = wayshot
-        .create_screencast_with_dmabuf(None, WayshotTarget::Screen(output), true)
+        .create_screencast_with_dmabuf(WayshotTarget::Screen(output), true, None)
         .unwrap();
 
     let view_porter = globals

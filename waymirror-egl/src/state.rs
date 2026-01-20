@@ -1,117 +1,96 @@
 use crate::error::{Result, WaylandEGLStateError};
 use crate::utils::load_shader;
 
-use libwayshot::WayshotConnection;
+use libwayshot::screencast::WayshotScreenCast;
+use libwayshot::{WayshotConnection, WayshotTarget};
 
 use gl::types::GLuint;
-use khronos_egl::{self as egl};
-use std::{ffi::c_void, rc::Rc};
+use r_egl_wayland::EGL_INSTALCE;
+use r_egl_wayland::{WayEglTrait, r_egl as egl};
+use std::ffi::c_void;
+use std::time::{Duration, Instant};
+use wayland_client::EventQueue;
+use wayland_client::globals::registry_queue_init;
+use wayland_client::protocol::wl_seat;
 use wayland_client::{
-    ConnectError, Connection, Proxy,
-    protocol::{wl_compositor, wl_display::WlDisplay, wl_surface::WlSurface},
+    Connection, Proxy,
+    protocol::{wl_compositor, wl_surface::WlSurface},
 };
 use wayland_egl::WlEglSurface;
-use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
-
+use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_wm_base};
 #[derive(Debug)]
 pub struct WaylandEGLState {
     pub width: i32,
     pub height: i32,
     pub running: bool,
-    pub title: String,
 
-    pub wl_connection: Connection,
-    pub wl_display: WlDisplay,
-    pub wl_surface: Option<WlSurface>,
+    pub wl_surface: WlSurface,
 
-    pub egl_instance: egl::Instance<egl::Static>,
-    pub egl_window: Option<Rc<WlEglSurface>>,
-    pub egl_display: Option<egl::Display>,
-    pub egl_surface: Option<egl::Surface>,
-    pub egl_context: Option<egl::Context>,
+    pub egl_window: WlEglSurface,
+    pub egl_display: egl::Display,
+    pub egl_surface: egl::Surface,
+    pub egl_context: egl::Context,
 
     pub gl_program: GLuint,
     pub gl_texture: GLuint,
 
-    pub xdg_wm_base: Option<xdg_wm_base::XdgWmBase>,
-    pub xdg_surface: Option<xdg_surface::XdgSurface>,
-    pub xdg_toplevel: Option<xdg_toplevel::XdgToplevel>,
-    pub wl_compositor: Option<wl_compositor::WlCompositor>,
+    pub xdg_surface: xdg_surface::XdgSurface,
 
     wayshot: WayshotConnection,
+    cast: WayshotScreenCast,
+    pub instant: Instant,
+}
+
+fn init_cast(
+    connection: &libwayshot::WayshotConnection,
+    target: WayshotTarget,
+    gl_texture: GLuint,
+    egl_display: egl::Display,
+) -> WayshotScreenCast {
+    unsafe {
+        gl::BindTexture(gl::TEXTURE_2D, gl_texture);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+    }
+    connection
+        .create_screencast_with_egl(target, true, None, egl_display)
+        .unwrap()
 }
 
 impl WaylandEGLState {
     #[tracing::instrument]
-    pub fn new() -> Result<Self, ConnectError> {
+    pub fn new() -> Result<(Self, EventQueue<Self>), WaylandEGLStateError> {
         let server_connection = Connection::connect_to_env()?;
+        let (globals, event_queue) = registry_queue_init::<Self>(&server_connection)?;
+        let qhandle = event_queue.handle();
+        let compositor = globals
+            .bind::<wl_compositor::WlCompositor, _, _>(&qhandle, 3..=3, ())
+            .unwrap();
+        let wl_surface = compositor.create_surface(&qhandle, ());
 
-        Ok(Self {
-            width: 1920,
-            height: 1080,
-            running: true,
-            title: "Waymirror-EGL".into(),
+        globals
+            .bind::<wl_seat::WlSeat, _, _>(&qhandle, 1..=1, ())
+            .unwrap();
 
-            wl_connection: server_connection.clone(),
-            wl_display: server_connection.display(),
-            wl_surface: None,
+        let wm_base = globals
+            .bind::<xdg_wm_base::XdgWmBase, _, _>(&qhandle, 2..=6, ())
+            .unwrap();
+        let xdg_surface = wm_base.get_xdg_surface(&wl_surface, &qhandle, ());
 
-            egl_instance: egl::Instance::new(egl::Static),
-            egl_window: None,
-            egl_display: None,
-            egl_surface: None,
-            egl_context: None,
-            gl_program: 0,
-            gl_texture: 0,
+        let toplevel = xdg_surface.get_toplevel(&qhandle, ());
+        toplevel.set_title("Waymirror-EGL".into());
+        wl_surface.commit();
 
-            xdg_wm_base: None,
-            xdg_surface: None,
-            xdg_toplevel: None,
-            wl_compositor: None,
-            wayshot: WayshotConnection::from_connection_with_dmabuf(
-                server_connection,
-                "/dev/dri/renderD128",
-            )
-            .unwrap(),
-        })
-    }
-
-    pub fn deinit(&self) -> Result<(), Box<dyn std::error::Error>> {
-        unsafe {
-            gl::DeleteProgram(self.gl_program);
-        }
-
-        self.egl_instance
-            .destroy_surface(self.egl_display.unwrap(), self.egl_surface.unwrap())?;
-        self.egl_instance
-            .destroy_context(self.egl_display.unwrap(), self.egl_context.unwrap())?;
-
-        self.xdg_surface.clone().unwrap().destroy();
-        self.wl_surface.clone().unwrap().destroy();
-
-        Ok(())
-    }
-
-    pub fn init_egl(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Init gl
         gl_loader::init_gl();
         gl::load_with(|s| gl_loader::get_proc_address(s) as *const _);
 
-        self.egl_window = Some(Rc::new(WlEglSurface::new(
-            self.wl_surface.clone().unwrap().id(),
-            self.width,
-            self.height,
-        )?));
+        let width = 1920;
+        let height = 1080;
+        let egl_window = WlEglSurface::new(wl_surface.id(), width, height)?;
+        let wl_display = server_connection.display();
+        let egl_display = EGL_INSTALCE.get_display_wl(&wl_display).unwrap();
 
-        self.egl_display = Some(
-            unsafe {
-                self.egl_instance
-                    .get_display(self.wl_display.id().as_ptr() as *mut c_void)
-            }
-            .unwrap(),
-        );
-
-        self.egl_instance.initialize(self.egl_display.unwrap())?;
+        EGL_INSTALCE.initialize(egl_display)?;
 
         let attributes = [
             egl::SURFACE_TYPE,
@@ -127,40 +106,76 @@ impl WaylandEGLState {
             egl::NONE,
         ];
 
-        let config = self
-            .egl_instance
-            .choose_first_config(self.egl_display.unwrap(), &attributes)?
+        let config = EGL_INSTALCE
+            .choose_first_config(egl_display, &attributes)?
             .expect("unable to find an appropriate EGL configuration");
-        self.egl_surface = Some(unsafe {
-            self.egl_instance.create_window_surface(
-                self.egl_display.unwrap(),
+        let egl_surface = unsafe {
+            EGL_INSTALCE.create_window_surface(
+                egl_display,
                 config,
-                self.egl_window.clone().unwrap().ptr() as egl::NativeWindowType,
+                egl_window.ptr() as egl::NativeWindowType,
                 None,
             )?
-        });
+        };
 
         let context_attributes = [egl::CONTEXT_CLIENT_VERSION, 2, egl::NONE];
-        self.egl_context = Some(self.egl_instance.create_context(
-            self.egl_display.unwrap(),
-            config,
-            None,
-            &context_attributes,
-        )?);
+        let egl_context =
+            EGL_INSTALCE.create_context(egl_display, config, None, &context_attributes)?;
 
-        self.egl_instance.make_current(
-            self.egl_display.unwrap(),
-            self.egl_surface,
-            self.egl_surface,
-            self.egl_context,
+        EGL_INSTALCE.make_current(
+            egl_display,
+            Some(egl_surface),
+            Some(egl_surface),
+            Some(egl_context),
         )?;
 
-        self.init_program()?;
+        let wayshot = WayshotConnection::from_connection_with_dmabuf(
+            server_connection,
+            "/dev/dri/renderD128",
+        )
+        .unwrap();
+        let target = WayshotTarget::Screen(wayshot.get_all_outputs()[0].wl_output.clone());
+        let cast = init_cast(&wayshot, target, 0, egl_display);
+        Ok((
+            Self {
+                width: 1920,
+                height: 1080,
+                running: true,
+                wl_surface,
+
+                egl_window,
+                egl_display,
+                egl_surface,
+                egl_context,
+                gl_program: 0,
+                gl_texture: 0,
+
+                xdg_surface,
+                wayshot,
+                instant: Instant::now()
+                    .checked_add(Duration::from_millis(10))
+                    .unwrap(),
+                cast,
+            },
+            event_queue,
+        ))
+    }
+
+    pub fn deinit(&self) -> Result<(), Box<dyn std::error::Error>> {
+        unsafe {
+            gl::DeleteProgram(self.gl_program);
+        }
+
+        EGL_INSTALCE.destroy_surface(self.egl_display, self.egl_surface)?;
+        EGL_INSTALCE.destroy_context(self.egl_display, self.egl_context)?;
+
+        self.xdg_surface.destroy();
+        self.wl_surface.destroy();
 
         Ok(())
     }
 
-    fn init_program(&mut self) -> Result<()> {
+    pub fn init_program(&mut self) -> Result<()> {
         let vert_shader = load_shader(
             gl::VERTEX_SHADER,
             include_str!("./shaders/vert.glsl").into(),
@@ -215,8 +230,6 @@ impl WaylandEGLState {
 
         unsafe {
             gl::GenTextures(1, &mut self.gl_texture);
-
-            self.dmabuf_to_texture();
 
             gl::GenVertexArrays(1, &mut vao as *mut u32);
             gl::GenBuffers(1, &mut vbo as *mut u32);
@@ -281,29 +294,7 @@ impl WaylandEGLState {
         }
     }
 
-    pub fn dmabuf_to_texture(&self) {
-        unsafe {
-            gl::BindTexture(gl::TEXTURE_2D, self.gl_texture);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
-
-            use libwayshot::WayshotTarget;
-            self.wayshot
-                .bind_target_frame_to_gl_texture(
-                    true,
-                    &WayshotTarget::Screen(self.wayshot.get_all_outputs()[0].wl_output.clone()),
-                    None,
-                )
-                .unwrap();
-        }
-    }
-
-    pub fn validate_globals(&self) -> Result<()> {
-        if self.xdg_wm_base.is_none() {
-            return Err(WaylandEGLStateError::XdgWmBaseMissing);
-        } else if self.wl_compositor.is_none() {
-            return Err(WaylandEGLStateError::WlCompositorMissing);
-        }
-
-        Ok(())
+    pub fn cast(&mut self) {
+        let _ = self.wayshot.screencast(&mut self.cast);
     }
 }

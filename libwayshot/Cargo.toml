@@ -24,7 +24,11 @@ rustix = { version = "1.1", features = ["fs", "shm"] }
 thiserror = "2"
 
 wayland-client = "0.31.8"
-wayland-protocols = { version = "0.32.6", features = ["client", "staging", "unstable"] }
+wayland-protocols = { version = "0.32.6", features = [
+	"client",
+	"staging",
+	"unstable",
+] }
 wayland-protocols-wlr = { version = "0.3.6", features = ["client"] }
 wayland-backend = { version = "0.3.10", features = ["client_system"] }
 
@@ -32,4 +36,4 @@ gbm = "0.18.0"
 drm = "0.14.1"
 
 gl = "0.14.0"
-khronos-egl = { version = "6.0.0", features = ["static"] }
+r-egl-wayland.workspace = true
