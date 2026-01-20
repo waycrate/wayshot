@@ -110,7 +110,7 @@ jobs:
         components: clippy rustfmt
     - name: Install wayland dependencies
       run: |
-        pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl
+        pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl github-cli
     - name: Obtain crates.io token
       uses: rust-lang/crates-io-auth-action@b7e9a28eded4986ec6b1fa40eeee8f8f165559ec # v1.0.3
       id: auth
