@@ -29,7 +29,7 @@ wayland-protocols = { version = "0.32.6", features = [
 	"staging",
 	"unstable",
 ] }
-wayland-protocols-wlr = { version = "0.3.6", features = ["client"] }
+wayland-protocols-wlr = { version = "0.3.10", features = ["client"] }
 wayland-backend = { version = "0.3.10", features = ["client_system"] }
 
 gbm = "0.18.0"
