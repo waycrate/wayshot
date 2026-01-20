@@ -17,13 +17,13 @@ eyre = "0.6.12"
 
 [dependencies]
 tracing.workspace = true
+tracing-subscriber.workspace = true
 
 libwayshot.workspace = true
 
 clap = { version = "4.5.51", features = ["derive"] }
-tracing-subscriber = "0.3.19"
 
-image = { version = "0.25", default-features = false, features = [
+image = { workspace = true, features = [
 	"jpeg",
 	"png",
 	"pnm",
@@ -38,7 +38,7 @@ eyre = "0.6.12"
 chrono = "0.4.41"
 
 wl-clipboard-rs = "0.9.3"
-rustix = { version = "1.1", features = ["process", "runtime"] }
+rustix = { workspace = true, features = ["process", "runtime"] }
 
 shellexpand = "3.1.1"
 toml = { version = "0.9.10", default-features = false, features = [

@@ -16,4 +16,12 @@ edition = "2024"
 [workspace.dependencies]
 libwayshot = { version = "0.7.0", path = "./libwayshot" }
 tracing = "0.1.44"
+tracing-subscriber = "0.3.19"
 r-egl-wayland = "0.7.1"
+rustix = "1.1"
+thiserror = "2"
+image = { version = "0.25", default-features = false }
+wayland-client = "0.31.8"
+wayland-egl = "0.32.5"
+wayland-protocols = "0.32.6"
+gl = "0.14.0"

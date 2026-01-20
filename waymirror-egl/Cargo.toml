@@ -5,13 +5,13 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-gl = "0.14.0"
+gl.workspace = true
 gl_loader = "0.1.2"
-thiserror = "2"
-tracing = "0.1.41"
-tracing-subscriber = "0.3.19"
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
 r-egl-wayland.workspace = true
-wayland-client = { version = "0.31.8" }
-wayland-egl = { version = "0.32.5" }
-wayland-protocols = { version = "0.32.6", features = ["client"] }
+wayland-client.workspace = true
+wayland-egl.workspace = true
+wayland-protocols = { workspace = true, features = ["client"] }
 libwayshot.workspace = true
