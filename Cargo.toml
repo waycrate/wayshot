@@ -23,5 +23,5 @@ thiserror = "2"
 image = { version = "0.25", default-features = false }
 wayland-client = "0.31.8"
 wayland-egl = "0.32.5"
-wayland-protocols = "0.32.6"
+wayland-protocols = "0.32.10"
 gl = "0.14.0"
