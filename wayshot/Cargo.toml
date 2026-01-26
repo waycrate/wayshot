@@ -35,7 +35,7 @@ jpegxl-rs = "0.11"
 
 dialoguer = { version = "0.12.0", features = ["fuzzy-select"] }
 eyre = "0.6.12"
-chrono = "0.4.41"
+chrono = "0.4.43"
 
 wl-clipboard-rs = "0.9.3"
 rustix = { workspace = true, features = ["process", "runtime"] }
