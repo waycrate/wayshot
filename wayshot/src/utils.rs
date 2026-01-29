@@ -242,6 +242,19 @@ pub fn encode_to_png(
     Ok(())
 }
 
+pub fn optimize_png(data: Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let optimized = oxipng::optimize_from_memory(&data, &oxipng::Options::default())?;
+    Ok(optimized)
+}
+
+pub fn optimize_and_save_png(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let data = std::fs::read(path)?;
+    let optimized = optimize_png(data)?;
+    let mut file = File::create(path)?;
+    file.write_all(&optimized)?;
+    Ok(())
+}
+
 const TIMEOUT: i32 = 5000;
 
 #[derive(Debug, Clone)]

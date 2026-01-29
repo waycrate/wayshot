@@ -95,4 +95,9 @@ pub struct Cli {
     ///     3. `None` -- if the config isn't found, the `Config::default()` will be used
     #[arg(long, verbatim_doc_comment)]
     pub config: Option<PathBuf>,
+
+    /// Optimize PNG files using oxipng to reduce file size.
+    /// Only applies when saving to a PNG file.
+    #[arg(long)]
+    pub optimize: bool,
 }

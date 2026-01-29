@@ -280,6 +280,10 @@ fn main() -> Result<()> {
                         png_config.get_filter(),
                     ) {
                         tracing::error!("Failed to encode to PNG: {}", e);
+                    } else if cli.optimize {
+                        if let Err(e) = utils::optimize_and_save_png(&f) {
+                            tracing::error!("Failed to optimize PNG: {}", e);
+                        }
                     }
                 } else {
                     image_buffer.save(f)?;
