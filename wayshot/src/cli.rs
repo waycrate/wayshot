@@ -96,6 +96,8 @@ pub struct Cli {
     #[arg(long, verbatim_doc_comment)]
     pub config: Option<PathBuf>,
 
+    /// Optimize PNG files using oxipng to reduce file size.
+    /// This process is slower but results in smaller images.
     #[arg(long)]
     pub optimize: bool,
 }
