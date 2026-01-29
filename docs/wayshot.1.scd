@@ -88,6 +88,9 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 
 	Example: *wayshot --config config.toml*
 
+*--optimize*
+	Optimize PNG using oxipng. Reduces file size at the cost of ~5x slower encoding.
+
 
 # SEE ALSO
 	- wayshot(5)

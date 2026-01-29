@@ -230,6 +230,16 @@ pub fn encode_to_png_bytes(
     Ok(buffer.into_inner())
 }
 
+pub fn encode_to_png_bytes_optimized(
+    image_buffer: &DynamicImage,
+    compression: CompressionType,
+    filter: FilterType,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let data = encode_to_png_bytes(image_buffer, compression, filter)?;
+    let optimized = oxipng::optimize_from_memory(&data, &oxipng::Options::default())?;
+    Ok(optimized)
+}
+
 pub fn encode_to_png(
     image_buffer: &DynamicImage,
     path: &PathBuf,
@@ -237,6 +247,18 @@ pub fn encode_to_png(
     filter: FilterType,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let data = encode_to_png_bytes(image_buffer, compression, filter)?;
+    let mut file = File::create(path)?;
+    file.write_all(&data)?;
+    Ok(())
+}
+
+pub fn encode_to_png_optimized(
+    image_buffer: &DynamicImage,
+    path: &PathBuf,
+    compression: CompressionType,
+    filter: FilterType,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let data = encode_to_png_bytes_optimized(image_buffer, compression, filter)?;
     let mut file = File::create(path)?;
     file.write_all(&data)?;
     Ok(())

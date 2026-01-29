@@ -56,6 +56,12 @@ Pick a hex color code, using ImageMagick:
 wayshot -g - | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
 ```
 
+Screenshot with PNG optimization (smaller files, slower):
+
+```bash
+wayshot --optimize
+```
+
 # Installation
 
 ## AUR:

@@ -114,6 +114,11 @@ This section documents the *[file]* table of the configuration file
 
 	Default: _"png"_
 
+*optimize* = _true_ | _false_
+	Optimize PNG using oxipng. Slower (~5x) but smaller file sizes.
+	CLI option takes precedence: _wayshot --optimize_
+	Default: _false_
+
 ## ENCODING
 
 	Encoding-specific configuration options.
