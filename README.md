@@ -67,6 +67,7 @@ wayshot -g - | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{
 -   scdoc (If present, man-pages will be generated.)
 -   rustup
 -   make
+-   pkg-config
 
 ## Compiling:
 
