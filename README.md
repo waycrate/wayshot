@@ -68,6 +68,7 @@ wayshot -g - | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{
 -   rustup
 -   make
 -   pkg-config
+-   libjxl
 
 ## Compiling:
 
