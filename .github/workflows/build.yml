@@ -18,14 +18,16 @@ jobs:
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy rustfmt
+
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
+
     - name: Install wayland dependencies
       run: |
         pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl
 
     - name: Build
-      run: |
-        rm Cargo.lock
-        cargo build --workspace --release
+      run: cargo build --workspace --release
     - name: Clippy check
       run:
         cargo clippy -- -D warnings
