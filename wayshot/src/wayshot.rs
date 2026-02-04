@@ -44,7 +44,7 @@ fn main() -> Result<()> {
     let encoding_config = config.encoding.unwrap_or_default();
     let jxl_config = encoding_config.jxl.unwrap_or_default();
     let png_config = encoding_config.png.unwrap_or_default();
-    let notifications_enabled = base.notifications.unwrap_or(true);
+    let notifications_enabled = !cli.silent && base.notifications.unwrap_or(true);
 
     let log_level = cli.log_level.unwrap_or(base.get_log_level());
     tracing_subscriber::fmt()
