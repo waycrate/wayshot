@@ -19,7 +19,7 @@ jobs:
       with:
         components: clippy rustfmt
 
-    - name: Rust Cache
+    - name: Build Cache
       uses: Swatinem/rust-cache@v2
 
     - name: Install wayland dependencies
@@ -47,14 +47,17 @@ jobs:
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: llvm-tools-preview
+    - name: Build Cache
+      uses: Swatinem/rust-cache@v2
 
     - name: Install wayland dependencies
       run: |
         pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl
 
     - name: Install cargo-llvm-cov
-      run: |
-        cargo install cargo-llvm-cov
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-llvm-cov
 
     - name: Generate coverage report
       run: |
