@@ -80,6 +80,13 @@ This section documents the *[base]* table of the configuration file
 
 	Default: _"info"_
 
+*notifications* = _true_ | _false_
+
+	Controls if desktop notifications should be shown.
+	When enabled, wayshot will show notifications for screenshot events (e.g., successful capture, errors).
+
+	Default: _true_
+
 # FILE
 
 This section documents the *[file]* table of the configuration file
