@@ -12,6 +12,8 @@ stdout = false
 # max logging level
 # possible values: info, trace, debug, warn, error
 log_level = "info"
+# should show desktop notifications?
+notifications = true
 
 [file]
 # screenshots directory (not a file!)
