@@ -1,6 +1,8 @@
 use clap::ValueEnum;
 use eyre::{ContextCompat, Error, bail};
 use notify_rust::Notification;
+use rustix::runtime::{self, Fork};
+use std::process::Command;
 
 use image::{
     DynamicImage,
@@ -252,24 +254,51 @@ pub enum ShotResult {
     All,
 }
 
-pub fn send_notification(shot_result: Result<ShotResult, &Error>) {
+pub fn send_notification(shot_result: Result<ShotResult, &Error>, saved_location: Option<PathBuf>) {
     match shot_result {
         Ok(result) => {
             let body = match result {
-                ShotResult::Output { name } => {
-                    format!("Screenshot of output '{}' saved", name)
-                }
-                ShotResult::Toplevel { name } => {
-                    format!("Screenshot of toplevel '{}' saved", name)
-                }
+                ShotResult::Output { name } => format!("Screenshot of output '{}' saved", name),
+                ShotResult::Toplevel { name } => format!("Screenshot of toplevel '{}' saved", name),
                 ShotResult::Area => "Screenshot of selected area saved".to_string(),
                 ShotResult::All => "Screenshot of all outputs saved".to_string(),
             };
-            let _ = Notification::new()
+            let mut notification = Notification::new();
+            notification
                 .summary("Screenshot Taken")
-                .body(&body)
-                .timeout(TIMEOUT)
-                .show();
+                .appname("wayshot")
+                .timeout(TIMEOUT);
+
+            if let Some(path) = saved_location {
+                notification.body(&format!("{}\nClick to see location", body));
+                notification.action("open_location", "Open Folder");
+                notification.action("default", "Open Folder");
+
+                match unsafe { runtime::kernel_fork() } {
+                    Ok(Fork::Child(_)) => {
+                        if let Ok(handle) = notification.show() {
+                            handle.wait_for_action(|action| {
+                                if action == "open_location" || action == "default" {
+                                    let parent = path.parent().unwrap_or(Path::new("."));
+                                    let _ = Command::new("xdg-open")
+                                        .arg(parent)
+                                        .stdout(std::process::Stdio::null())
+                                        .stderr(std::process::Stdio::null())
+                                        .spawn();
+                                }
+                            });
+                        }
+                        std::process::exit(0);
+                    }
+                    Ok(Fork::ParentOf(_)) => {}
+                    Err(e) => {
+                        tracing::error!("Fork failed for notification action: {}", e);
+                        let _ = notification.body(&body).show();
+                    }
+                }
+            } else {
+                let _ = notification.body(&body).show();
+            }
         }
         Err(e) => {
             let _ = Notification::new()
