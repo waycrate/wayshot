@@ -45,7 +45,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 	Using this flag will cause the wayshot process to fork and persist in the background offering the image
 	on the wayland clipboard until some other program overwrites the clipboard.
 
-*-e*, *--extension*
+*-e*, *--extension*, *--encoding*, *--format*, *--file-format*
 	Set the image encoder. Without this option, encoding is either inferred from the *output* filename or defaults to png.
 	Valid arguments:
 		- jpg
@@ -62,11 +62,23 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 *-l*, *--list-outputs*
 	List all valid output names. This flag is generally used in combination with *-o* flag.
 
+*--list-outputs-info*
+	List all valid outputs with their name, description, size, and position.
+
+*--list-toplevels*, *--list-windows*
+	List all toplevel windows (applications).
+
 *--choose-output*
 	Present a fuzzy selector for display (wl_output) selection.
 
 *-o*, *--output*
 	Choose a particular display (wl_output) to screenshot.
+
+*--toplevel*, *--window*
+	Capture a specific toplevel window by name ("app_id title").
+
+*--choose-toplevel*, *--choose-window*
+	Present a fuzzy selector for toplevel/window selection.
 
 *-g*, *--geometry*
 	If this option is passed, wayshot takes a screenshot first and then uses
@@ -87,6 +99,9 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 	- *None* if config isn't found, the default values will be used
 
 	Example: *wayshot --config config.toml*
+
+*--silent*
+	Silents notification after screenshot.
 
 
 # SEE ALSO
