@@ -12,7 +12,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 
 *output*,
 	Location to send captured screenshot to, it can be of the following types:
-		1. A directory, image outputs will be saved in the default format "wayshot-yyyy-mm-dd-hh-mm-ss.png"
+		1. A directory, image outputs will be saved in the default format "wayshot-yyyy-mm-dd-hh-mm-ss.png" (Parent directories will be created if they do not exist)
 
 		2. A path (Encoding is automatically inferred from the extension).
 
