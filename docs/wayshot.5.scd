@@ -91,7 +91,7 @@ This section documents the *[file]* table of the configuration file
 
 	Refer to _[base]_ category's _file_ for examples
 
-	Default: _"None"_ (current working directory)
+	Default: _"None"_ ($HOME/Pictures/Screenshots, fallbacks to current working directory)
 
 *name_format* = _"<string>"_ | _"None"_
 
