@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use wayland_client::protocol::{wl_output, wl_output::WlOutput};
 
-use crate::region::{LogicalRegion, Size};
+use crate::region::{LogicalRegion, Position, Size};
 
 /// Represents an accessible wayland output.
 ///
@@ -37,6 +37,21 @@ impl Display for OutputInfo {
 impl OutputInfo {
     pub(crate) fn scale(&self) -> f64 {
         self.physical_size.height as f64 / self.logical_region.inner.size.height as f64
+    }
+
+    /// return the physical_size
+    pub fn physical_size(&self) -> Size {
+        self.physical_size
+    }
+
+    /// return the logical_size
+    pub fn logical_size(&self) -> Size {
+        self.logical_region.inner.size
+    }
+
+    /// return the position of screen
+    pub fn logical_position(&self) -> Position {
+        self.logical_region.inner.position
     }
 }
 
