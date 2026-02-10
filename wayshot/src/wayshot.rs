@@ -1,6 +1,6 @@
 use config::Config;
 use std::{
-    env,
+    fs,
     io::{self, BufWriter, Cursor, Write},
 };
 
@@ -101,7 +101,7 @@ fn main() -> Result<()> {
             if base.file.unwrap_or_default() {
                 let dir = file
                     .path
-                    .unwrap_or_else(|| env::current_dir().unwrap_or_default());
+                    .unwrap_or_else(config::File::get_default_screenshot_dir);
                 Some(utils::get_full_file_name(&dir, &file_name_format, encoding))
             } else {
                 None
@@ -262,6 +262,9 @@ fn main() -> Result<()> {
             let mut image_buf: Option<Cursor<Vec<u8>>> = None;
 
             if let Some(f) = file {
+                if let Some(parent) = f.parent() {
+                    fs::create_dir_all(parent)?;
+                }
                 if encoding == EncodingFormat::Jxl {
                     if let Err(e) = utils::encode_to_jxl(
                         &image_buffer,

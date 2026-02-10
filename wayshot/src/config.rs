@@ -87,10 +87,18 @@ pub struct File {
 impl Default for File {
     fn default() -> Self {
         File {
-            path: Some(env::current_dir().unwrap_or_default()),
+            path: Some(File::get_default_screenshot_dir()),
             name_format: Some("wayshot-%Y_%m_%d-%H_%M_%S".to_string()),
             encoding: Some(EncodingFormat::Png),
         }
+    }
+}
+
+impl File {
+    pub fn get_default_screenshot_dir() -> PathBuf {
+        dirs::picture_dir()
+            .map(|path| path.join("Screenshots"))
+            .unwrap_or_else(|| env::current_dir().unwrap_or_default())
     }
 }
 
