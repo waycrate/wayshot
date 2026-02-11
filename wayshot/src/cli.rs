@@ -99,4 +99,9 @@ pub struct Cli {
     /// Silents notification after screenshot
     #[arg(long)]
     pub silent: bool,
+
+	/// Show preview window before saving (Enter to confirm, Esc to cancel)
+    #[arg(long)]
+    pub preview: bool,
 }
+
