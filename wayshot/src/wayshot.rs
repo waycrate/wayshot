@@ -2,6 +2,7 @@ use config::Config;
 use std::{
     env,
     io::{self, BufWriter, Cursor, Write},
+    path::PathBuf,
 };
 
 use clap::Parser;
@@ -260,6 +261,7 @@ fn main() -> Result<()> {
     match result {
         Ok((image_buffer, shot_result)) => {
             let mut image_buf: Option<Cursor<Vec<u8>>> = None;
+            let mut image_saved_location: Option<PathBuf> = None;
 
             if let Some(f) = file {
                 if encoding == EncodingFormat::Jxl {
@@ -271,6 +273,8 @@ fn main() -> Result<()> {
                         jxl_config.get_encoder_speed(),
                     ) {
                         tracing::error!("Failed to encode to JXL: {}", e);
+                    } else {
+                        image_saved_location = Some(f);
                     }
                 } else if encoding == EncodingFormat::Png {
                     if let Err(e) = utils::encode_to_png(
@@ -280,9 +284,12 @@ fn main() -> Result<()> {
                         png_config.get_filter(),
                     ) {
                         tracing::error!("Failed to encode to PNG: {}", e);
+                    } else {
+                        image_saved_location = Some(f);
                     }
                 } else {
-                    image_buffer.save(f)?;
+                    image_buffer.save(&f)?;
+                    image_saved_location = Some(f);
                 }
             }
 
@@ -344,14 +351,14 @@ fn main() -> Result<()> {
             }
 
             if notifications_enabled {
-                send_notification(Ok(shot_result));
+                send_notification(Ok(shot_result), image_saved_location);
             }
 
             Ok(())
         }
         Err(e) => {
             if notifications_enabled {
-                send_notification(Err(&e));
+                send_notification(Err(&e), None);
             }
             Err(e)
         }
