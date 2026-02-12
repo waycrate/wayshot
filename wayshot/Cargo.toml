@@ -58,4 +58,4 @@ name = "wayshot"
 path = "src/wayshot.rs"
 
 [features]
-preview = ["tempfile", "wayland-client", "wayland-protocols"]
+preview = ["dep:tempfile", "dep:wayland-client", "dep:wayland-protocols"]
