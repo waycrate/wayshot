@@ -49,13 +49,13 @@ serde = { version = "1.0.219", features = ["derive"] }
 dirs = "6.0.0"
 libwaysip = "0.6.0"
 notify-rust = "4.11.7"
-tempfile = "3.14"
-wayland-client = { workspace = true }
-wayland-protocols = { workspace = true, features = ["client"] }
+tempfile = { version = "3.14", optional = true }
+wayland-client = { workspace = true, optional = true }
+wayland-protocols = { workspace = true, features = ["client"], optional = true }
 
 [[bin]]
 name = "wayshot"
 path = "src/wayshot.rs"
 
 [features]
-preview = []
+preview = ["tempfile", "wayland-client", "wayland-protocols"]
