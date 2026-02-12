@@ -1,12 +1,16 @@
 use image::DynamicImage;
-use libwayshot::WayshotConnection;
 use std::io::Write;
-use std::os::fd::AsRawFd;
+use std::os::fd::AsFd;
 use wayland_client::{
-    globals::registry_queue_init, protocol::*, Connection, Dispatch, QueueHandle, WEnum,
     delegate_noop,
+    globals::{registry_queue_init, GlobalListContents},
+    protocol::{
+        wl_buffer, wl_compositor, wl_keyboard, wl_registry, wl_seat, wl_shm, wl_shm_pool,
+        wl_surface,
+    },
+    Connection, Dispatch, QueueHandle, WEnum,
 };
-use wayland_protocols::xdg::shell::client::*;
+use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
 
 struct PreviewState {
     running: bool,
@@ -58,8 +62,16 @@ pub fn show_preview(image: &DynamicImage) -> eyre::Result<bool> {
     }
     file.write_all(&buffer)?;
 
-    let pool = shm.create_pool(file.as_raw_fd(), stride * height, &qh, ());
-    let wl_buffer = pool.create_buffer(0, width, height, stride, wl_shm::Format::Argb8888, &qh, ());
+    let pool = shm.create_pool(file.as_fd(), stride * height, &qh, ());
+    let wl_buffer = pool.create_buffer(
+        0,
+        width,
+        height,
+        stride,
+        wl_shm::Format::Argb8888,
+        &qh,
+        (),
+    );
 
     surface.attach(Some(&wl_buffer), 0, 0);
     surface.damage(0, 0, width, height);
@@ -72,12 +84,12 @@ pub fn show_preview(image: &DynamicImage) -> eyre::Result<bool> {
     Ok(state.confirmed)
 }
 
-impl Dispatch<wl_registry::WlRegistry, ()> for PreviewState {
+impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for PreviewState {
     fn event(
         _: &mut Self,
         _: &wl_registry::WlRegistry,
         _: wl_registry::Event,
-        _: &(),
+        _: &GlobalListContents,
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
@@ -165,9 +177,9 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for PreviewState {
     ) {
         if let wl_keyboard::Event::Key { key, .. } = event {
             match key {
-                1 => state.running = false,              // ESC
+                1 => state.running = false, // ESC
                 28 => {
-                    state.confirmed = true;              // Enter
+                    state.confirmed = true; // Enter
                     state.running = false;
                 }
                 _ => {}

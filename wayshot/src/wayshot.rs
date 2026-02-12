@@ -259,7 +259,7 @@ fn main() -> Result<()> {
         }
     })();
 
-   match result {
+    match result {
         Ok((image_buffer, shot_result)) => {
             #[cfg(feature = "preview")]
             if cli.preview {

@@ -95,13 +95,11 @@ pub struct Cli {
     ///     3. `None` -- if the config isn't found, the `Config::default()` will be used
     #[arg(long, verbatim_doc_comment)]
     pub config: Option<PathBuf>,
-
     /// Silents notification after screenshot
     #[arg(long)]
     pub silent: bool,
 
-	/// Show preview window before saving (Enter to confirm, Esc to cancel)
+    /// Show preview window before saving (Enter to confirm, Esc to cancel)
     #[arg(long)]
     pub preview: bool,
 }
-
