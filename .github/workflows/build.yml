@@ -26,11 +26,13 @@ jobs:
       run: |
         pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl
 
-   - name: Build
+    - name: Build
       run: cargo build --workspace --release --all-features
+
     - name: Clippy check
       run:
         cargo clippy -- -D warnings
+
     - name: Check test
       run: |
         cargo test --verbose --all-features
