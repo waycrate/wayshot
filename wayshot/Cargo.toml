@@ -50,6 +50,8 @@ dirs = "6.0.0"
 libwaysip = "0.6.0"
 notify-rust = "4.11.7"
 tempfile = "3.14"
+wayland-client = { workspace = true }
+wayland-protocols = { workspace = true, features = ["client"] }
 
 [[bin]]
 name = "wayshot"
