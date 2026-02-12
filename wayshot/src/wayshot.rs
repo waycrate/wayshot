@@ -259,9 +259,9 @@ fn main() -> Result<()> {
         }
     })();
 
-    match result {
+   match result {
         Ok((image_buffer, shot_result)) => {
-			#[cfg(feature = "preview")]
+            #[cfg(feature = "preview")]
             if cli.preview {
                 let confirmed = preview::show_preview(&image_buffer)?;
                 if !confirmed {
