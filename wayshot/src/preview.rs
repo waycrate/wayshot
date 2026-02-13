@@ -2,13 +2,12 @@ use image::DynamicImage;
 use std::io::Write;
 use std::os::fd::AsFd;
 use wayland_client::{
-    delegate_noop,
-    globals::{registry_queue_init, GlobalListContents},
+    Connection, Dispatch, QueueHandle, WEnum, delegate_noop,
+    globals::{GlobalListContents, registry_queue_init},
     protocol::{
         wl_buffer, wl_compositor, wl_keyboard, wl_registry, wl_seat, wl_shm, wl_shm_pool,
         wl_surface,
     },
-    Connection, Dispatch, QueueHandle, WEnum,
 };
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
 
@@ -63,15 +62,7 @@ pub fn show_preview(image: &DynamicImage) -> eyre::Result<bool> {
     file.write_all(&buffer)?;
 
     let pool = shm.create_pool(file.as_fd(), stride * height, &qh, ());
-    let wl_buffer = pool.create_buffer(
-        0,
-        width,
-        height,
-        stride,
-        wl_shm::Format::Argb8888,
-        &qh,
-        (),
-    );
+    let wl_buffer = pool.create_buffer(0, width, height, stride, wl_shm::Format::Argb8888, &qh, ());
 
     surface.attach(Some(&wl_buffer), 0, 0);
     surface.damage(0, 0, width, height);

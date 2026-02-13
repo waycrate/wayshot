@@ -10,9 +10,9 @@ use libwayshot::WayshotConnection;
 
 mod cli;
 mod config;
-mod utils;
 #[cfg(feature = "preview")]
 mod preview;
+mod utils;
 
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use libwaysip::WaySip;
