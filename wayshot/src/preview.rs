@@ -49,15 +49,12 @@ pub fn show_preview(image: &DynamicImage) -> eyre::Result<bool> {
     let rgba = image.to_rgba8();
     let mut buffer = vec![0u8; (stride * height) as usize];
 
-    for y in 0..height {
-        for x in 0..width {
-            let pixel = rgba.get_pixel(x as u32, y as u32);
-            let offset = ((y * width + x) * 4) as usize;
-            buffer[offset] = pixel[2];
-            buffer[offset + 1] = pixel[1];
-            buffer[offset + 2] = pixel[0];
-            buffer[offset + 3] = pixel[3];
-        }
+    for (i, pixel) in rgba.pixels().enumerate() {
+        let offset = i * 4;
+        buffer[offset] = pixel[2];     // B
+        buffer[offset + 1] = pixel[1]; // G
+        buffer[offset + 2] = pixel[0]; // R
+        buffer[offset + 3] = pixel[3]; // A
     }
     file.write_all(&buffer)?;
 
@@ -168,9 +165,9 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for PreviewState {
     ) {
         if let wl_keyboard::Event::Key { key, .. } = event {
             match key {
-                1 => state.running = false, // ESC
-                28 => {
-                    state.confirmed = true; // Enter
+                9 => state.running = false, // ESC (evdev 1 + 8)
+                36 => {
+                    state.confirmed = true; // Enter (evdev 28 + 8)
                     state.running = false;
                 }
                 _ => {}
