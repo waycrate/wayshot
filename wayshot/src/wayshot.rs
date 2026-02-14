@@ -10,6 +10,8 @@ use libwayshot::WayshotConnection;
 
 mod cli;
 mod config;
+#[cfg(feature = "preview")]
+mod preview;
 mod utils;
 
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
@@ -259,6 +261,13 @@ fn main() -> Result<()> {
 
     match result {
         Ok((image_buffer, shot_result)) => {
+            #[cfg(feature = "preview")]
+            if cli.preview {
+                let confirmed = preview::show_preview(&image_buffer)?;
+                if !confirmed {
+                    return Ok(());
+                }
+            }
             let mut image_buf: Option<Cursor<Vec<u8>>> = None;
 
             if let Some(f) = file {
