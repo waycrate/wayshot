@@ -1,5 +1,17 @@
 # Wayshot
 
+## Unreleased
+
+### Documentation / Internal Improvements
+
+- Document changes introduced in PR #78
+  - Reusable region, size, and position data structures
+  - Improved CLI design and argument typing
+  - Freeze functionality additions
+  - Removal of explicit panics and exits
+  - Internal refactoring for screen capture components
+
+
 ## [1.4.5] (libwayshot 0.7.2)
 
 ### Hot fix: reexport ExtForeignToplevelHandle and fix ci
