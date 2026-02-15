@@ -1207,6 +1207,7 @@ impl WayshotConnection {
                 .map(|capture_region| capture_region.logical())
                 .unwrap_or(output_info.logical_region),
             physical_size: rotated_physical_size,
+            color_converted: false,
         };
         tracing::debug!("Created frame copy: {:#?}", frame_copy);
         Ok((frame_copy, frame_guard))
@@ -1424,6 +1425,9 @@ impl WayshotConnection {
                         let logical_region = frame_copy.logical_region;
                         let transform = frame_copy.transform;
                         let logical_size = logical_region.inner.size;
+                        // Perform in-place color conversion directly on the mmap buffer
+                        // to avoid cloning. Calling `get_image()` here would force an
+                        // immediate clone.
                         let frame_color_type = frame_copy.convert_color_inplace()?;
 
                         let image = match frame_color_type {
@@ -1687,6 +1691,7 @@ impl WayshotConnection {
                 },
             },
             physical_size: frame_format.size,
+            color_converted: false,
         };
 
         frame_copy.get_image()

@@ -122,10 +122,14 @@ pub struct FrameCopy {
     /// Logical region with the transform already applied.
     pub logical_region: LogicalRegion,
     pub physical_size: Size,
+    pub(crate) color_converted: bool,
 }
 
 impl FrameCopy {
     pub(crate) fn convert_color_inplace(&mut self) -> Result<ColorType, Error> {
+        if self.color_converted {
+            return Ok(self.frame_color_type);
+        }
         let frame_color_type = match create_converter(self.frame_format.format) {
             Some(converter) => {
                 let FrameData::Mmap(raw) = &mut self.frame_data else {
@@ -143,6 +147,7 @@ impl FrameCopy {
         };
 
         self.frame_color_type = frame_color_type;
+        self.color_converted = true;
         Ok(frame_color_type)
     }
 
