@@ -51,7 +51,7 @@ pub fn show_preview(image: &DynamicImage) -> eyre::Result<bool> {
 
     for (i, pixel) in rgba.pixels().enumerate() {
         let offset = i * 4;
-        buffer[offset] = pixel[2];     // B
+        buffer[offset] = pixel[2]; // B
         buffer[offset + 1] = pixel[1]; // G
         buffer[offset + 2] = pixel[0]; // R
         buffer[offset + 3] = pixel[3]; // A
