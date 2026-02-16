@@ -301,7 +301,8 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
         }
         match event {
             ext_image_copy_capture_session_v1::Event::BufferSize { width, height } => {
-                let format = state.formats.first_mut().unwrap();
+                //formats is guaranteed to have at least one element due to the check above
+                let format = &mut state.formats[0];
                 format.size = Size { width, height };
                 format.stride = 4 * width;
                 for DMAFrameFormat {
@@ -320,21 +321,35 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
             ext_image_copy_capture_session_v1::Event::ShmFormat {
                 format: WEnum::Value(format),
             } => {
-                let set_format = state.formats.first_mut().unwrap();
+                let set_format = &mut state.formats[0];
                 set_format.format = format;
             }
             ext_image_copy_capture_session_v1::Event::DmabufDevice { device } => {
                 if !state.find_gbm {
                     return;
                 }
-                let device = u64::from_le_bytes(device.try_into().unwrap());
+                // Handle potential malformed data from compositor
+                let device = match device.try_into() {
+                    Ok(bytes) => u64::from_le_bytes(bytes),
+                    Err(_) => {
+                        tracing::warn!("Received invalid device data from compositor (expected 8 bytes)");
+                        return;
+                    }
+                };
                 let Ok(node) = DrmNode::from_dev_id(device) else {
+                    tracing::warn!("Failed to create DRM node from device ID: {}", device);
                     return;
                 };
                 let Some(pa) = node.dev_path() else {
+                    tracing::warn!("DRM node has no device path");
                     return;
                 };
-                let Ok(gbm) = gbm::Device::new(Card::open(pa)) else {
+                let Ok(card) = Card::open(&pa) else {
+                    tracing::warn!("Failed to open DRM card at {:?}", pa);
+                    return;
+                };
+                let Ok(gbm) = gbm::Device::new(card) else {
+                    tracing::warn!("Failed to create GBM device");
                     return;
                 };
                 state.gbm = Some(gbm);
@@ -545,11 +560,11 @@ impl AsFd for Card {
 impl drm::Device for Card {}
 /// Simple helper methods for opening a `Card`.
 impl Card {
-    pub fn open<P: AsRef<Path>>(path: P) -> Self {
+    pub fn open<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let mut options = std::fs::OpenOptions::new();
         options.read(true);
         options.write(true);
-        Card(options.open(path).unwrap())
+        Ok(Card(options.open(path)?))
     }
 }
 #[derive(Debug)]
