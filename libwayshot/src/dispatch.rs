@@ -332,7 +332,9 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
                 let device = match device.try_into() {
                     Ok(bytes) => u64::from_le_bytes(bytes),
                     Err(_) => {
-                        tracing::warn!("Received invalid device data from compositor (expected 8 bytes)");
+                        tracing::warn!(
+                            "Received invalid device data from compositor (expected 8 bytes)"
+                        );
                         return;
                     }
                 };
