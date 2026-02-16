@@ -16,6 +16,13 @@
 
 ### libwayshot 0.7.0
 
+### Internal improvements
+- Reusable region, size, and position data structures (PR #78)
+- CLI design and argument typing improvements
+- Freeze functionality additions
+- Removal of explicit panics and exits
+- Internal refactoring for screen capture components
+
 ### There is Breaking changes in libwayshot, but it is just some tidy up for the api, mainly the order of params
 - (libwayshot): use the r-egl lib which maintained by waycrate instead of khornos-egl
 - (libwayshot): remove the Instance uses of egl lib. we only use the static feature
