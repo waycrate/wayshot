@@ -14,6 +14,14 @@
 
 ## [1.4.3] 2026-01-20
 
+### Internal improvements
+- Reusable region, size, and position data structures (PR #78)
+- CLI design and argument typing improvements
+- Freeze functionality additions
+- Removal of explicit panics and exits
+- Internal refactoring for screen capture components
+
+
 ### libwayshot 0.7.0
 
 ### There is Breaking changes in libwayshot, but it is just some tidy up for the api, mainly the order of params
