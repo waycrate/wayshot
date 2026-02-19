@@ -5,7 +5,7 @@ use std::{
 };
 
 use gbm::BufferObject;
-use image::{ColorType, DynamicImage, ImageBuffer, Pixel};
+use image::{ColorType, DynamicImage, ImageBuffer, Pixel, Rgba};
 use memmap2::MmapMut;
 use r_egl_wayland::{EGL_INSTALCE, r_egl as egl};
 use rustix::{
@@ -92,23 +92,18 @@ impl FrameFormat {
 }
 
 #[tracing::instrument(skip(frame_data))]
-fn create_image_buffer<P>(
-    frame_format: &FrameFormat,
-    frame_data: &FrameData,
-) -> Result<ImageBuffer<P, Vec<P::Subpixel>>>
+fn create_image_buffer<P, C>(frame_format: &FrameFormat, frame_data: C) -> Result<ImageBuffer<P, C>>
 where
     P: Pixel<Subpixel = u8>,
+    C: std::ops::Deref<Target = [u8]>,
 {
     tracing::debug!("Creating image buffer");
-    match frame_data {
-        FrameData::Mmap(frame_mmap) => ImageBuffer::from_vec(
-            frame_format.size.width,
-            frame_format.size.height,
-            frame_mmap.to_vec(),
-        )
-        .ok_or(Error::BufferTooSmall),
-        FrameData::GBMBo(_) => todo!(),
-    }
+    ImageBuffer::from_raw(
+        frame_format.size.width,
+        frame_format.size.height,
+        frame_data,
+    )
+    .ok_or(Error::BufferTooSmall)
 }
 
 #[derive(Debug)]
@@ -127,10 +122,14 @@ pub struct FrameCopy {
     /// Logical region with the transform already applied.
     pub logical_region: LogicalRegion,
     pub physical_size: Size,
+    pub(crate) color_converted: bool,
 }
 
 impl FrameCopy {
-    pub(crate) fn get_image(&mut self) -> Result<DynamicImage, Error> {
+    pub(crate) fn convert_color_inplace(&mut self) -> Result<ColorType, Error> {
+        if self.color_converted {
+            return Ok(self.frame_color_type);
+        }
         let frame_color_type = match create_converter(self.frame_format.format) {
             Some(converter) => {
                 let FrameData::Mmap(raw) = &mut self.frame_data else {
@@ -146,7 +145,25 @@ impl FrameCopy {
                 return Err(Error::NoSupportedBufferFormat);
             }
         };
+
         self.frame_color_type = frame_color_type;
+        self.color_converted = true;
+        Ok(frame_color_type)
+    }
+
+    pub(crate) fn into_mmap_rgba_image_buffer(self) -> Result<ImageBuffer<Rgba<u8>, MmapMut>> {
+        if self.frame_color_type != ColorType::Rgba8 {
+            return Err(Error::InvalidColor);
+        }
+
+        match self.frame_data {
+            FrameData::Mmap(frame_mmap) => create_image_buffer(&self.frame_format, frame_mmap),
+            FrameData::GBMBo(_) => todo!(),
+        }
+    }
+
+    pub(crate) fn get_image(&mut self) -> Result<DynamicImage, Error> {
+        self.convert_color_inplace()?;
         let image: DynamicImage = (&*self).try_into()?;
         Ok(image)
     }
@@ -158,10 +175,18 @@ impl TryFrom<&FrameCopy> for DynamicImage {
     fn try_from(value: &FrameCopy) -> Result<Self> {
         Ok(match value.frame_color_type {
             ColorType::Rgb8 => {
-                Self::ImageRgb8(create_image_buffer(&value.frame_format, &value.frame_data)?)
+                let frame_data = match &value.frame_data {
+                    FrameData::Mmap(frame_mmap) => frame_mmap.to_vec(),
+                    FrameData::GBMBo(_) => todo!(),
+                };
+                Self::ImageRgb8(create_image_buffer(&value.frame_format, frame_data)?)
             }
             ColorType::Rgba8 => {
-                Self::ImageRgba8(create_image_buffer(&value.frame_format, &value.frame_data)?)
+                let frame_data = match &value.frame_data {
+                    FrameData::Mmap(frame_mmap) => frame_mmap.to_vec(),
+                    FrameData::GBMBo(_) => todo!(),
+                };
+                Self::ImageRgba8(create_image_buffer(&value.frame_format, frame_data)?)
             }
             _ => return Err(Error::InvalidColor),
         })

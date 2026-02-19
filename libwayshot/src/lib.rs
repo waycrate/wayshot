@@ -22,11 +22,14 @@ use std::{
 };
 
 use dispatch::{DMABUFState, LayerShellState};
-use image::{DynamicImage, imageops::replace};
+use image::DynamicImage;
 use memmap2::MmapMut;
 use r_egl_wayland::WayEglTrait;
 use r_egl_wayland::{EGL_INSTALCE, r_egl as egl};
-use screencopy::{DMAFrameFormat, DMAFrameGuard, EGLImageGuard, FrameData, FrameGuard};
+use screencopy::{
+    DMAFrameFormat, DMAFrameGuard, EGLImageGuard, FrameCopy, FrameData, FrameFormat, FrameGuard,
+    create_shm_fd,
+};
 use tracing::debug;
 use wayland_client::{
     Connection, EventQueue, Proxy,
@@ -73,10 +76,7 @@ use wayland_protocols_wlr::{
     },
 };
 
-use crate::{
-    dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState},
-    screencopy::{FrameCopy, FrameFormat, create_shm_fd},
-};
+use crate::dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState};
 
 pub use crate::{
     output::OutputInfo,
@@ -1207,6 +1207,7 @@ impl WayshotConnection {
                 .map(|capture_region| capture_region.logical())
                 .unwrap_or(output_info.logical_region),
             physical_size: rotated_physical_size,
+            color_converted: false,
         };
         tracing::debug!("Created frame copy: {:#?}", frame_copy);
         Ok((frame_copy, frame_guard))
@@ -1421,16 +1422,37 @@ impl WayshotConnection {
                 .into_iter()
                 .map(|(mut frame_copy, _, _)| {
                     scope.spawn(move || {
-                        let image = frame_copy.get_image()?;
-                        Ok((
-                            image_util::rotate_image_buffer(
-                                image,
-                                frame_copy.transform,
-                                frame_copy.logical_region.inner.size,
-                                max_scale,
-                            ),
-                            frame_copy,
-                        ))
+                        let logical_region = frame_copy.logical_region;
+                        let transform = frame_copy.transform;
+                        let logical_size = logical_region.inner.size;
+                        // Perform in-place color conversion directly on the mmap buffer
+                        // to avoid cloning. Calling `get_image()` here would force an
+                        // immediate clone.
+                        let frame_color_type = frame_copy.convert_color_inplace()?;
+
+                        let image = match frame_color_type {
+                            image::ColorType::Rgba8 => {
+                                let image = frame_copy.into_mmap_rgba_image_buffer()?;
+                                image_util::prepare_mmap_rgba_image(
+                                    image,
+                                    transform,
+                                    logical_size,
+                                    max_scale,
+                                )
+                            }
+                            image::ColorType::Rgb8 => {
+                                let image: DynamicImage = (&frame_copy).try_into()?;
+                                image_util::PreparedImage::Dynamic(image_util::rotate_image_buffer(
+                                    image,
+                                    transform,
+                                    logical_size,
+                                    max_scale,
+                                ))
+                            }
+                            _ => return Err(Error::InvalidColor),
+                        };
+
+                        Ok((image, logical_region))
                     })
                 })
                 .collect::<Vec<_>>();
@@ -1451,26 +1473,26 @@ impl WayshotConnection {
 
                         Some(|| -> Result<_> {
                             let mut composite_image = composite_image?;
-                            let (image, frame_copy) = image?;
+                            let (image, frame_region) = image?;
                             let (x, y) = (
-                                ((frame_copy.logical_region.inner.position.x as f64
+                                ((frame_region.inner.position.x as f64
                                     - capture_region.inner.position.x as f64)
                                     * max_scale) as i64,
-                                ((frame_copy.logical_region.inner.position.y as f64
+                                ((frame_region.inner.position.y as f64
                                     - capture_region.inner.position.y as f64)
                                     * max_scale) as i64,
                             );
                             tracing::span!(
                                 tracing::Level::DEBUG,
                                 "replace",
-                                frame_copy_region = format!("{}", frame_copy.logical_region),
+                                frame_copy_region = format!("{}", frame_region),
                                 capture_region = format!("{}", capture_region),
                                 x = x,
                                 y = y,
                             )
                             .in_scope(|| {
                                 tracing::debug!("Replacing parts of the final image");
-                                replace(&mut composite_image, &image, x, y);
+                                image.replace_into(&mut composite_image, x, y);
                             });
 
                             Ok(composite_image)
@@ -1669,6 +1691,7 @@ impl WayshotConnection {
                 },
             },
             physical_size: frame_format.size,
+            color_converted: false,
         };
 
         frame_copy.get_image()
