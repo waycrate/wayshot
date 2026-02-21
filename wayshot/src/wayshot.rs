@@ -20,6 +20,39 @@ use wl_clipboard_rs::copy::{MimeType, Options, Source};
 use crate::utils::EncodingFormat;
 use rustix::runtime::{self, Fork};
 
+fn rgb_to_hsl(r: u8, g: u8, b: u8) -> (u16, u8, u8) {
+    let r = r as f32 / 255.0;
+    let g = g as f32 / 255.0;
+    let b = b as f32 / 255.0;
+
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    let delta = max - min;
+
+    let l = (max + min) / 2.0;
+
+    let s = if delta == 0.0 {
+        0.0
+    } else {
+        delta / (1.0 - (2.0 * l - 1.0).abs())
+    };
+
+    let h = if delta == 0.0 {
+        0.0
+    } else if max == r {
+        60.0 * (((g - b) / delta) % 6.0)
+    } else if max == g {
+        60.0 * ((b - r) / delta + 2.0)
+    } else {
+        60.0 * ((r - g) / delta + 4.0)
+    };
+
+    let h = ((h + 360.0) % 360.0) as u16;
+    let s = (s * 100.0).round() as u8;
+    let l = (l * 100.0).round() as u8;
+    (h, s, l)
+}
+
 fn select_output<T>(outputs: &[T]) -> Option<usize>
 where
     T: ToString + std::fmt::Display,
@@ -168,9 +201,22 @@ fn main() -> Result<()> {
         let g_f = g as f32 / 255.;
         let b_f = b as f32 / 255.;
         let a_f = a as f32 / 255.;
-        println!("RGBA       : R:{r}, G:{g}, B{b}, A{a}");
-        println!("RGBA(float): R:{r_f:.2}, G:{g_f:.2}, B:{b_f:.2}, A:{a_f:.2}");
-        println!("16hex      : #{:02x}{:02x}{:02x}{:02x}", r, g, b, a);
+        use crate::cli::ColorFormat;
+        match cli.color_format {
+            ColorFormat::Hex => println!("#{:02x}{:02x}{:02x}", r, g, b),
+            ColorFormat::HexAlpha => println!("#{:02x}{:02x}{:02x}{:02x}", r, g, b, a),
+            ColorFormat::Rgb => println!("rgb({r}, {g}, {b})"),
+            ColorFormat::Rgba => println!("rgba({r}, {g}, {b}, {a_f:.2})"),
+            ColorFormat::Hsl => {
+                let (h, s, l) = rgb_to_hsl(r, g, b);
+                println!("hsl({h}, {s}%, {l}%)");
+            }
+            ColorFormat::Plain => {
+                println!("RGBA       : R:{r}, G:{g}, B:{b}, A:{a}");
+                println!("RGBA(float): R:{r_f:.2}, G:{g_f:.2}, B:{b_f:.2}, A:{a_f:.2}");
+                println!("16hex      : #{:02x}{:02x}{:02x}{:02x}", r, g, b, a);
+            }
+        }
         return Ok(());
     }
 

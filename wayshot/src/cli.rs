@@ -6,6 +6,7 @@ use clap::{
         Styles,
         styling::{AnsiColor, Effects},
     },
+    ValueEnum,
 };
 use tracing::Level;
 
@@ -17,6 +18,17 @@ fn get_styles() -> Styles {
         .usage(AnsiColor::Green.on_default() | Effects::BOLD)
         .literal(AnsiColor::Blue.on_default() | Effects::BOLD)
         .placeholder(AnsiColor::Green.on_default())
+}
+
+#[derive(ValueEnum, Clone, Debug, Default, PartialEq)]
+pub enum ColorFormat {
+    #[default]
+    Plain,
+    Hex,
+    HexAlpha,
+    Rgb,
+    Rgba,
+    Hsl,
 }
 
 #[derive(Parser)]
@@ -70,6 +82,12 @@ pub struct Cli {
     /// Grasp a point in screen and get its color
     #[arg(long, conflicts_with_all = ["geometry", "output", "choose_output"])]
     pub color: bool,
+
+    /// Format for color output when using --color.
+    /// Available options: plain, hex, hex-alpha, rgb, rgba, hsl
+    /// If omitted, falls back to plain (prints all formats).
+    #[arg(long, value_name = "FORMAT", requires = "color", default_value = "plain")]
+    pub color_format: ColorFormat,
 
     /// Capture a specific toplevel window by name ("app_id title").
     #[arg(long, alias = "window", conflicts_with_all = ["geometry", "output", "choose_output", "choose_toplevel"])]
