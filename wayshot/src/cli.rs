@@ -1,12 +1,11 @@
 use std::path::PathBuf;
 
 use clap::{
-    Parser,
+    Parser, ValueEnum,
     builder::{
         Styles,
         styling::{AnsiColor, Effects},
     },
-    ValueEnum,
 };
 use tracing::Level;
 
@@ -86,7 +85,12 @@ pub struct Cli {
     /// Format for color output when using --color.
     /// Available options: plain, hex, hex-alpha, rgb, rgba, hsl
     /// If omitted, falls back to plain (prints all formats).
-    #[arg(long, value_name = "FORMAT", requires = "color", default_value = "plain")]
+    #[arg(
+        long,
+        value_name = "FORMAT",
+        requires = "color",
+        default_value = "plain"
+    )]
     pub color_format: ColorFormat,
 
     /// Capture a specific toplevel window by name ("app_id title").
