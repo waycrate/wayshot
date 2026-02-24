@@ -78,20 +78,16 @@ pub struct Cli {
     #[arg(short, long, conflicts_with = "geometry")]
     pub output: Option<String>,
 
-    /// Grasp a point in screen and get its color
-    #[arg(long, conflicts_with_all = ["geometry", "output", "choose_output"])]
-    pub color: bool,
-
-    /// Format for color output when using --color.
-    /// Available options: plain, hex, hex-alpha, rgb, rgba, hsl
-    /// If omitted, falls back to plain (prints all formats).
+    /// Grasp a point in screen and get its color.
+    /// Optionally accepts a format: plain (default), hex, hex-alpha, rgb, rgba, hsl.
     #[arg(
         long,
         value_name = "FORMAT",
-        requires = "color",
-        default_value = "plain"
+        conflicts_with_all = ["geometry", "output", "choose_output"],
+        default_missing_value = "plain",
+        num_args = 0..=1,
     )]
-    pub color_format: ColorFormat,
+    pub color: Option<ColorFormat>,
 
     /// Capture a specific toplevel window by name ("app_id title").
     #[arg(long, alias = "window", conflicts_with_all = ["geometry", "output", "choose_output", "choose_toplevel"])]

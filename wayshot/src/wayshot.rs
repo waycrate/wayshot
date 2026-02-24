@@ -172,7 +172,7 @@ fn main() -> Result<()> {
         writer.flush()?;
         return Ok(());
     }
-    if cli.color {
+    if let Some(fmt) = cli.color {
         let image = wayshot_conn
             .screenshot_freeze(
                 |w_conn| {
@@ -202,7 +202,7 @@ fn main() -> Result<()> {
         let b_f = b as f32 / 255.;
         let a_f = a as f32 / 255.;
         use crate::cli::ColorFormat;
-        match cli.color_format {
+        match fmt {
             ColorFormat::Hex => println!("#{:02x}{:02x}{:02x}", r, g, b),
             ColorFormat::HexAlpha => println!("#{:02x}{:02x}{:02x}{:02x}", r, g, b, a),
             ColorFormat::Rgb => println!("rgb({r}, {g}, {b})"),
