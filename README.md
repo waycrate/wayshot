@@ -50,10 +50,22 @@ Pick color with information
 wayshot --color
 ```
 
-Pick a hex color code, using ImageMagick:
+Pick a hex color code:
 
 ```bash
-wayshot -g - | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
+wayshot --color hex
+```
+
+Pick a color in HSL format (useful for CSS):
+
+```bash
+wayshot --color hsl
+```
+
+Pick a color and copy the hex code directly to clipboard:
+
+```bash
+wayshot --color hex | wl-copy
 ```
 
 # Installation
