@@ -56,6 +56,7 @@ impl AppSettings {
         let encoding_config = config.encoding.clone().unwrap_or_default();
 
         // ── Cursor ────────────────────────────────────────────────────────────
+        // Either the --cursor flag or config `cursor = true` enables cursor capture.
         let cursor = cli.cursor || base.cursor.unwrap_or_default();
 
         // ── Encoding ──────────────────────────────────────────────────────────
@@ -75,11 +76,13 @@ impl AppSettings {
             && ie != encoding
         {
             tracing::warn!(
-                "The encoding requested '{encoding}' does not match the output file's encoding '{ie}'. Still using the requested encoding however.",
+                "Requested encoding '{encoding}' does not match \
+                 the file extension '{ie}'. Using the requested encoding."
             );
         }
 
         // ── File name format ──────────────────────────────────────────────────
+        // CLI --file-name-format overrides config; falls back to a timestamp pattern.
         let file_name_format = cli.file_name_format.clone().unwrap_or_else(|| {
             file_config
                 .name_format
@@ -181,7 +184,6 @@ fn main() -> Result<()> {
     logger::setup(&cli, &config);
 
     let settings = AppSettings::resolve(&cli, &config);
-
     let conn = WayshotConnection::new()?;
 
     let stdout = io::stdout();

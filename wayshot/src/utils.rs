@@ -17,16 +17,21 @@ use std::{
 };
 
 use chrono::Local;
-use libwayshot::region::{LogicalRegion, Position, Region, Size};
+#[cfg(feature = "selector")]
+use libwayshot::{
+    Result as WayshotResult,
+    region::{LogicalRegion, Position, Region, Size},
+};
 
 use crate::config::{Jxl, Png};
 
 // ─── Region helpers ───────────────────────────────────────────────────────────
 
+#[cfg(feature = "selector")]
 pub fn waysip_to_region(
     size: libwaysip::Size,
     position: libwaysip::Position,
-) -> libwayshot::Result<LogicalRegion> {
+) -> WayshotResult<LogicalRegion> {
     let size = Size {
         width: size.width.try_into().map_err(|_| {
             libwayshot::Error::FreezeCallbackError("width cannot be negative".to_string())

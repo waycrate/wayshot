@@ -1,9 +1,11 @@
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use eyre::{Result, bail};
 use libwayshot::WayshotConnection;
+#[cfg(feature = "selector")]
 use libwaysip::WaySip;
 
 use crate::cli::Cli;
+#[cfg(feature = "selector")]
 use crate::utils::waysip_to_region;
 
 /// Describes what was captured, used to build the notification body.
@@ -19,6 +21,7 @@ pub enum ShotResult {
 /// How the screenshot target is determined.
 pub enum CaptureMode {
     /// Interactive area/region selection via waysip.
+    #[cfg(feature = "selector")]
     Geometry,
     /// A specific toplevel window by its id+title string.
     Toplevel(String),
@@ -35,6 +38,7 @@ pub enum CaptureMode {
 impl CaptureMode {
     /// Derive the capture mode from parsed CLI flags.
     pub fn from_cli(cli: &Cli) -> Self {
+        #[cfg(feature = "selector")]
         if cli.geometry {
             return Self::Geometry;
         }
@@ -59,6 +63,7 @@ pub fn capture(
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
     match mode {
+        #[cfg(feature = "selector")]
         CaptureMode::Geometry => capture_geometry(conn, cursor),
         CaptureMode::Toplevel(name) => capture_toplevel_by_name(conn, name, cursor),
         CaptureMode::ChooseToplevel => capture_toplevel_interactive(conn, cursor),
@@ -68,6 +73,8 @@ pub fn capture(
     }
 }
 
+/// Capture an interactively selected screen region.
+#[cfg(feature = "selector")]
 fn capture_geometry(
     conn: &WayshotConnection,
     cursor: bool,

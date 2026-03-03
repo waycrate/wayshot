@@ -19,7 +19,7 @@ repository.workspace = true
 #
 #   cargo build --no-default-features --features clipboard
 #
-default = ["avif", "clipboard", "color_picker", "jxl", "logger", "notifications"]
+default = ["avif", "clipboard", "color_picker", "jxl", "logger", "notifications", "selector"]
 
 # Copies the screenshot to the Wayland clipboard via wl-clipboard-rs.
 # The image is served by a forked child process so it persists after wayshot exits.
@@ -30,6 +30,11 @@ clipboard = ["dep:wl-clipboard-rs", "dep:rustix"]
 # Adds the --color CLI flag: freeze the screen, click a pixel, print its RGBA/hex value.
 # No additional dependencies.
 color_picker = []
+
+# Interactive screen-region selection via libwaysip (Wayland selection overlay).
+# Adds the --geometry CLI flag for interactive region selection.
+# Pulls in: libwaysip
+selector = ["dep:libwaysip"]
 
 # AVIF encoding support via the image crate's `avif` feature (pulls in rav1e, a large AV1 encoder).
 # Disable to significantly reduce compile time on platforms where AVIF output is not needed.
@@ -54,7 +59,6 @@ notifications = ["dep:notify-rust"]
 [build-dependencies]
 flate2 = "1.1.5"
 eyre = "0.6.12"
-
 
 [dependencies]
 tracing.workspace = true
@@ -87,7 +91,7 @@ toml = { version = "0.9.10", default-features = false, features = [
 ] }
 serde = { version = "1.0.219", features = ["derive"] }
 dirs = "6.0.0"
-libwaysip = "0.6.0"
+libwaysip = { version = "0.6.0", optional = true }
 notify-rust = { version = "4.11.7", optional = true }
 
 [[bin]]
