@@ -14,6 +14,7 @@ mod clipboard;
 #[cfg(feature = "color_picker")]
 mod color_picker;
 mod config;
+mod logger;
 mod utils;
 
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
@@ -39,20 +40,15 @@ where
 
 fn main() -> Result<()> {
     let cli = cli::Cli::parse();
-    let config_path = cli.config.unwrap_or(Config::get_default_path());
+    let config_path = cli.config.clone().unwrap_or(Config::get_default_path());
     let config = Config::load(&config_path).unwrap_or_default();
+    logger::setup(&cli, &config);
     let base = config.base.unwrap_or_default();
     let file = config.file.unwrap_or_default();
     let encoding_config = config.encoding.unwrap_or_default();
     let jxl_config = encoding_config.jxl.unwrap_or_default();
     let png_config = encoding_config.png.unwrap_or_default();
     let notifications_enabled = !cli.silent && base.notifications.unwrap_or(true);
-
-    let log_level = cli.log_level.unwrap_or(base.get_log_level());
-    tracing_subscriber::fmt()
-        .with_max_level(log_level)
-        .with_writer(io::stderr)
-        .init();
 
     let cursor = match cli.cursor {
         true => cli.cursor,
