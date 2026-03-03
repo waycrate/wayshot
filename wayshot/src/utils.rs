@@ -1,6 +1,5 @@
 use clap::ValueEnum;
 use eyre::{ContextCompat, Error, bail};
-use notify_rust::Notification;
 
 use image::{
     DynamicImage,
@@ -242,41 +241,10 @@ pub fn encode_to_png(
     Ok(())
 }
 
-const TIMEOUT: i32 = 5000;
-
 #[derive(Debug, Clone)]
 pub enum ShotResult {
     Output { name: String },
     Toplevel { name: String },
     Area,
     All,
-}
-
-pub fn send_notification(shot_result: Result<ShotResult, &Error>) {
-    match shot_result {
-        Ok(result) => {
-            let body = match result {
-                ShotResult::Output { name } => {
-                    format!("Screenshot of output '{}' saved", name)
-                }
-                ShotResult::Toplevel { name } => {
-                    format!("Screenshot of toplevel '{}' saved", name)
-                }
-                ShotResult::Area => "Screenshot of selected area saved".to_string(),
-                ShotResult::All => "Screenshot of all outputs saved".to_string(),
-            };
-            let _ = Notification::new()
-                .summary("Screenshot Taken")
-                .body(&body)
-                .timeout(TIMEOUT)
-                .show();
-        }
-        Err(e) => {
-            let _ = Notification::new()
-                .summary("Screenshot Failed")
-                .body(&e.to_string())
-                .timeout(TIMEOUT)
-                .show();
-        }
-    }
 }

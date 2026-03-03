@@ -16,11 +16,12 @@ mod color_picker;
 mod config;
 #[cfg(feature = "logger")]
 mod logger;
+mod notification;
 mod utils;
 
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use libwaysip::WaySip;
-use utils::{ShotResult, send_notification, waysip_to_region};
+use utils::{ShotResult, waysip_to_region};
 
 use crate::utils::EncodingFormat;
 
@@ -315,14 +316,14 @@ fn main() -> Result<()> {
             }
 
             if notifications_enabled {
-                send_notification(Ok(shot_result));
+                notification::send_success(&shot_result);
             }
 
             Ok(())
         }
         Err(e) => {
             if notifications_enabled {
-                send_notification(Err(&e));
+                notification::send_failure(&e);
             }
             Err(e)
         }
