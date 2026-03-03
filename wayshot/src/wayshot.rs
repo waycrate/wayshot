@@ -6,7 +6,7 @@ use std::{
 };
 
 use clap::Parser;
-use eyre::{Result, bail};
+use eyre::Result;
 use libwayshot::WayshotConnection;
 
 mod cli;
@@ -19,11 +19,8 @@ mod config;
 mod logger;
 #[cfg(feature = "notifications")]
 mod notification;
+mod screenshot;
 mod utils;
-
-use dialoguer::{FuzzySelect, theme::ColorfulTheme};
-use libwaysip::WaySip;
-use utils::{ShotResult, waysip_to_region};
 
 use crate::utils::EncodingFormat;
 
@@ -146,23 +143,6 @@ fn resolve_output_file(
     None
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-fn select_output<T>(outputs: &[T]) -> Option<usize>
-where
-    T: ToString + std::fmt::Display,
-{
-    let Ok(selection) = FuzzySelect::with_theme(&ColorfulTheme::default())
-        .with_prompt("Choose Screen")
-        .default(0)
-        .items(outputs)
-        .interact()
-    else {
-        return None;
-    };
-    Some(selection)
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 fn main() -> Result<()> {
@@ -174,9 +154,6 @@ fn main() -> Result<()> {
     logger::setup(&cli, &config);
 
     let settings = AppSettings::resolve(&cli, &config);
-    let output = cli
-        .output
-        .or_else(|| config.base.as_ref().and_then(|b| b.output.clone()));
 
     let wayshot_conn = WayshotConnection::new()?;
 
@@ -211,91 +188,8 @@ fn main() -> Result<()> {
         return color_picker::pick(&wayshot_conn);
     }
 
-    let result = (|| -> Result<(image::DynamicImage, ShotResult)> {
-        if cli.geometry {
-            Ok((
-                wayshot_conn.screenshot_freeze(
-                    |w_conn| {
-                        let info = WaySip::new()
-                            .with_connection(w_conn.conn.clone())
-                            .with_selection_type(libwaysip::SelectionType::Area)
-                            .get()
-                            .map_err(|e| libwayshot::Error::FreezeCallbackError(e.to_string()))?
-                            .ok_or(libwayshot::Error::FreezeCallbackError(
-                                "Failed to capture the area".to_string(),
-                            ))?;
-                        waysip_to_region(info.size(), info.left_top_point())
-                    },
-                    settings.cursor,
-                )?,
-                ShotResult::Area,
-            ))
-        } else if let Some(ref name) = cli.toplevel {
-            let toplevels = wayshot_conn.get_all_toplevels();
-            let maybe = toplevels
-                .iter()
-                .filter(|t| t.active)
-                .find(|t| t.id_and_title() == *name);
-            if let Some(toplevel) = maybe {
-                Ok((
-                    wayshot_conn.screenshot_toplevel(toplevel, settings.cursor)?,
-                    ShotResult::Toplevel { name: name.clone() },
-                ))
-            } else {
-                bail!("No toplevel window matched '{name}'")
-            }
-        } else if cli.choose_toplevel {
-            let toplevels = wayshot_conn.get_all_toplevels();
-            let active: Vec<_> = toplevels.iter().filter(|t| t.active).collect();
-            if active.is_empty() {
-                bail!("No active toplevel windows found!");
-            }
-            let names: Vec<String> = active.iter().map(|t| t.id_and_title()).collect();
-            if let Some(idx) = select_output(&names) {
-                Ok((
-                    wayshot_conn.screenshot_toplevel(active[idx], settings.cursor)?,
-                    ShotResult::Toplevel {
-                        name: names[idx].clone(),
-                    },
-                ))
-            } else {
-                bail!("No toplevel window selected!");
-            }
-        } else if let Some(output_name) = output {
-            let outputs = wayshot_conn.get_all_outputs();
-            if let Some(output) = outputs.iter().find(|output| output.name == output_name) {
-                Ok((
-                    wayshot_conn.screenshot_single_output(output, settings.cursor)?,
-                    ShotResult::Output {
-                        name: output_name.clone(),
-                    },
-                ))
-            } else {
-                bail!("No output found!");
-            }
-        } else if cli.choose_output {
-            let outputs = wayshot_conn.get_all_outputs();
-            let output_names: Vec<&str> = outputs
-                .iter()
-                .map(|display| display.name.as_str())
-                .collect();
-            if let Some(index) = select_output(&output_names) {
-                Ok((
-                    wayshot_conn.screenshot_single_output(&outputs[index], settings.cursor)?,
-                    ShotResult::Output {
-                        name: output_names[index].to_string(),
-                    },
-                ))
-            } else {
-                bail!("No output found!");
-            }
-        } else {
-            Ok((
-                wayshot_conn.screenshot_all(settings.cursor)?,
-                ShotResult::All,
-            ))
-        }
-    })();
+    let mode = screenshot::CaptureMode::from_cli(&cli);
+    let result = screenshot::capture(&wayshot_conn, &mode, settings.cursor);
 
     match result {
         Ok((image_buffer, shot_result)) => {

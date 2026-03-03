@@ -3,7 +3,7 @@
 use eyre::Error;
 use notify_rust::Notification;
 
-use crate::utils::ShotResult;
+use crate::screenshot::ShotResult;
 
 const TIMEOUT_MS: i32 = 5000;
 
