@@ -19,7 +19,7 @@ repository.workspace = true
 #
 #   cargo build --no-default-features --features clipboard
 #
-default = ["clipboard", "color_picker"]
+default = ["clipboard", "color_picker", "logger"]
 
 # Copies the screenshot to the Wayland clipboard via wl-clipboard-rs.
 # The image is served by a forked child process so it persists after wayshot exits.
@@ -31,6 +31,11 @@ clipboard = ["dep:wl-clipboard-rs", "dep:rustix"]
 # No additional dependencies.
 color_picker = []
 
+# Initialises the tracing subscriber and exposes the --log-level CLI flag.
+# Disable to suppress all stderr log output entirely.
+# Pulls in: tracing-subscriber
+logger = ["dep:tracing-subscriber"]
+
 [build-dependencies]
 flate2 = "1.1.5"
 eyre = "0.6.12"
@@ -38,7 +43,7 @@ eyre = "0.6.12"
 
 [dependencies]
 tracing.workspace = true
-tracing-subscriber.workspace = true
+tracing-subscriber = { workspace = true, optional = true }
 
 libwayshot.workspace = true
 

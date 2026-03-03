@@ -7,6 +7,7 @@ use clap::{
         styling::{AnsiColor, Effects},
     },
 };
+#[cfg(feature = "logger")]
 use tracing::Level;
 
 use crate::utils::EncodingFormat;
@@ -36,6 +37,7 @@ pub struct Cli {
     pub clipboard: bool,
 
     /// Log level to be used for printing to stderr
+    #[cfg(feature = "logger")]
     #[arg(long, verbatim_doc_comment)]
     pub log_level: Option<Level>,
 

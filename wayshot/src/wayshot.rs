@@ -14,6 +14,7 @@ mod clipboard;
 #[cfg(feature = "color_picker")]
 mod color_picker;
 mod config;
+#[cfg(feature = "logger")]
 mod logger;
 mod utils;
 
@@ -42,6 +43,7 @@ fn main() -> Result<()> {
     let cli = cli::Cli::parse();
     let config_path = cli.config.clone().unwrap_or(Config::get_default_path());
     let config = Config::load(&config_path).unwrap_or_default();
+    #[cfg(feature = "logger")]
     logger::setup(&cli, &config);
     let base = config.base.unwrap_or_default();
     let file = config.file.unwrap_or_default();
