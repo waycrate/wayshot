@@ -4,6 +4,7 @@ use image::{
     DynamicImage,
     codecs::png::{CompressionType, FilterType, PngEncoder},
 };
+#[cfg(feature = "jxl")]
 use jpegxl_rs::encode::{EncoderResult, EncoderSpeed};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -62,9 +63,11 @@ pub enum EncodingFormat {
     Qoi,
     /// WebP encoder.
     Webp,
-    /// AVIF encoder.
+    /// AVIF encoder. Requires the `avif` Cargo feature.
+    #[cfg(feature = "avif")]
     Avif,
-    /// JPEG-XL encoder.
+    /// JPEG-XL encoder. Requires the `jxl` Cargo feature.
+    #[cfg(feature = "jxl")]
     Jxl,
 }
 
@@ -76,8 +79,10 @@ impl From<EncodingFormat> for image::ImageFormat {
             EncodingFormat::Ppm => image::ImageFormat::Pnm,
             EncodingFormat::Qoi => image::ImageFormat::Qoi,
             EncodingFormat::Webp => image::ImageFormat::WebP,
+            #[cfg(feature = "avif")]
             EncodingFormat::Avif => image::ImageFormat::Avif,
             // JXL is handled via encode_image; this fallback should never be reached.
+            #[cfg(feature = "jxl")]
             EncodingFormat::Jxl => image::ImageFormat::Png,
         }
     }
@@ -118,7 +123,9 @@ impl From<EncodingFormat> for &str {
             EncodingFormat::Ppm => "ppm",
             EncodingFormat::Qoi => "qoi",
             EncodingFormat::Webp => "webp",
+            #[cfg(feature = "avif")]
             EncodingFormat::Avif => "avif",
+            #[cfg(feature = "jxl")]
             EncodingFormat::Jxl => "jxl",
         }
     }
@@ -134,7 +141,9 @@ impl FromStr for EncodingFormat {
             "ppm" => Self::Ppm,
             "qoi" => Self::Qoi,
             "webp" => Self::Webp,
+            #[cfg(feature = "avif")]
             "avif" => Self::Avif,
+            #[cfg(feature = "jxl")]
             "jxl" => Self::Jxl,
             _ => bail!("unsupported extension '{s}'"),
         })
@@ -191,7 +200,11 @@ pub fn encode_image(
     jxl: &Jxl,
     png: &Png,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    #[cfg(not(feature = "jxl"))]
+    let _ = jxl;
+
     match encoding {
+        #[cfg(feature = "jxl")]
         EncodingFormat::Jxl => encode_to_jxl_bytes(
             image,
             jxl.get_lossless(),
@@ -207,6 +220,7 @@ pub fn encode_image(
     }
 }
 
+#[cfg(feature = "jxl")]
 fn encode_to_jxl_bytes(
     image: &DynamicImage,
     lossless: bool,

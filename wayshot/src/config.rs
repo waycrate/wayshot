@@ -1,4 +1,5 @@
 use crate::utils::EncodingFormat;
+#[cfg(feature = "jxl")]
 use jpegxl_rs::encode::EncoderSpeed;
 use serde::{Deserialize, Serialize};
 use std::{env, io::Read, path::PathBuf};
@@ -128,6 +129,7 @@ impl Default for Jxl {
     }
 }
 
+#[cfg(feature = "jxl")]
 impl Jxl {
     pub fn get_lossless(&self) -> bool {
         self.lossless.unwrap_or(false)
