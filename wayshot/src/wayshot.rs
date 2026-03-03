@@ -143,6 +143,33 @@ fn resolve_output_file(
     None
 }
 
+// ─── List commands ────────────────────────────────────────────────────────────
+
+/// Handle `--list-*` flags. Returns `true` if a list command was handled.
+fn handle_list_commands(
+    cli: &cli::Cli,
+    conn: &WayshotConnection,
+    writer: &mut impl Write,
+) -> Result<bool> {
+    if cli.list_outputs {
+        for output in conn.get_all_outputs() {
+            writeln!(writer, "{}", output.name)?;
+        }
+        return Ok(true);
+    }
+    if cli.list_outputs_info {
+        conn.print_displays_info();
+        return Ok(true);
+    }
+    if cli.list_toplevels {
+        for tl in conn.get_all_toplevels().iter().filter(|t| t.active) {
+            writeln!(writer, "{}", tl.id_and_title())?;
+        }
+        return Ok(true);
+    }
+    Ok(false)
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 fn main() -> Result<()> {
@@ -155,41 +182,25 @@ fn main() -> Result<()> {
 
     let settings = AppSettings::resolve(&cli, &config);
 
-    let wayshot_conn = WayshotConnection::new()?;
+    let conn = WayshotConnection::new()?;
 
     let stdout = io::stdout();
     let mut writer = BufWriter::new(stdout.lock());
 
-    if cli.list_outputs {
-        let valid_outputs = wayshot_conn.get_all_outputs();
-        for output in valid_outputs {
-            writeln!(writer, "{}", output.name)?;
-        }
+    // List commands print info and exit immediately without capturing.
+    if handle_list_commands(&cli, &conn, &mut writer)? {
         writer.flush()?;
         return Ok(());
     }
 
-    if cli.list_outputs_info {
-        wayshot_conn.print_displays_info();
-        return Ok(());
-    }
-
-    if cli.list_toplevels {
-        let toplevels = wayshot_conn.get_all_toplevels();
-        for tl in toplevels.iter().filter(|t| t.active) {
-            writeln!(writer, "{}", tl.id_and_title())?;
-        }
-        writer.flush()?;
-        return Ok(());
-    }
-
+    // Color picker is also a query mode — pick a pixel color and exit.
     #[cfg(feature = "color_picker")]
     if cli.color {
-        return color_picker::pick(&wayshot_conn);
+        return color_picker::pick(&conn);
     }
 
     let mode = screenshot::CaptureMode::from_cli(&cli);
-    let result = screenshot::capture(&wayshot_conn, &mode, settings.cursor);
+    let result = screenshot::capture(&conn, &mode, settings.cursor);
 
     match result {
         Ok((image_buffer, shot_result)) => {

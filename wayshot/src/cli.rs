@@ -23,85 +23,95 @@ fn get_styles() -> Styles {
 #[derive(Parser)]
 #[command(version, about, styles=get_styles())]
 pub struct Cli {
-    /// Custom screenshot file path can be of the following types:
-    ///     1. Directory (Default naming scheme is used for the screenshot file).
-    ///     2. Path (Encoding is automatically inferred from the extension).
-    ///     3. `-` (Indicates writing to terminal [stdout]).
+    // ─── Positional argument ──────────────────────────────────────────────────
+    /// Custom screenshot file path. Accepts:
+    ///   1. A directory — default naming scheme is applied.
+    ///   2. A file path — encoding is inferred from the extension.
+    ///   3. `-` — write raw image bytes to stdout (no file is saved).
     #[arg(value_name = "FILE", verbatim_doc_comment)]
     pub file: Option<PathBuf>,
 
-    /// Copy image to clipboard. Can be used simultaneously with [FILE].
-    /// Wayshot persists in the background offering the image till the clipboard is overwritten.
-    #[cfg(feature = "clipboard")]
-    #[arg(long, verbatim_doc_comment)]
-    pub clipboard: bool,
-
-    /// Log level to be used for printing to stderr
-    #[cfg(feature = "logger")]
-    #[arg(long, verbatim_doc_comment)]
-    pub log_level: Option<Level>,
-
-    /// Region aware screenshotting
-    #[arg(short, long)]
-    pub geometry: bool,
-
-    /// Enable cursor in screenshots
-    #[arg(short, long)]
-    pub cursor: bool,
-
-    /// Set image encoder, by default uses the file extension from the FILE
-    /// positional argument. Otherwise defaults to png.
-    #[arg(long, verbatim_doc_comment, visible_aliases = ["extension", "format", "file-format"], value_name = "FILE_EXTENSION")]
-    pub encoding: Option<EncodingFormat>,
-
-    /// List all valid outputs
+    // ─── Query commands (print info then exit; no screenshot is taken) ────────
+    /// List all connected outputs by name.
     #[arg(short, long, alias = "list-outputs")]
     pub list_outputs: bool,
 
-    /// List all valid outputs with their name, description, size, and position
+    /// List all connected outputs with name, description, size, and position.
     #[arg(long)]
     pub list_outputs_info: bool,
 
-    /// List all toplevel windows (applications)
+    /// List all active toplevel windows.
     #[arg(long, alias = "list-windows")]
     pub list_toplevels: bool,
 
-    /// Choose a particular output/display to screenshot
-    #[arg(short, long, conflicts_with = "geometry")]
-    pub output: Option<String>,
-
-    /// Grasp a point in screen and get its color
+    /// Click a point on screen and print its color values.
     #[cfg(feature = "color_picker")]
     #[arg(long, conflicts_with_all = ["geometry", "output", "choose_output"])]
     pub color: bool,
 
-    /// Capture a specific toplevel window by name ("app_id title").
-    #[arg(long, alias = "window", conflicts_with_all = ["geometry", "output", "choose_output", "choose_toplevel"])]
-    pub toplevel: Option<String>,
+    // ─── Capture target (what to capture) ────────────────────────────────────
+    /// Interactively select a screen region to capture.
+    #[arg(short, long)]
+    pub geometry: bool,
 
-    /// Present a fuzzy selector for output/display selection
+    /// Capture a specific output/display by name.
+    #[arg(short, long, conflicts_with = "geometry")]
+    pub output: Option<String>,
+
+    /// Interactively choose an output/display to capture.
     #[arg(long, alias = "choose-output", conflicts_with_all = ["geometry", "output"])]
     pub choose_output: bool,
 
-    /// Present a fuzzy selector for toplevel/window selection
+    /// Capture a specific toplevel window by its "app_id title" string.
+    #[arg(long, alias = "window", conflicts_with_all = ["geometry", "output", "choose_output", "choose_toplevel"])]
+    pub toplevel: Option<String>,
+
+    /// Interactively choose a toplevel window to capture.
     #[arg(long, alias = "choose-window", conflicts_with_all = ["geometry", "output", "choose_output", "toplevel"])]
     pub choose_toplevel: bool,
 
-    /// Output file name's formatting.
-    /// Defaults to config value (`wayshot-%Y_%m_%d-%H_%M_%S`)
+    // ─── Capture options (how to capture) ────────────────────────────────────
+    /// Include the cursor in the screenshot.
+    #[arg(short, long)]
+    pub cursor: bool,
+
+    // ─── Output options (where/how to save the image) ─────────────────────────
+    /// Image encoding format. Defaults to the FILE extension, then to `png`.
+    #[arg(
+        long,
+        verbatim_doc_comment,
+        visible_aliases = ["extension", "format", "file-format"],
+        value_name = "FILE_EXTENSION"
+    )]
+    pub encoding: Option<EncodingFormat>,
+
+    /// `strftime`-style format for the output file name.
+    /// Defaults to `wayshot-%Y_%m_%d-%H_%M_%S`.
     #[arg(long, verbatim_doc_comment)]
     pub file_name_format: Option<String>,
 
-    /// Path to your config file.
-    /// Defaults to:
-    ///     1. `$XDG_CONFIG_HOME/wayshot/config.toml`
-    ///     2. `$HOME/wayshot/config.toml` -- if `$XDG_CONFIG_HOME` variable doesn't exist
-    ///     3. `None` -- if the config isn't found, the `Config::default()` will be used
+    /// Copy the screenshot to the Wayland clipboard.
+    /// Wayshot stays in the background offering the image until it is overwritten.
+    #[cfg(feature = "clipboard")]
     #[arg(long, verbatim_doc_comment)]
-    pub config: Option<PathBuf>,
+    pub clipboard: bool,
 
+    // ─── Notification options ─────────────────────────────────────────────────
     /// Silents notification after screenshot
     #[cfg(feature = "notifications")]
     #[arg(long)]
     pub silent: bool,
+
+    // ─── Global options ───────────────────────────────────────────────────────
+    /// Path to the config file. Defaults to:
+    ///   1. `$XDG_CONFIG_HOME/wayshot/config.toml`
+    ///   2. `$HOME/wayshot/config.toml`
+    ///   3. Built-in defaults when no file is found.
+    #[arg(long, verbatim_doc_comment)]
+    pub config: Option<PathBuf>,
+
+    /// Log level written to stderr.
+    #[cfg(feature = "logger")]
+    #[arg(long)]
+    pub log_level: Option<Level>,
 }
