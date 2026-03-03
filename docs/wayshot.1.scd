@@ -31,78 +31,110 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 *-V*, *--version*
 	Print version information.
 
-*--log-level <LOG_LEVEL>*
-	Log level to be used for printing to stderr
-	Possible values: trace, debug, info, warn, error
-
-	Default value: info
-
-*-c*, *--cursor*
-	Enable cursor visibility in screenshots.
-
-*--clipboard*
-	Copy image contents to clipboard also.
-	Using this flag will cause the wayshot process to fork and persist in the background offering the image
-	on the wayland clipboard until some other program overwrites the clipboard.
-
-*-e*, *--extension*, *--encoding*, *--format*, *--file-format*
-	Set the image encoder. Without this option, encoding is either inferred from the *output* filename or defaults to png.
-	Valid arguments:
-		- jpg
-		- png (Default encoder)
-		- ppm
-		- qoi
-		- webp
-		- avif
-		- jxl
-
-*--color*
-	Pick color, and print the information
+## Query (print info, then exit — no screenshot is taken)
 
 *-l*, *--list-outputs*
-	List all valid output names. This flag is generally used in combination with *-o* flag.
+	List all connected output names.
 
 *--list-outputs-info*
-	List all valid outputs with their name, description, size, and position.
+	List all connected outputs with their name, description, size, and position.
 
 *--list-toplevels*, *--list-windows*
-	List all toplevel windows (applications).
+	List all active toplevel windows.
+
+*--color*
+	Freeze the screen, click a pixel, and print its RGBA and hex color value.
+
+	_Requires the_ *color_picker* _feature (enabled by default)._
+
+## Capture target (what to capture)
+
+*-g*, *--geometry*
+	Interactively select a screen region. The screen is frozen before the selection overlay is
+	shown, giving a stable view for precise selection.
+
+	_Requires the_ *selector* _feature (enabled by default)._
+
+*-o*, *--output <OUTPUT>*
+	Capture a specific output/display by name. Use *--list-outputs* to discover names.
 
 *--choose-output*
-	Present a fuzzy selector for display (wl_output) selection.
+	Present a fuzzy selector for output/display selection.
 
-*-o*, *--output*
-	Choose a particular display (wl_output) to screenshot.
-
-*--toplevel*, *--window*
-	Capture a specific toplevel window by name ("app_id title").
+*--toplevel <APP_ID TITLE>*, *--window <APP_ID TITLE>*
+	Capture a specific toplevel window identified by its "app_id title" string.
+	Use *--list-toplevels* to discover available strings.
 
 *--choose-toplevel*, *--choose-window*
 	Present a fuzzy selector for toplevel/window selection.
 
-*-g*, *--geometry*
-	If this option is passed, wayshot takes a screenshot first and then uses
-	libwaysip (https://github.com/waycrate/waysip) to select a portion of that screenshot.
+## Capture options (how to capture)
 
-*--file-name-format*
-	Output file name's formatting. Refer to chrono formatting rules: https://docs.rs/chrono/latest/chrono/format/strftime/index.html.
+*-c*, *--cursor*
+	Include the cursor in the screenshot.
+
+## Output options (where/how to save the image)
+
+*-e*, *--encoding*, *--extension*, *--format*, *--file-format <FILE_EXTENSION>*
+	Set the image encoder. Without this option, encoding is either inferred from the *output*
+	filename or defaults to png.
+	Valid arguments:
+		- jpg
+		- png (default)
+		- ppm
+		- qoi
+		- webp
+		- avif _(requires_ *avif* _feature, enabled by default)_
+		- jxl  _(requires_ *jxl* _feature, enabled by default)_
+
+*--file-name-format <FORMAT>*
+	Format string for the output file name. Refer to chrono strftime formatting rules:
+	https://docs.rs/chrono/latest/chrono/format/strftime/index.html
 
 	Example: --file-name-format "%Y_%m_%d-%H_%M_%S"
 
 	Default: wayshot-%Y_%m_%d-%H_%M_%S
 
-*--config*
-	Path to your config file. Defaults to:
+*--clipboard*
+	Copy the screenshot to the Wayland clipboard.
+	Wayshot forks a child process that serves the image until the clipboard is overwritten.
+
+	_Requires the_ *clipboard* _feature (enabled by default)._
+
+## Notification options
+
+*--silent*
+	Suppress the desktop notification after a screenshot.
+
+	_Requires the_ *notifications* _feature (enabled by default)._
+
+## Global options
+
+*--config <PATH>*
+	Path to the config file. Defaults to:
 
 	- *$XDG_CONFIG_HOME/wayshot/config.toml*
-	- *$HOME/wayshot/config.toml* if *$XDG_CONFIG_HOME* variable doesn't exist
-	- *None* if config isn't found, the default values will be used
+	- *$HOME/.config/wayshot/config.toml* when *$XDG_CONFIG_HOME* is unset
+	- Built-in defaults when no file is found
 
 	Example: *wayshot --config config.toml*
 
-*--silent*
-	Silents notification after screenshot.
+*--log-level <LOG_LEVEL>*
+	Log level written to stderr.
+	Possible values: trace, debug, info, warn, error
 
+	Default value: info
+
+	_Requires the_ *logger* _feature (enabled by default)._
+
+# FEATURES
+
+Wayshot supports optional Cargo features. All features are enabled by default in the official binary.
+To build with a reduced set, use *--no-default-features* together with *--features*:
+
+	cargo build --no-default-features --features clipboard,logger
+
+Available features: *avif*, *clipboard*, *color_picker*, *jxl*, *logger*, *notifications*, *selector*
 
 # SEE ALSO
 	- wayshot(5)
