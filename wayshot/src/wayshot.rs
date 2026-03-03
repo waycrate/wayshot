@@ -1,7 +1,7 @@
 use config::Config;
 use std::{
     env,
-    io::{self, BufWriter, Cursor, Write},
+    io::{self, BufWriter, Write},
     path::PathBuf,
 };
 
@@ -204,91 +204,25 @@ fn main() -> Result<()> {
 
     match result {
         Ok((image_buffer, shot_result)) => {
-            #[cfg(feature = "clipboard")]
-            let mut image_buf: Option<Cursor<Vec<u8>>> = None;
+            let encoded = utils::encode_image(
+                &image_buffer,
+                settings.encoding,
+                &settings.jxl,
+                &settings.png,
+            )
+            .map_err(|e| eyre::eyre!("Failed to encode image: {e}"))?;
 
-            if let Some(f) = settings.file {
-                if settings.encoding == EncodingFormat::Jxl {
-                    if let Err(e) = utils::encode_to_jxl(
-                        &image_buffer,
-                        &f,
-                        settings.jxl.get_lossless(),
-                        settings.jxl.get_distance(),
-                        settings.jxl.get_encoder_speed(),
-                    ) {
-                        tracing::error!("Failed to encode to JXL: {}", e);
-                    }
-                } else if settings.encoding == EncodingFormat::Png {
-                    if let Err(e) = utils::encode_to_png(
-                        &image_buffer,
-                        &f,
-                        settings.png.get_compression(),
-                        settings.png.get_filter(),
-                    ) {
-                        tracing::error!("Failed to encode to PNG: {}", e);
-                    }
-                } else {
-                    image_buffer.save(f)?;
-                }
+            if let Some(ref f) = settings.file {
+                std::fs::write(f, &encoded)?;
             }
 
             if settings.stdout_print {
-                let buffer = if settings.encoding == EncodingFormat::Jxl {
-                    let data = utils::encode_to_jxl_bytes(
-                        &image_buffer,
-                        settings.jxl.get_lossless(),
-                        settings.jxl.get_distance(),
-                        settings.jxl.get_encoder_speed(),
-                    )
-                    .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
-                    Cursor::new(data)
-                } else if settings.encoding == EncodingFormat::Png {
-                    let data = utils::encode_to_png_bytes(
-                        &image_buffer,
-                        settings.png.get_compression(),
-                        settings.png.get_filter(),
-                    )
-                    .map_err(|e| eyre::eyre!("Failed to encode PNG: {}", e))?;
-                    Cursor::new(data)
-                } else {
-                    let mut buffer = Cursor::new(Vec::new());
-                    image_buffer.write_to(&mut buffer, settings.encoding.into())?;
-                    buffer
-                };
-                writer.write_all(buffer.get_ref())?;
-                #[cfg(feature = "clipboard")]
-                {
-                    image_buf = Some(buffer);
-                }
+                writer.write_all(&encoded)?;
             }
 
             #[cfg(feature = "clipboard")]
             if settings.clipboard {
-                clipboard::copy_to_clipboard(match image_buf {
-                    Some(buf) => buf.into_inner(),
-                    None => {
-                        if settings.encoding == EncodingFormat::Jxl {
-                            utils::encode_to_jxl_bytes(
-                                &image_buffer,
-                                settings.jxl.get_lossless(),
-                                settings.jxl.get_distance(),
-                                settings.jxl.get_encoder_speed(),
-                            )
-                            .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?
-                        } else if settings.encoding == EncodingFormat::Png {
-                            utils::encode_to_png_bytes(
-                                &image_buffer,
-                                settings.png.get_compression(),
-                                settings.png.get_filter(),
-                            )
-                            .map_err(|e| eyre::eyre!("Failed to encode PNG: {}", e))?
-                        } else {
-                            let mut buffer = Cursor::new(Vec::new());
-                            image_buffer.write_to(&mut buffer, settings.encoding.into())?;
-                            buffer.into_inner()
-                        }
-                    }
-                })?;
+                clipboard::copy_to_clipboard(encoded)?;
             }
 
             #[cfg(feature = "notifications")]

@@ -1,31 +1,32 @@
 use clap::ValueEnum;
 use eyre::{ContextCompat, Error, bail};
-
 use image::{
     DynamicImage,
     codecs::png::{CompressionType, FilterType, PngEncoder},
 };
 use jpegxl_rs::encode::{EncoderResult, EncoderSpeed};
 use serde::{Deserialize, Serialize};
-use std::io::Cursor;
 use std::{
     env,
     fmt::Display,
-    fs::File,
-    io::Write,
+    io::Cursor,
     path::{Path, PathBuf},
+    result::Result,
     str::FromStr,
 };
 
 use chrono::Local;
-use libwayshot::Result;
 use libwayshot::region::{LogicalRegion, Position, Region, Size};
+
+use crate::config::{Jxl, Png};
+
+// ─── Region helpers ───────────────────────────────────────────────────────────
 
 pub fn waysip_to_region(
     size: libwaysip::Size,
     position: libwaysip::Position,
-) -> Result<LogicalRegion> {
-    let size: Size = Size {
+) -> libwayshot::Result<LogicalRegion> {
+    let size = Size {
         width: size.width.try_into().map_err(|_| {
             libwayshot::Error::FreezeCallbackError("width cannot be negative".to_string())
         })?,
@@ -33,15 +34,18 @@ pub fn waysip_to_region(
             libwayshot::Error::FreezeCallbackError("height cannot be negative".to_string())
         })?,
     };
-    let position: Position = Position {
-        x: position.x,
-        y: position.y,
-    };
-
     Ok(LogicalRegion {
-        inner: Region { position, size },
+        inner: Region {
+            position: Position {
+                x: position.x,
+                y: position.y,
+            },
+            size,
+        },
     })
 }
+
+// ─── Encoding format ──────────────────────────────────────────────────────────
 
 /// Supported image encoding formats.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Serialize, Deserialize, Default)]
@@ -49,18 +53,18 @@ pub fn waysip_to_region(
 pub enum EncodingFormat {
     /// JPG/JPEG encoder.
     Jpg,
-    /// PNG encoder.
+    /// PNG encoder (default).
     #[default]
     Png,
     /// PPM encoder.
     Ppm,
-    /// Qut encoder.
+    /// QOI encoder.
     Qoi,
-    /// WebP encoder,
+    /// WebP encoder.
     Webp,
-    /// Avif encoder,
+    /// AVIF encoder.
     Avif,
-    /// JPEG-XL encoder,
+    /// JPEG-XL encoder.
     Jxl,
 }
 
@@ -73,8 +77,7 @@ impl From<EncodingFormat> for image::ImageFormat {
             EncodingFormat::Qoi => image::ImageFormat::Qoi,
             EncodingFormat::Webp => image::ImageFormat::WebP,
             EncodingFormat::Avif => image::ImageFormat::Avif,
-            // Note: JXL is handled separately via encode_to_jxl_bytes since image-rs doesn't support it yet
-            // This fallback is only used if the code path somehow reaches here (shouldn't happen)
+            // JXL is handled via encode_image; this fallback should never be reached.
             EncodingFormat::Jxl => image::ImageFormat::Png,
         }
     }
@@ -83,7 +86,7 @@ impl From<EncodingFormat> for image::ImageFormat {
 impl TryFrom<&PathBuf> for EncodingFormat {
     type Error = Error;
 
-    fn try_from(value: &PathBuf) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &PathBuf) -> Result<Self, Self::Error> {
         value
             .extension()
             .wrap_err_with(|| {
@@ -124,7 +127,7 @@ impl From<EncodingFormat> for &str {
 impl FromStr for EncodingFormat {
     type Err = Error;
 
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
             "jpg" | "jpeg" => Self::Jpg,
             "png" => Self::Png,
@@ -138,17 +141,18 @@ impl FromStr for EncodingFormat {
     }
 }
 
+// ─── Path helpers ─────────────────────────────────────────────────────────────
+
 pub fn get_absolute_path(path: &Path) -> PathBuf {
     if path.is_absolute() {
         path.to_path_buf()
     } else {
-        std::env::current_dir().unwrap_or_default().join(path)
+        env::current_dir().unwrap_or_default().join(path)
     }
 }
 
 pub fn get_expanded_path(path: &Path) -> PathBuf {
     let path_str = path.to_string_lossy();
-
     match shellexpand::full(&path_str) {
         Ok(expanded) => PathBuf::from(expanded.into_owned()),
         Err(_) => env::current_dir().unwrap_or_default(),
@@ -156,87 +160,79 @@ pub fn get_expanded_path(path: &Path) -> PathBuf {
 }
 
 pub fn get_default_file_name(filename_format: &str, encoding: EncodingFormat) -> PathBuf {
-    let format = Local::now().format(filename_format);
-
-    PathBuf::from(format!("{format}.{encoding}"))
+    PathBuf::from(format!(
+        "{}.{encoding}",
+        Local::now().format(filename_format)
+    ))
 }
 
 pub fn get_full_file_name(path: &Path, filename_format: &str, encoding: EncodingFormat) -> PathBuf {
-    let expanded_path = get_expanded_path(path);
-    let absolute_path = get_absolute_path(&expanded_path);
-
-    if absolute_path.is_dir() {
-        absolute_path.join(get_default_file_name(filename_format, encoding))
+    let absolute = get_absolute_path(&get_expanded_path(path));
+    if absolute.is_dir() {
+        absolute.join(get_default_file_name(filename_format, encoding))
     } else {
-        let base_dir = absolute_path
+        let base_dir = absolute
             .parent()
             .map(PathBuf::from)
             .unwrap_or_else(|| env::current_dir().unwrap_or_default());
-        let stem = absolute_path
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy();
+        let stem = absolute.file_stem().unwrap_or_default().to_string_lossy();
         base_dir.join(format!("{stem}.{encoding}"))
     }
 }
 
-pub fn encode_to_jxl_bytes(
-    image_buffer: &DynamicImage,
+// ─── Image encoding ───────────────────────────────────────────────────────────
+
+/// Encode `image` to raw bytes using the given format and per-format config.
+///
+/// This is the single encoding path used for file output, stdout, and clipboard.
+pub fn encode_image(
+    image: &DynamicImage,
+    encoding: EncodingFormat,
+    jxl: &Jxl,
+    png: &Png,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    match encoding {
+        EncodingFormat::Jxl => encode_to_jxl_bytes(
+            image,
+            jxl.get_lossless(),
+            jxl.get_distance(),
+            jxl.get_encoder_speed(),
+        ),
+        EncodingFormat::Png => encode_to_png_bytes(image, png.get_compression(), png.get_filter()),
+        _ => {
+            let mut buf = Cursor::new(Vec::new());
+            image.write_to(&mut buf, encoding.into())?;
+            Ok(buf.into_inner())
+        }
+    }
+}
+
+fn encode_to_jxl_bytes(
+    image: &DynamicImage,
     lossless: bool,
     distance: f32,
     speed: EncoderSpeed,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let width = image_buffer.width();
-    let height = image_buffer.height();
-
-    // using buffer with alpha channel results in bad output and we don't need alpha on screenshot anyway
-    // see: https://github.com/inflation/jpegxl-rs/issues/96
-    let pixels_rgb8 = image_buffer.to_rgb8();
+    // Alpha channel causes artefacts in jpegxl-rs; screenshots don't need it.
+    // See: https://github.com/inflation/jpegxl-rs/issues/96
+    let pixels_rgb8 = image.to_rgb8();
     let pixels = pixels_rgb8.as_raw();
-
     let mut encoder = jpegxl_rs::encoder_builder()
         .lossless(lossless)
         .quality(distance)
         .speed(speed)
         .build()?;
-    let EncoderResult { data, .. } = encoder.encode::<u8, u8>(pixels, width, height)?;
-
+    let EncoderResult { data, .. } =
+        encoder.encode::<u8, u8>(pixels, image.width(), image.height())?;
     Ok(data.to_vec())
 }
 
-pub fn encode_to_jxl(
-    image_buffer: &DynamicImage,
-    path: &PathBuf,
-    lossless: bool,
-    distance: f32,
-    speed: EncoderSpeed,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let data = encode_to_jxl_bytes(image_buffer, lossless, distance, speed)?;
-    let mut file = File::create(path)?;
-    file.write_all(&data)?;
-
-    Ok(())
-}
-
-pub fn encode_to_png_bytes(
-    image_buffer: &DynamicImage,
+fn encode_to_png_bytes(
+    image: &DynamicImage,
     compression: CompressionType,
     filter: FilterType,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut buffer = Cursor::new(Vec::new());
-    let encoder = PngEncoder::new_with_quality(&mut buffer, compression, filter);
-    image_buffer.write_with_encoder(encoder)?;
-    Ok(buffer.into_inner())
-}
-
-pub fn encode_to_png(
-    image_buffer: &DynamicImage,
-    path: &PathBuf,
-    compression: CompressionType,
-    filter: FilterType,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let data = encode_to_png_bytes(image_buffer, compression, filter)?;
-    let mut file = File::create(path)?;
-    file.write_all(&data)?;
-    Ok(())
+    let mut buf = Cursor::new(Vec::new());
+    image.write_with_encoder(PngEncoder::new_with_quality(&mut buf, compression, filter))?;
+    Ok(buf.into_inner())
 }
