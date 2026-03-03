@@ -16,6 +16,7 @@ mod color_picker;
 mod config;
 #[cfg(feature = "logger")]
 mod logger;
+#[cfg(feature = "notifications")]
 mod notification;
 mod utils;
 
@@ -51,6 +52,7 @@ fn main() -> Result<()> {
     let encoding_config = config.encoding.unwrap_or_default();
     let jxl_config = encoding_config.jxl.unwrap_or_default();
     let png_config = encoding_config.png.unwrap_or_default();
+    #[cfg(feature = "notifications")]
     let notifications_enabled = !cli.silent && base.notifications.unwrap_or(true);
 
     let cursor = match cli.cursor {
@@ -315,13 +317,18 @@ fn main() -> Result<()> {
                 })?;
             }
 
+            #[cfg(feature = "notifications")]
             if notifications_enabled {
                 notification::send_success(&shot_result);
             }
+            // Silence unused warning when the notifications feature is disabled.
+            #[cfg(not(feature = "notifications"))]
+            drop(shot_result);
 
             Ok(())
         }
         Err(e) => {
+            #[cfg(feature = "notifications")]
             if notifications_enabled {
                 notification::send_failure(&e);
             }

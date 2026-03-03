@@ -19,7 +19,7 @@ repository.workspace = true
 #
 #   cargo build --no-default-features --features clipboard
 #
-default = ["clipboard", "color_picker", "logger"]
+default = ["clipboard", "color_picker", "logger", "notifications"]
 
 # Copies the screenshot to the Wayland clipboard via wl-clipboard-rs.
 # The image is served by a forked child process so it persists after wayshot exits.
@@ -35,6 +35,11 @@ color_picker = []
 # Disable to suppress all stderr log output entirely.
 # Pulls in: tracing-subscriber
 logger = ["dep:tracing-subscriber"]
+
+# Sends a desktop notification (via D-Bus / libnotify) after each capture.
+# Disable removes the --silent CLI flag.
+# Pulls in: notify-rust
+notifications = ["dep:notify-rust"]
 
 [build-dependencies]
 flate2 = "1.1.5"
@@ -74,7 +79,7 @@ toml = { version = "0.9.10", default-features = false, features = [
 serde = { version = "1.0.219", features = ["derive"] }
 dirs = "6.0.0"
 libwaysip = "0.6.0"
-notify-rust = "4.11.7"
+notify-rust = { version = "4.11.7", optional = true }
 
 [[bin]]
 name = "wayshot"

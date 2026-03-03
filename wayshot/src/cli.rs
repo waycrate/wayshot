@@ -101,6 +101,7 @@ pub struct Cli {
     pub config: Option<PathBuf>,
 
     /// Silents notification after screenshot
+    #[cfg(feature = "notifications")]
     #[arg(long)]
     pub silent: bool,
 }

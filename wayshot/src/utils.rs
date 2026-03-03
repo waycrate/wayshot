@@ -242,6 +242,7 @@ pub fn encode_to_png(
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(not(feature = "notifications"), allow(dead_code))]
 pub enum ShotResult {
     Output { name: String },
     Toplevel { name: String },
