@@ -11,6 +11,7 @@ use libwayshot::WayshotConnection;
 mod cli;
 #[cfg(feature = "clipboard")]
 mod clipboard;
+#[cfg(feature = "color_picker")]
 mod color_picker;
 mod config;
 mod utils;
@@ -138,6 +139,7 @@ fn main() -> Result<()> {
         writer.flush()?;
         return Ok(());
     }
+    #[cfg(feature = "color_picker")]
     if cli.color {
         return color_picker::pick(&wayshot_conn);
     }

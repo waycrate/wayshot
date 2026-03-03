@@ -69,6 +69,7 @@ pub struct Cli {
     pub output: Option<String>,
 
     /// Grasp a point in screen and get its color
+    #[cfg(feature = "color_picker")]
     #[arg(long, conflicts_with_all = ["geometry", "output", "choose_output"])]
     pub color: bool,
 
