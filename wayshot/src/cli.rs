@@ -31,6 +31,7 @@ pub struct Cli {
 
     /// Copy image to clipboard. Can be used simultaneously with [FILE].
     /// Wayshot persists in the background offering the image till the clipboard is overwritten.
+    #[cfg(feature = "clipboard")]
     #[arg(long, verbatim_doc_comment)]
     pub clipboard: bool,
 

@@ -9,6 +9,7 @@ use eyre::{Result, bail};
 use libwayshot::WayshotConnection;
 
 mod cli;
+#[cfg(feature = "clipboard")]
 mod clipboard;
 mod config;
 mod utils;
@@ -55,10 +56,8 @@ fn main() -> Result<()> {
         true => cli.cursor,
         _ => base.cursor.unwrap_or_default(),
     };
-    let clipboard = match cli.clipboard {
-        true => cli.clipboard,
-        _ => base.clipboard.unwrap_or_default(),
-    };
+    #[cfg(feature = "clipboard")]
+    let clipboard = cli.clipboard || base.clipboard.unwrap_or_default();
 
     let input_encoding = cli
         .file
@@ -258,6 +257,7 @@ fn main() -> Result<()> {
 
     match result {
         Ok((image_buffer, shot_result)) => {
+            #[cfg(feature = "clipboard")]
             let mut image_buf: Option<Cursor<Vec<u8>>> = None;
 
             if let Some(f) = file {
@@ -309,9 +309,13 @@ fn main() -> Result<()> {
                     buffer
                 };
                 writer.write_all(buffer.get_ref())?;
-                image_buf = Some(buffer);
+                #[cfg(feature = "clipboard")]
+                {
+                    image_buf = Some(buffer);
+                }
             }
 
+            #[cfg(feature = "clipboard")]
             if clipboard {
                 clipboard::copy_to_clipboard(match image_buf {
                     Some(buf) => buf.into_inner(),
