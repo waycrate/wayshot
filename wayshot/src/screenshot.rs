@@ -4,7 +4,6 @@ use libwayshot::WayshotConnection;
 #[cfg(feature = "selector")]
 use libwaysip::WaySip;
 
-use crate::cli::Cli;
 #[cfg(feature = "selector")]
 use crate::utils::waysip_to_region;
 
@@ -35,26 +34,6 @@ pub enum CaptureMode {
     All,
 }
 
-impl CaptureMode {
-    /// Derive the capture mode from parsed CLI flags.
-    pub fn from_cli(cli: &Cli) -> Self {
-        #[cfg(feature = "selector")]
-        if cli.geometry {
-            return Self::Geometry;
-        }
-        if let Some(ref name) = cli.toplevel {
-            Self::Toplevel(name.clone())
-        } else if cli.choose_toplevel {
-            Self::ChooseToplevel
-        } else if let Some(ref name) = cli.output {
-            Self::Output(name.clone())
-        } else if cli.choose_output {
-            Self::ChooseOutput
-        } else {
-            Self::All
-        }
-    }
-}
 
 /// Capture a screenshot according to `mode`.
 pub fn capture(
