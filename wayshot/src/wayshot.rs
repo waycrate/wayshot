@@ -9,16 +9,15 @@ use eyre::{Result, bail};
 use libwayshot::WayshotConnection;
 
 mod cli;
+mod clipboard;
 mod config;
 mod utils;
 
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use libwaysip::WaySip;
 use utils::{ShotResult, send_notification, waysip_to_region};
-use wl_clipboard_rs::copy::{MimeType, Options, Source};
 
 use crate::utils::EncodingFormat;
-use rustix::runtime::{self, Fork};
 
 fn select_output<T>(outputs: &[T]) -> Option<usize>
 where
@@ -314,30 +313,28 @@ fn main() -> Result<()> {
             }
 
             if clipboard {
-                clipboard_daemonize(match image_buf {
-                    Some(buf) => buf,
+                clipboard::copy_to_clipboard(match image_buf {
+                    Some(buf) => buf.into_inner(),
                     None => {
                         if encoding == EncodingFormat::Jxl {
-                            let data = utils::encode_to_jxl_bytes(
+                            utils::encode_to_jxl_bytes(
                                 &image_buffer,
                                 jxl_config.get_lossless(),
                                 jxl_config.get_distance(),
                                 jxl_config.get_encoder_speed(),
                             )
-                            .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?;
-                            Cursor::new(data)
+                            .map_err(|e| eyre::eyre!("Failed to encode JXL: {}", e))?
                         } else if encoding == EncodingFormat::Png {
-                            let data = utils::encode_to_png_bytes(
+                            utils::encode_to_png_bytes(
                                 &image_buffer,
                                 png_config.get_compression(),
                                 png_config.get_filter(),
                             )
-                            .map_err(|e| eyre::eyre!("Failed to encode PNG: {}", e))?;
-                            Cursor::new(data)
+                            .map_err(|e| eyre::eyre!("Failed to encode PNG: {}", e))?
                         } else {
                             let mut buffer = Cursor::new(Vec::new());
                             image_buffer.write_to(&mut buffer, encoding.into())?;
-                            buffer
+                            buffer.into_inner()
                         }
                     }
                 })?;
@@ -356,34 +353,4 @@ fn main() -> Result<()> {
             Err(e)
         }
     }
-}
-
-/// Daemonize and copy the given buffer containing the encoded image to the clipboard
-fn clipboard_daemonize(buffer: Cursor<Vec<u8>>) -> Result<()> {
-    let mut opts = Options::new();
-    match unsafe { runtime::kernel_fork() } {
-        // Having the image persistently available on the clipboard requires a wayshot process to be alive.
-        // Fork the process with a child detached from the main process and have the parent exit
-        Ok(Fork::ParentOf(_)) => {
-            return Ok(());
-        }
-        Ok(Fork::Child(_)) => {
-            opts.foreground(true); // Offer the image till something else is available on the clipboard
-            opts.copy(
-                Source::Bytes(buffer.into_inner().into()),
-                MimeType::Autodetect,
-            )?;
-        }
-        Err(e) => {
-            tracing::warn!(
-                "Fork failed with error: {e}, couldn't offer image on the clipboard persistently.
-                 Use a clipboard manager to record screenshot."
-            );
-            opts.copy(
-                Source::Bytes(buffer.into_inner().into()),
-                MimeType::Autodetect,
-            )?;
-        }
-    }
-    Ok(())
 }
