@@ -34,7 +34,6 @@ pub enum CaptureMode {
     All,
 }
 
-
 /// Capture a screenshot according to `mode`.
 pub fn capture(
     conn: &WayshotConnection,
