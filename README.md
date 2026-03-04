@@ -88,6 +88,16 @@ cargo build --no-default-features --features clipboard,logger,notifications
 | `notifications`| Desktop notifications after each capture              | notify-rust           |
 | `selector`     | `--geometry` flag, interactive region selection       | libwaysip             |
 
+## Clipboard without the built-in feature
+
+If you build without the `clipboard` feature, you can still pipe stdout to `wl-copy`:
+
+```bash
+wayshot - | wl-copy
+```
+
+Alternatively, set `stdout = true` in your config file to always write to stdout, then pipe as usual.
+
 # Installation
 
 ## AUR:
