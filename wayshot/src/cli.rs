@@ -99,7 +99,7 @@ pub struct Cli {
     // ─── Notification options ─────────────────────────────────────────────────
     /// Silents notification after screenshot
     #[cfg(feature = "notifications")]
-    #[arg(long)]
+    #[arg(long, alias = "no-notifications")]
     pub silent: bool,
 
     // ─── Global options ───────────────────────────────────────────────────────

@@ -103,7 +103,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 
 ## Notification options
 
-*--silent*
+*--silent*, *--no-notifications*
 	Suppress the desktop notification after a screenshot.
 
 	_Requires the_ *notifications* _feature (enabled by default)._
