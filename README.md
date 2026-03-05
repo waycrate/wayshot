@@ -4,7 +4,7 @@
 
   <p align="center">
   <a href="./LICENSE.md"><img src="https://img.shields.io/github/license/waycrate/wayshot?style=flat-square&logo=appveyor"></a>
-  <img src="https://img.shields.io/badge/cargo-v1.3.0-green?style=flat-square&logo=appveyor">
+  <img src="https://img.shields.io/badge/cargo-v1.4.5-green?style=flat-square&logo=appveyor">
   <img src="https://img.shields.io/github/issues/waycrate/wayshot?style=flat-square&logo=appveyor">
   <img src="https://img.shields.io/github/forks/waycrate/wayshot?style=flat-square&logo=appveyor">
   <img src="https://img.shields.io/github/stars/waycrate/wayshot?style=flat-square&logo=appveyor">
@@ -26,7 +26,7 @@ NOTE: Read `man 5 wayshot` for [config file](./config.toml) information.
 
 NOTE: Read `man wayshot` for flag information.
 
-Screenshot and Crop Region:
+Screenshot and crop region:
 
 ```bash
 wayshot -g
@@ -44,10 +44,23 @@ Screenshot and copy to clipboard:
 wayshot --clipboard
 ```
 
-Pick color with information
+Pick color with information:
 
 ```bash
 wayshot --color
+```
+
+Capture a specific output:
+
+```bash
+wayshot --list-outputs   # see available output names
+wayshot -o eDP-1
+```
+
+Interactively choose a window to capture:
+
+```bash
+wayshot --choose-toplevel
 ```
 
 Pick a hex color code, using ImageMagick:
@@ -55,6 +68,35 @@ Pick a hex color code, using ImageMagick:
 ```bash
 wayshot -g - | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})" -o
 ```
+
+# Optional features
+
+All features are enabled in the default build. To reduce binary size or compile-time dependencies,
+features can be selectively disabled:
+
+```bash
+cargo build --no-default-features --features clipboard,logger,notifications
+```
+
+| Feature        | What it adds                                          | Extra dependency      |
+|----------------|-------------------------------------------------------|-----------------------|
+| `avif`         | AVIF encoding (`--encoding avif`)                     | rav1e (via image)     |
+| `clipboard`    | `--clipboard` flag, copy to Wayland clipboard         | wl-clipboard-rs       |
+| `color_picker` | `--color` flag, freeze screen and pick a pixel color  | —                     |
+| `jxl`          | JPEG-XL encoding (`--encoding jxl`)                   | libjxl / jpegxl-rs    |
+| `logger`       | `--log-level` flag, tracing output to stderr          | tracing-subscriber    |
+| `notifications`| Desktop notifications after each capture              | notify-rust           |
+| `selector`     | `--geometry` flag, interactive region selection       | libwaysip             |
+
+## Clipboard without the built-in feature
+
+If you build without the `clipboard` feature, you can still pipe stdout to `wl-copy`:
+
+```bash
+wayshot - | wl-copy
+```
+
+Alternatively, set `stdout = true` in your config file to always write to stdout, then pipe as usual.
 
 # Installation
 
@@ -68,7 +110,7 @@ wayshot -g - | convert - -format '%[pixel:p{0,0}]' txt:-|grep -E "#([A-Fa-f0-9]{
 -   rustup
 -   make
 -   pkg-config
--   libjxl
+-   libjxl _(optional — only needed when the `jxl` feature is enabled)_
 
 ## Compiling:
 
