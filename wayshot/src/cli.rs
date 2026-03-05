@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{
-    Parser,
+    Parser, ValueEnum,
     builder::{
         Styles,
         styling::{AnsiColor, Effects},
@@ -17,6 +17,17 @@ fn get_styles() -> Styles {
         .usage(AnsiColor::Green.on_default() | Effects::BOLD)
         .literal(AnsiColor::Blue.on_default() | Effects::BOLD)
         .placeholder(AnsiColor::Green.on_default())
+}
+
+#[derive(ValueEnum, Clone, Debug, Default, PartialEq)]
+pub enum ColorFormat {
+    #[default]
+    Plain,
+    Hex,
+    HexAlpha,
+    Rgb,
+    Rgba,
+    Hsl,
 }
 
 #[derive(Parser)]
@@ -67,9 +78,16 @@ pub struct Cli {
     #[arg(short, long, conflicts_with = "geometry")]
     pub output: Option<String>,
 
-    /// Grasp a point in screen and get its color
-    #[arg(long, conflicts_with_all = ["geometry", "output", "choose_output"])]
-    pub color: bool,
+    /// Grasp a point in screen and get its color.
+    /// Optionally accepts a format: plain (default), hex, hex-alpha, rgb, rgba, hsl.
+    #[arg(
+        long,
+        value_name = "FORMAT",
+        conflicts_with_all = ["geometry", "output", "choose_output"],
+        default_missing_value = "plain",
+        num_args = 0..=1,
+    )]
+    pub color: Option<ColorFormat>,
 
     /// Capture a specific toplevel window by name ("app_id title").
     #[arg(long, alias = "window", conflicts_with_all = ["geometry", "output", "choose_output", "choose_toplevel"])]

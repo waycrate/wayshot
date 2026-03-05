@@ -56,8 +56,19 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 		- avif
 		- jxl
 
-*--color*
-	Pick color, and print the information
+*--color [FORMAT]*
+	Pick a point on screen and print its color. An optional format can be specified:
+		- plain (Default: prints RGBA, RGBA float, and hex)
+		- hex
+		- hex-alpha
+		- rgb
+		- rgba
+		- hsl
+
+	Examples:
+		- *wayshot --color* (prints all formats)
+		- *wayshot --color hex* (prints #rrggbb)
+		- *wayshot --color hsl* (prints hsl(h, s%, l%))
 
 *-l*, *--list-outputs*
 	List all valid output names. This flag is generally used in combination with *-o* flag.
