@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.6] - 2026-03-09
+
+### Fixed
+- fix problems that the state ext-image-copy only contains one format
+- fix publish ci
+- make image buffer without clone by @Nuhia-Arefin
+- remove needless unwrap by @oxsamlt
+- fix changelog format by @Anshi321
+- add size, position api for OutputInfo
+- add silent options for cli by @Suyansh-Dev
+- caching coverage by @Suyansh-Dev
+
+[1.4.6]: https://github.com/waycrate/wayshot/compare/1.4.6...v1.4.5
+
 ## [1.4.5] - 2026-01-20
 
 ### Fixed
