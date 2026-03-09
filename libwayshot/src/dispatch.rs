@@ -215,6 +215,7 @@ pub struct CaptureFrameState {
     pub(crate) session_done: bool,
     pub(crate) gbm: Option<gbm::Device<Card>>,
     find_gbm: bool,
+    session_size: Size,
 }
 
 impl CaptureFrameState {
@@ -228,6 +229,10 @@ impl CaptureFrameState {
             session_done: false,
             gbm: None,
             find_gbm,
+            session_size: Size {
+                width: 0,
+                height: 0,
+            },
         }
     }
 }
@@ -289,22 +294,16 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
         _conn: &Connection,
         _qhandle: &QueueHandle<Self>,
     ) {
-        if state.formats.is_empty() {
-            state.formats.push(FrameFormat {
-                format: wayland_client::protocol::wl_shm::Format::Rgb888A8,
-                size: Size {
-                    width: 0,
-                    height: 0,
-                },
-                stride: 0,
-            });
-        }
         match event {
             ext_image_copy_capture_session_v1::Event::BufferSize { width, height } => {
+                state.session_size.width = width;
+                state.session_size.height = height;
                 //formats is guaranteed to have at least one element due to the check above
-                let format = &mut state.formats[0];
-                format.size = Size { width, height };
-                format.stride = 4 * width;
+                for format in &mut state.formats {
+                    format.size = Size { width, height };
+                    format.stride = 4 * width;
+                }
+
                 for DMAFrameFormat {
                     size:
                         Size {
@@ -321,6 +320,11 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
             ext_image_copy_capture_session_v1::Event::ShmFormat {
                 format: WEnum::Value(format),
             } => {
+                state.formats.push(FrameFormat {
+                    format,
+                    size: state.session_size,
+                    stride: 4 * state.session_size.width,
+                });
                 let set_format = &mut state.formats[0];
                 set_format.format = format;
             }
@@ -357,16 +361,9 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
                 state.gbm = Some(gbm);
             }
             ext_image_copy_capture_session_v1::Event::DmabufFormat { format, .. } => {
-                let mut width = 0;
-                let mut height = 0;
-                if !state.formats.is_empty() {
-                    let format = state.formats[0];
-                    width = format.size.width;
-                    height = format.size.height;
-                }
                 state.dmabuf_formats.push(DMAFrameFormat {
                     format,
-                    size: Size { width, height },
+                    size: state.session_size,
                 });
             }
             ext_image_copy_capture_session_v1::Event::Done => {
