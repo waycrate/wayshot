@@ -1,7 +1,9 @@
 use crate::utils::EncodingFormat;
+#[cfg(feature = "jxl")]
 use jpegxl_rs::encode::EncoderSpeed;
 use serde::{Deserialize, Serialize};
 use std::{env, io::Read, path::PathBuf};
+#[cfg(feature = "logger")]
 use tracing::Level;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -62,6 +64,7 @@ impl Default for Base {
     }
 }
 
+#[cfg(feature = "logger")]
 impl Base {
     pub fn get_log_level(&self) -> Level {
         self.log_level
@@ -126,6 +129,7 @@ impl Default for Jxl {
     }
 }
 
+#[cfg(feature = "jxl")]
 impl Jxl {
     pub fn get_lossless(&self) -> bool {
         self.lossless.unwrap_or(false)

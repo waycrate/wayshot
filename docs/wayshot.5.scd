@@ -41,11 +41,13 @@ This section documents the *[base]* table of the configuration file
 *clipboard* = _true_ | _false_
 
 	Controls if screenshot file should be copied into clipboard.
-	Wayshot persists in the background offering the image until the clipboard is overwritten
+	Wayshot persists in the background offering the image until the clipboard is overwritten.
 
 	CLI option takes precedence: _wayshot --clipboard_
 
-	Default: _true_
+	_Requires the_ *clipboard* _feature (enabled by default)._
+
+	Default: _false_
 
 *file* = _true_ | _false_
 
@@ -78,12 +80,16 @@ This section documents the *[base]* table of the configuration file
 		- _"warn"_
 		- _"error"_
 
+	_Requires the_ *logger* _feature (enabled by default)._
+
 	Default: _"info"_
 
 *notifications* = _true_ | _false_
 
 	Controls if desktop notifications should be shown.
 	When enabled, wayshot will show notifications for screenshot events (e.g., successful capture, errors).
+
+	_Requires the_ *notifications* _feature (enabled by default)._
 
 	Default: _true_
 
@@ -109,7 +115,7 @@ This section documents the *[file]* table of the configuration file
 
 	Default: _"None"_ (fallbacks to *"wayshot-%Y_%m_%d-%H_%M_%S"*)
 
-*encoding* = _"png"_ | _"jpg"_ | _"ppm"_ | _"qui"_ | _"webp"_ | _"avif"_ | _"jxl"_
+*encoding* = _"png"_ | _"jpg"_ | _"ppm"_ | _"qoi"_ | _"webp"_ | _"avif"_ | _"jxl"_
 
 	Screenshot file encoding
 
@@ -124,6 +130,10 @@ This section documents the *[file]* table of the configuration file
 ## ENCODING
 
 	Encoding-specific configuration options.
+
+	Note: the *avif* and *jxl* formats are only available when the corresponding Cargo features are
+	enabled (both are on by default). When a feature is disabled, the format is silently ignored and
+	wayshot falls back to PNG.
 
 ## PNG
 

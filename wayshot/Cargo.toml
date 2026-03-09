@@ -10,14 +10,59 @@ keywords.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+# All features are on by default. To build a slimmer binary, opt out selectively:
+#
+#   cargo build --no-default-features
+#
+# Or keep most features but drop one, e.g.:
+#
+#   cargo build --no-default-features --features clipboard
+#
+default = ["avif", "clipboard", "color_picker", "jxl", "logger", "notifications", "selector"]
+
+# Copies the screenshot to the Wayland clipboard via wl-clipboard-rs.
+# The image is served by a forked child process so it persists after wayshot exits.
+# Adds the --clipboard CLI flag.
+# Pulls in: wl-clipboard-rs, rustix
+clipboard = ["dep:wl-clipboard-rs", "dep:rustix"]
+
+# Adds the --color CLI flag: freeze the screen, click a pixel, print its RGBA/hex value.
+# No additional dependencies.
+color_picker = []
+
+# Interactive screen-region selection via libwaysip (Wayland selection overlay).
+# Adds the --geometry CLI flag for interactive region selection.
+# Pulls in: libwaysip
+selector = ["dep:libwaysip"]
+
+# AVIF encoding support via the image crate's `avif` feature (pulls in rav1e, a large AV1 encoder).
+# Disable to significantly reduce compile time on platforms where AVIF output is not needed.
+avif = ["image/avif"]
+
+# JPEG-XL encoding support via jpegxl-rs.
+# Adds the `jxl` variant to --encoding and the [encoding.jxl] config section.
+# Disable to drop the jpegxl-rs dependency (useful on platforms without libjxl).
+# Pulls in: jpegxl-rs
+jxl = ["dep:jpegxl-rs"]
+
+# Initialises the tracing subscriber and exposes the --log-level CLI flag.
+# Disable to suppress all stderr log output entirely.
+# Pulls in: tracing-subscriber
+logger = ["dep:tracing-subscriber"]
+
+# Sends a desktop notification (via D-Bus / libnotify) after each capture.
+# Disable removes the --silent CLI flag.
+# Pulls in: notify-rust
+notifications = ["dep:notify-rust"]
+
 [build-dependencies]
 flate2 = "1.1.5"
 eyre = "0.6.12"
 
-
 [dependencies]
 tracing.workspace = true
-tracing-subscriber.workspace = true
+tracing-subscriber = { workspace = true, optional = true }
 
 libwayshot.workspace = true
 
@@ -29,16 +74,15 @@ image = { workspace = true, features = [
 	"pnm",
 	"qoi",
 	"webp",
-	"avif",
 ] }
-jpegxl-rs = "0.11"
+jpegxl-rs = { version = "0.11", optional = true }
 
 dialoguer = { version = "0.12.0", features = ["fuzzy-select"] }
 eyre = "0.6.12"
 chrono = "0.4.41"
 
-wl-clipboard-rs = "0.9.3"
-rustix = { workspace = true, features = ["process", "runtime"] }
+wl-clipboard-rs = { version = "0.9.3", optional = true }
+rustix = { workspace = true, features = ["process", "runtime"], optional = true }
 
 shellexpand = "3.1.1"
 toml = { version = "0.9.10", default-features = false, features = [
@@ -47,8 +91,8 @@ toml = { version = "0.9.10", default-features = false, features = [
 ] }
 serde = { version = "1.0.219", features = ["derive"] }
 dirs = "6.0.0"
-libwaysip = "0.6.0"
-notify-rust = "4.11.7"
+libwaysip = { version = "0.6.0", optional = true }
+notify-rust = { version = "4.11.7", optional = true }
 
 [[bin]]
 name = "wayshot"
