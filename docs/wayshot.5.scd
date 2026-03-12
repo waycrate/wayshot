@@ -38,6 +38,15 @@ This section documents the *[base]* table of the configuration file
 
 	Default: _false_
 
+*freeze* = _true_ | _false_
+
+	When true, freeze the screen before interactive region (*--geometry*) or point (*--color*)
+	selection, giving a stable view. When false, selection is on the live display and the
+	capture is taken after selection (same as *--no-freeze*). CLI *--no-freeze* takes
+	precedence.
+
+	Default: _true_
+
 *clipboard* = _true_ | _false_
 
 	Controls if screenshot file should be copied into clipboard.
