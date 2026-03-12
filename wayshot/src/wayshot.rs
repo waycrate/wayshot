@@ -55,9 +55,9 @@ fn main() -> Result<()> {
             Ok(())
         }
         #[cfg(feature = "color_picker")]
-        Command::ColorPicker => color_picker::pick(&connection),
+        Command::ColorPicker => color_picker::pick(&connection, settings.freeze),
         Command::Screenshot(mode) => {
-            let result = screenshot::capture(&connection, &mode, settings.cursor);
+            let result = screenshot::capture(&connection, &mode, settings.cursor, settings.freeze);
             match result {
                 Ok((image_buffer, shot_result)) => {
                     let encoded = utils::encode_image(

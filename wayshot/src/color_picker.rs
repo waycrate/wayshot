@@ -2,36 +2,21 @@
 
 use eyre::Result;
 use libwayshot::WayshotConnection;
-use libwaysip::WaySip;
 
-use crate::utils::waysip_to_region;
+use crate::utils::get_region_point;
 
-/// Freeze the screen, let the user click a pixel, and print its color.
-pub fn pick(conn: &WayshotConnection) -> Result<()> {
-    let image = conn
-        .screenshot_freeze(
-            |w_conn| {
-                let info = WaySip::new()
-                    .with_connection(w_conn.conn.clone())
-                    .with_selection_type(libwaysip::SelectionType::Point)
-                    .get()
-                    .map_err(|e| libwayshot::Error::FreezeCallbackError(e.to_string()))?
-                    .ok_or_else(|| {
-                        libwayshot::Error::FreezeCallbackError(
-                            "Failed to capture the point".to_string(),
-                        )
-                    })?;
-                waysip_to_region(
-                    libwaysip::Size {
-                        width: 1,
-                        height: 1,
-                    },
-                    info.left_top_point(),
-                )
-            },
+/// Let the user click a pixel and print its color. When `freeze` is true, the screen is frozen first.
+pub fn pick(conn: &WayshotConnection, freeze: bool) -> Result<()> {
+    let image = (if freeze {
+        conn.screenshot_freeze(
+            |w_conn| get_region_point(w_conn).map_err(libwayshot::Error::FreezeCallbackError),
             false,
         )?
-        .to_rgba8();
+    } else {
+        let region = get_region_point(conn).map_err(|e| eyre::eyre!("{e}"))?;
+        conn.screenshot(region, false)?
+    })
+    .to_rgba8();
 
     let [r, g, b, a] = image.get_pixel(0, 0).0;
     println!("RGBA       : R:{r}, G:{g}, B:{b}, A:{a}");
