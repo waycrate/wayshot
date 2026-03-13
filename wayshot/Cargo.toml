@@ -7,7 +7,7 @@ documentation = "https://docs.rs/crate/wayshot/latest"
 edition.workspace = true
 homepage.workspace = true
 keywords.workspace = true
-license.workspace = true
+license = "GPL-3.0-or-later"
 repository.workspace = true
 
 [features]
