@@ -1,0 +1,33 @@
+name: fmt and clippy
+
+on: [push, pull_request]
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    fmt-clippy:
+        runs-on: ubuntu-latest
+        container:
+            image: archlinux:latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: clippy rustfmt
+
+            - name: Build Cache
+              uses: Swatinem/rust-cache@v2
+
+            - name: Install wayland dependencies
+              run: |
+                  pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl
+
+            - name: Check formatting
+              run: cargo fmt -- --check
+
+            - name: Clippy check
+              run: cargo clippy --all-features -- -D warnings

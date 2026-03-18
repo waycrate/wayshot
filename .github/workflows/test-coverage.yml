@@ -1,0 +1,65 @@
+name: Test and coverage
+
+on: [push, pull_request]
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    test-coverage:
+        runs-on: ubuntu-latest
+        container:
+            image: archlinux:latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: llvm-tools-preview
+
+            - name: Build Cache
+              uses: Swatinem/rust-cache@v2
+
+            - name: Install wayland dependencies
+              run: |
+                  pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl
+
+            - name: Install cargo-llvm-cov
+              uses: taiki-e/install-action@v2
+              with:
+                  tool: cargo-llvm-cov
+
+            - name: Run tests
+              run: cargo test --all-features --verbose
+
+            - name: Generate coverage report (libwayshot)
+              run: |
+                  cargo llvm-cov --all-features -p libwayshot --lcov --output-path lcov-libwayshot.info
+
+            - name: Generate coverage report (wayshot)
+              run: |
+                  cargo llvm-cov --all-features -p wayshot --lcov --output-path lcov-wayshot.info
+
+            - name: Upload libwayshot coverage to Codecov
+              uses: codecov/codecov-action@v5
+              with:
+                  files: ./lcov-libwayshot.info
+                  flags: libwayshot
+                  name: libwayshot
+                  fail_ci_if_error: false
+                  verbose: true
+              env:
+                  CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+            - name: Upload wayshot coverage to Codecov
+              uses: codecov/codecov-action@v5
+              with:
+                  files: ./lcov-wayshot.info
+                  flags: wayshot
+                  name: wayshot
+                  fail_ci_if_error: false
+                  verbose: true
+              env:
+                  CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
