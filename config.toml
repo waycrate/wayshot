@@ -3,6 +3,8 @@
 # output = "HDMI-A-1"
 # should contain cursor?
 cursor = false
+# freeze screen when selecting region (--geometry) or point (--color)? false = live selection (like --no-freeze)
+freeze = true
 # should copy screenshot to clipborad?
 clipboard = false
 # should write screenshot as file in filesystem?

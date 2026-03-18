@@ -1,11 +1,8 @@
+#[cfg(feature = "selector")]
+use crate::utils::get_region_area;
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use eyre::{Result, bail};
 use libwayshot::WayshotConnection;
-#[cfg(feature = "selector")]
-use libwaysip::WaySip;
-
-#[cfg(feature = "selector")]
-use crate::utils::waysip_to_region;
 
 /// Describes what was captured, used to build the notification body.
 #[derive(Debug, Clone)]
@@ -39,10 +36,11 @@ pub fn capture(
     conn: &WayshotConnection,
     mode: &CaptureMode,
     cursor: bool,
+    freeze: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
     match mode {
         #[cfg(feature = "selector")]
-        CaptureMode::Geometry => capture_geometry(conn, cursor),
+        CaptureMode::Geometry => capture_geometry(conn, cursor, freeze),
         CaptureMode::Toplevel(name) => capture_toplevel_by_name(conn, name, cursor),
         CaptureMode::ChooseToplevel => capture_toplevel_interactive(conn, cursor),
         CaptureMode::Output(name) => capture_output_by_name(conn, name, cursor),
@@ -56,21 +54,17 @@ pub fn capture(
 fn capture_geometry(
     conn: &WayshotConnection,
     cursor: bool,
+    freeze: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
-    let image = conn.screenshot_freeze(
-        |w_conn| {
-            let info = WaySip::new()
-                .with_connection(w_conn.conn.clone())
-                .with_selection_type(libwaysip::SelectionType::Area)
-                .get()
-                .map_err(|e| libwayshot::Error::FreezeCallbackError(e.to_string()))?
-                .ok_or_else(|| {
-                    libwayshot::Error::FreezeCallbackError("No area selected".to_string())
-                })?;
-            waysip_to_region(info.size(), info.left_top_point())
-        },
-        cursor,
-    )?;
+    let image = if freeze {
+        conn.screenshot_freeze(
+            |w_conn| get_region_area(w_conn).map_err(libwayshot::Error::FreezeCallbackError),
+            cursor,
+        )?
+    } else {
+        let region = get_region_area(conn).map_err(|e| eyre::eyre!("{e}"))?;
+        conn.screenshot(region, cursor)?
+    };
     Ok((image, ShotResult::Area))
 }
 

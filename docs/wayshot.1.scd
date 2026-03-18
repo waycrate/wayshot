@@ -43,15 +43,17 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 	List all active toplevel windows.
 
 *--color*
-	Freeze the screen, click a pixel, and print its RGBA and hex color value.
+	Click a pixel and print its RGBA and hex color value. By default the screen is frozen first;
+	use *--no-freeze* to pick on the live display.
 
 	_Requires the_ *color_picker* _feature (enabled by default)._
 
 ## Capture target (what to capture)
 
 *-g*, *--geometry*
-	Interactively select a screen region. The screen is frozen before the selection overlay is
-	shown, giving a stable view for precise selection.
+	Interactively select a screen region. By default the screen is frozen before the selection
+	overlay is shown, giving a stable view for precise selection. Use *--no-freeze* to select on
+	the live display and capture after selection.
 
 	_Requires the_ *selector* _feature (enabled by default)._
 
@@ -72,6 +74,11 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 
 *-c*, *--cursor*
 	Include the cursor in the screenshot.
+
+*--no-freeze*
+	Do not freeze the screen when selecting a region (*--geometry*) or a point (*--color*).
+	Selection is done on the live display; the capture is taken after selection.
+	Config: *[base] freeze* (see wayshot(5)).
 
 ## Output options (where/how to save the image)
 

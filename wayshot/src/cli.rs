@@ -75,6 +75,11 @@ pub struct Cli {
     #[arg(short, long)]
     pub cursor: bool,
 
+    /// Do not freeze the screen when selecting a region (geometry) or a point (color picker).
+    /// Selection happens on the live display; the capture is taken after selection.
+    #[arg(long)]
+    pub no_freeze: bool,
+
     // ─── Output options (where/how to save the image) ─────────────────────────
     /// Image encoding format. Defaults to the FILE extension, then to `png`.
     #[arg(

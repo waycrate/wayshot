@@ -17,7 +17,7 @@ use std::{
 };
 
 use chrono::Local;
-#[cfg(feature = "selector")]
+#[cfg(any(feature = "selector", feature = "color_picker"))]
 use libwayshot::{
     Result as WayshotResult,
     region::{LogicalRegion, Position, Region, Size},
@@ -27,7 +27,7 @@ use crate::config::{Jxl, Png};
 
 // ─── Region helpers ───────────────────────────────────────────────────────────
 
-#[cfg(feature = "selector")]
+#[cfg(any(feature = "selector", feature = "color_picker"))]
 pub fn waysip_to_region(
     size: libwaysip::Size,
     position: libwaysip::Position,
@@ -49,6 +49,37 @@ pub fn waysip_to_region(
             size,
         },
     })
+}
+
+/// Run WaySip area selection and return the chosen region. Used for both freeze and live paths.
+#[cfg(feature = "selector")]
+pub fn get_region_area(conn: &libwayshot::WayshotConnection) -> Result<LogicalRegion, String> {
+    let info = libwaysip::WaySip::new()
+        .with_connection(conn.conn.clone())
+        .with_selection_type(libwaysip::SelectionType::Area)
+        .get()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "No area selected".to_string())?;
+    waysip_to_region(info.size(), info.left_top_point()).map_err(|e| e.to_string())
+}
+
+/// Run WaySip point selection and return a 1×1 region. Used for both freeze and live paths.
+#[cfg(feature = "color_picker")]
+pub fn get_region_point(conn: &libwayshot::WayshotConnection) -> Result<LogicalRegion, String> {
+    let info = libwaysip::WaySip::new()
+        .with_connection(conn.conn.clone())
+        .with_selection_type(libwaysip::SelectionType::Point)
+        .get()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Failed to capture the point".to_string())?;
+    waysip_to_region(
+        libwaysip::Size {
+            width: 1,
+            height: 1,
+        },
+        info.left_top_point(),
+    )
+    .map_err(|e| e.to_string())
 }
 
 // ─── Encoding format ──────────────────────────────────────────────────────────
