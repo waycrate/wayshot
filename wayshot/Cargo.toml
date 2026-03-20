@@ -75,7 +75,7 @@ image = { workspace = true, features = [
 	"qoi",
 	"webp",
 ] }
-jpegxl-rs = { version = "0.11", optional = true }
+jpegxl-rs = { version = "0.13", optional = true }
 
 dialoguer = { version = "0.12", features = ["fuzzy-select"] }
 eyre = "0.6"
