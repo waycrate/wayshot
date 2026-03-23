@@ -33,7 +33,7 @@ wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 wayland-backend = { version = "0.3", features = ["client_system"] }
 
 gbm = "0.18"
-drm = "0.14"
+drm = "0.15"
 
 gl.workspace = true
 r-egl-wayland.workspace = true
