@@ -43,6 +43,7 @@ impl Config {
 pub struct Base {
     pub output: Option<String>,
     pub cursor: Option<bool>,
+    pub delay: Option<u32>,
     pub clipboard: Option<bool>,
     pub file: Option<bool>,
     pub stdout: Option<bool>,
@@ -55,6 +56,7 @@ impl Default for Base {
         Base {
             output: None,
             cursor: Some(false),
+            delay: None,
             clipboard: Some(false),
             file: Some(true),
             stdout: Some(false),

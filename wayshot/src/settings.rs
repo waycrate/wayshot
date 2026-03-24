@@ -33,6 +33,8 @@ pub(crate) struct AppSettings {
     pub(crate) command: Command,
     /// Whether to render the cursor in the captured image.
     pub(crate) cursor: bool,
+    /// Milliseconds to wait before capturing; `None` means no delay.
+    pub(crate) delay: Option<u32>,
     /// Final encoding format, after resolving extension / flag / config precedence.
     pub(crate) encoding: EncodingFormat,
     /// Destination file path, or `None` to skip file output.
@@ -58,6 +60,10 @@ impl AppSettings {
         // ── Cursor ────────────────────────────────────────────────────────────
         // Either the --cursor flag or config `cursor = true` enables cursor capture.
         let cursor = cli.cursor || base.cursor.unwrap_or_default();
+
+        // ── Delay ─────────────────────────────────────────────────────────────
+        // Wait N ms before capture; CLI overrides config; None = no delay.
+        let delay = cli.delay.or(base.delay);
 
         // ── Encoding ──────────────────────────────────────────────────────────
         // Resolution order:
@@ -126,6 +132,7 @@ impl AppSettings {
         AppSettings {
             command,
             cursor,
+            delay,
             encoding,
             file,
             stdout_print,
