@@ -19,7 +19,7 @@ repository.workspace = true
 #
 #   cargo build --no-default-features --features clipboard
 #
-default = ["avif", "clipboard", "color_picker", "jxl", "logger", "notifications", "selector"]
+default = ["avif", "clipboard", "color_picker", "completions", "jxl", "logger", "notifications", "selector"]
 
 # Copies the screenshot to the Wayland clipboard via wl-clipboard-rs.
 # The image is served by a forked child process so it persists after wayshot exits.
@@ -56,6 +56,10 @@ logger = ["dep:tracing-subscriber"]
 # Pulls in: notify-rust
 notifications = ["dep:notify-rust"]
 
+# Adds the --completions <SHELL> CLI flag for generating shell completion scripts.
+# Pulls in: clap_complete, clap_complete_nushell
+completions = ["dep:clap_complete", "dep:clap_complete_nushell"]
+
 [build-dependencies]
 flate2 = "1.1"
 eyre = "0.6"
@@ -67,6 +71,8 @@ tracing-subscriber = { workspace = true, optional = true }
 libwayshot.workspace = true
 
 clap = { version = "4.6", features = ["derive"] }
+clap_complete = { version = "4.6", optional = true }
+clap_complete_nushell = { version = "4.6", optional = true }
 
 image = { workspace = true, features = [
 	"jpeg",
