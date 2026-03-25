@@ -73,6 +73,10 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 *-c*, *--cursor*
 	Include the cursor in the screenshot.
 
+*--delay* _MS_
+	Wait _MS_ milliseconds before taking the screenshot. No delay when omitted.
+	Config: *[base] delay* (see wayshot(5)).
+
 ## Output options (where/how to save the image)
 
 *-e*, *--encoding*, *--extension*, *--format*, *--file-format <FILE_EXTENSION>*

@@ -1,4 +1,5 @@
 use std::io::{self, BufWriter, Write};
+use std::time::Duration;
 
 use clap::Parser;
 use eyre::Result;
@@ -57,6 +58,9 @@ fn main() -> Result<()> {
         #[cfg(feature = "color_picker")]
         Command::ColorPicker => color_picker::pick(&connection),
         Command::Screenshot(mode) => {
+            if let Some(ms) = settings.delay {
+                std::thread::sleep(Duration::from_millis(ms as u64));
+            }
             let result = screenshot::capture(&connection, &mode, settings.cursor);
             match result {
                 Ok((image_buffer, shot_result)) => {
