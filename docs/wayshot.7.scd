@@ -62,6 +62,35 @@ Capture all connected outputs:
 
 	wayshot -g - | convert - -format '%[pixel:p{0,0}]' txt:-
 
+# SHELL COMPLETIONS
+
+Generate and install a completion script for your shell (requires *completions* feature):
+
+*fish*
+
+	wayshot --completions fish | source
+
+*zsh*
+
+	wayshot --completions zsh > ~/.zfunc/\_wayshot
+
+*bash*
+
+	wayshot --completions bash > /etc/bash\_completion.d/wayshot
+
+*elvish*
+
+	wayshot --completions elvish >> ~/.config/elvish/rc.elv
+
+*PowerShell (pwsh)*
+
+	wayshot --completions pwsh >> $PROFILE
+
+*nushell*
+
+	wayshot --completions nushell | save -f ~/.config/nushell/completions/wayshot.nu
+	# then source it from env.nu
+
 # AUTHORS
 
 Maintained by Shinyzenith <aakashsensharma@gmail.com>.

@@ -24,6 +24,13 @@ use settings::{AppSettings, Command};
 
 fn main() -> Result<()> {
     let cli = cli::Cli::parse();
+
+    #[cfg(feature = "completions")]
+    if let Some(shell) = cli.completions {
+        utils::print_completions(shell);
+        return Ok(());
+    }
+
     let config_path = cli.config.clone().unwrap_or(Config::get_default_path());
     let config = Config::load(&config_path).unwrap_or_default();
 

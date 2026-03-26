@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+#[cfg(feature = "completions")]
+use clap::ValueEnum;
 use clap::{
     Parser,
     builder::{
@@ -12,6 +14,18 @@ use tracing::Level;
 
 use crate::utils::EncodingFormat;
 
+/// Shell variants for completion generation.
+#[cfg(feature = "completions")]
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum Shell {
+    Bash,
+    Elvish,
+    Fish,
+    Pwsh,
+    Zsh,
+    Nushell,
+}
+
 fn get_styles() -> Styles {
     Styles::styled()
         .header(AnsiColor::Yellow.on_default() | Effects::BOLD)
@@ -23,6 +37,13 @@ fn get_styles() -> Styles {
 #[derive(Parser)]
 #[command(version, about, styles=get_styles())]
 pub struct Cli {
+    // ─── Shell completions ────────────────────────────────────────────────────
+    /// Generate shell completions and print to stdout.
+    /// Example: wayshot --completions fish | source
+    #[cfg(feature = "completions")]
+    #[arg(long, value_name = "SHELL", exclusive = true, verbatim_doc_comment)]
+    pub completions: Option<Shell>,
+
     // ─── Positional argument ──────────────────────────────────────────────────
     /// Custom screenshot file path. Accepts:
     ///   1. A directory — default naming scheme is applied.
