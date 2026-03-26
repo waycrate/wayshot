@@ -63,12 +63,12 @@ fn main() -> Result<()> {
             Ok(())
         }
         #[cfg(feature = "color_picker")]
-        Command::ColorPicker => color_picker::pick(&connection),
+        Command::ColorPicker => color_picker::pick(&connection, settings.freeze),
         Command::Screenshot(mode) => {
             if let Some(ms) = settings.delay {
                 std::thread::sleep(Duration::from_millis(ms as u64));
             }
-            let result = screenshot::capture(&connection, &mode, settings.cursor);
+            let result = screenshot::capture(&connection, &mode, settings.cursor, settings.freeze);
             match result {
                 Ok((image_buffer, shot_result)) => {
                     let encoded = utils::encode_image(

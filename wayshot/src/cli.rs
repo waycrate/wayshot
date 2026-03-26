@@ -96,6 +96,11 @@ pub struct Cli {
     #[arg(short, long)]
     pub cursor: bool,
 
+    /// Do not freeze the screen when selecting a region (geometry) or a point (color picker).
+    /// Selection happens on the live display; the capture is taken after selection.
+    #[arg(long)]
+    pub no_freeze: bool,
+
     /// Wait this many milliseconds before taking the screenshot. No delay when unset.
     #[arg(long, value_name = "MS")]
     pub delay: Option<u32>,

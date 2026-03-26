@@ -33,6 +33,8 @@ pub(crate) struct AppSettings {
     pub(crate) command: Command,
     /// Whether to render the cursor in the captured image.
     pub(crate) cursor: bool,
+    /// When true, freeze the screen before region/point selection; when false, select on live display.
+    pub(crate) freeze: bool,
     /// Milliseconds to wait before capturing; `None` means no delay.
     pub(crate) delay: Option<u32>,
     /// Final encoding format, after resolving extension / flag / config precedence.
@@ -60,6 +62,10 @@ impl AppSettings {
         // ── Cursor ────────────────────────────────────────────────────────────
         // Either the --cursor flag or config `cursor = true` enables cursor capture.
         let cursor = cli.cursor || base.cursor.unwrap_or_default();
+
+        // ── Freeze ─────────────────────────────────────────────────────────────
+        // Freeze screen before selection; false when CLI --no-freeze or config freeze = false.
+        let freeze = !cli.no_freeze && base.freeze.unwrap_or(true);
 
         // ── Delay ─────────────────────────────────────────────────────────────
         // Wait N ms before capture; CLI overrides config; None = no delay.
@@ -132,6 +138,7 @@ impl AppSettings {
         AppSettings {
             command,
             cursor,
+            freeze,
             delay,
             encoding,
             file,
