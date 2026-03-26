@@ -5,6 +5,8 @@
 
 mod convert;
 mod dispatch;
+#[cfg(feature = "egl")]
+mod egl;
 mod error;
 mod image_util;
 pub mod output;
@@ -13,22 +15,14 @@ pub mod screencast;
 mod screencopy;
 
 use std::{
-    collections::HashSet,
-    fs::File,
-    os::fd::{AsFd, IntoRawFd},
-    path::Path,
-    sync::atomic::Ordering,
-    thread,
+    collections::HashSet, fs::File, os::fd::AsFd, path::Path, sync::atomic::Ordering, thread,
 };
 
 use dispatch::{DMABUFState, LayerShellState};
 use image::DynamicImage;
 use memmap2::MmapMut;
-use r_egl_wayland::WayEglTrait;
-use r_egl_wayland::{EGL_INSTALCE, r_egl as egl};
 use screencopy::{
-    DMAFrameFormat, DMAFrameGuard, EGLImageGuard, FrameCopy, FrameData, FrameFormat, FrameGuard,
-    create_shm_fd,
+    DMAFrameFormat, DMAFrameGuard, FrameCopy, FrameData, FrameFormat, FrameGuard, create_shm_fd,
 };
 use tracing::debug;
 use wayland_client::{
@@ -84,6 +78,9 @@ pub use crate::{
 };
 
 pub use crate::error::{Error, Result};
+
+#[cfg(feature = "egl")]
+pub use crate::egl::EGLImageGuard;
 
 pub mod reexport {
     use wayland_client::protocol::wl_output;
@@ -462,35 +459,15 @@ impl WayshotConnection {
     /// - If the function was found and called, an OK(()), note that this does not necessarily mean that binding was successful, only that the function was called.
     ///   The caller may check for any OpenGL errors using the standard routes.
     /// - If the function was not found, [`Error::EGLImageToTexProcNotFoundError`] is returned
+    #[cfg(feature = "egl")]
     pub fn bind_target_frame_to_gl_texture(
         &self,
         target: &WayshotTarget,
         cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<()> {
-        let eglimage_guard =
-            self.capture_target_frame_eglimage(target, cursor_overlay, capture_region)?;
-        unsafe {
-            let gl_egl_image_texture_target_2d_oes: unsafe extern "system" fn(
-                target: gl::types::GLenum,
-                image: gl::types::GLeglImageOES,
-            ) -> () = std::mem::transmute(
-                match EGL_INSTALCE.get_proc_address("glEGLImageTargetTexture2DOES") {
-                    Some(f) => {
-                        tracing::debug!("glEGLImageTargetTexture2DOES found at address {:#?}", f);
-                        f
-                    }
-                    None => {
-                        tracing::error!("glEGLImageTargetTexture2DOES not found");
-                        return Err(Error::EGLImageToTexProcNotFoundError);
-                    }
-                },
-            );
-
-            gl_egl_image_texture_target_2d_oes(gl::TEXTURE_2D, eglimage_guard.image.as_ptr());
-            tracing::trace!("glEGLImageTargetTexture2DOES called");
-            Ok(())
-        }
+        let guard = self.capture_target_frame_eglimage(target, cursor_overlay, capture_region)?;
+        crate::egl::bind_egl_image_to_gl_texture(&guard)
     }
 
     /// Obtain a screencapture in the form of a EGLImage.
@@ -506,16 +483,16 @@ impl WayshotConnection {
     /// # Returns
     /// If successful, an EGLImageGuard which contains a pointer 'image' to the created EGLImage
     /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
+    #[cfg(feature = "egl")]
     pub fn capture_target_frame_eglimage(
         &self,
         target: &WayshotTarget,
         cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<EGLImageGuard> {
-        let egl_display = EGL_INSTALCE.get_display_wl(&self.conn.display())?;
+        let egl_display = crate::egl::get_egl_display_wl(&self.conn.display())?;
         tracing::trace!("eglDisplay obtained from Wayland connection's display");
-
-        EGL_INSTALCE.initialize(egl_display)?;
+        crate::egl::initialize_egl(egl_display)?;
         self.capture_target_frame_eglimage_on_display(
             egl_display,
             target,
@@ -530,65 +507,25 @@ impl WayshotConnection {
     /// It returns the captured frame as an `EGLImage`, wrapped in an `EGLImageGuard`
     /// for safe handling and cleanup.
     /// # Parameters
-    /// - `egl_instance`: Reference to an `EGL1_5` instance, which is used to create the `EGLImage`.
     /// - `egl_display`: The `EGLDisplay` on which the image should be created.
     /// - `cursor_overlay`: A boolean flag indicating whether the cursor should be included in the capture.
-    /// - `output`: Reference to the `WlOutput` from which the frame is to be captured.
+    /// - `target`: Reference to the `WayshotTarget` from which the frame is to be captured.
     /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
     ///
     /// # Returns
     /// If successful, an EGLImageGuard which contains a pointer 'image' to the created EGLImage
     /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
+    #[cfg(feature = "egl")]
     pub fn capture_target_frame_eglimage_on_display(
         &self,
-        egl_display: egl::Display,
+        egl_display: crate::egl::EglDisplay,
         target: &WayshotTarget,
         cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<EGLImageGuard> {
-        type Attrib = egl::Attrib;
         let (frame_format, _guard, bo) =
             self.capture_target_frame_dmabuf(target, cursor_overlay, capture_region)?;
-        let modifier: u64 = bo.modifier().into();
-
-        let image_attribs = [
-            egl::WIDTH as Attrib,
-            frame_format.size.width as Attrib,
-            egl::HEIGHT as Attrib,
-            frame_format.size.height as Attrib,
-            egl::LINUX_DRM_FOURCC_EXT as Attrib,
-            bo.format() as Attrib,
-            egl::DMA_BUF_PLANE0_FD_EXT as Attrib,
-            bo.fd_for_plane(0)?.into_raw_fd() as Attrib,
-            egl::DMA_BUF_PLANE0_OFFSET_EXT as Attrib,
-            bo.offset(0) as Attrib,
-            egl::DMA_BUF_PLANE0_PITCH_EXT as Attrib,
-            bo.stride_for_plane(0) as Attrib,
-            egl::DMA_BUF_PLANE0_MODIFIER_LO_EXT as Attrib,
-            (modifier as u32) as Attrib,
-            egl::DMA_BUF_PLANE0_MODIFIER_HI_EXT as Attrib,
-            (modifier >> 32) as Attrib,
-            egl::ATTRIB_NONE as Attrib,
-        ];
-        tracing::debug!(
-            "Calling eglCreateImage with attributes: {:#?}",
-            image_attribs
-        );
-        unsafe {
-            match EGL_INSTALCE.create_image(
-                egl_display,
-                egl::Context::from_ptr(egl::NO_CONTEXT),
-                egl::LINUX_DMA_BUF_EXT as u32,
-                egl::ClientBuffer::from_ptr(std::ptr::null_mut()), //NULL
-                &image_attribs,
-            ) {
-                Ok(image) => Ok(EGLImageGuard { image, egl_display }),
-                Err(e) => {
-                    tracing::error!("eglCreateImage call failed with error {e}");
-                    Err(e.into())
-                }
-            }
-        }
+        crate::egl::create_egl_image_from_dmabuf(egl_display, &bo, &frame_format)
     }
 
     /// Obtain a screencapture in the form of a WlBuffer backed by a GBM Bufferobject on the GPU.
