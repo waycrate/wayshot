@@ -6,12 +6,12 @@ publish = false
 
 [dependencies]
 gl.workspace = true
-gl_loader = "0.1.2"
+gl_loader = "0.1"
 thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 r-egl-wayland.workspace = true
 wayland-client.workspace = true
-wayland-egl.workspace = true
+wayland-egl = "0.32"
 wayland-protocols = { workspace = true, features = ["client"] }
 libwayshot.workspace = true

@@ -47,6 +47,13 @@ This section documents the *[base]* table of the configuration file
 
 	Default: _true_
 
+*delay* = _<integer>_ | _unset_
+
+	Number of milliseconds to wait before taking the screenshot. When unset or omitted, no delay is applied.
+	Useful to allow windows or overlays to appear before capture. CLI *--delay* takes precedence.
+
+	Default: _unset_ (no delay)
+
 *clipboard* = _true_ | _false_
 
 	Controls if screenshot file should be copied into clipboard.

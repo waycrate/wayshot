@@ -1,4 +1,5 @@
 use std::io::{self, BufWriter, Write};
+use std::time::Duration;
 
 use clap::Parser;
 use eyre::Result;
@@ -23,6 +24,13 @@ use settings::{AppSettings, Command};
 
 fn main() -> Result<()> {
     let cli = cli::Cli::parse();
+
+    #[cfg(feature = "completions")]
+    if let Some(shell) = cli.completions {
+        utils::print_completions(shell);
+        return Ok(());
+    }
+
     let config_path = cli.config.clone().unwrap_or(Config::get_default_path());
     let config = Config::load(&config_path).unwrap_or_default();
 
@@ -57,6 +65,9 @@ fn main() -> Result<()> {
         #[cfg(feature = "color_picker")]
         Command::ColorPicker => color_picker::pick(&connection, settings.freeze),
         Command::Screenshot(mode) => {
+            if let Some(ms) = settings.delay {
+                std::thread::sleep(Duration::from_millis(ms as u64));
+            }
             let result = screenshot::capture(&connection, &mode, settings.cursor, settings.freeze);
             match result {
                 Ok((image_buffer, shot_result)) => {

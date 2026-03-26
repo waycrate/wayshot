@@ -19,7 +19,7 @@ repository.workspace = true
 #
 #   cargo build --no-default-features --features clipboard
 #
-default = ["avif", "clipboard", "color_picker", "jxl", "logger", "notifications", "selector"]
+default = ["avif", "clipboard", "color_picker", "completions", "jxl", "logger", "notifications", "selector"]
 
 # Copies the screenshot to the Wayland clipboard via wl-clipboard-rs.
 # The image is served by a forked child process so it persists after wayshot exits.
@@ -56,9 +56,13 @@ logger = ["dep:tracing-subscriber"]
 # Pulls in: notify-rust
 notifications = ["dep:notify-rust"]
 
+# Adds the --completions <SHELL> CLI flag for generating shell completion scripts.
+# Pulls in: clap_complete, clap_complete_nushell
+completions = ["dep:clap_complete", "dep:clap_complete_nushell"]
+
 [build-dependencies]
-flate2 = "1.1.5"
-eyre = "0.6.12"
+flate2 = "1.1"
+eyre = "0.6"
 
 [dependencies]
 tracing.workspace = true
@@ -66,7 +70,9 @@ tracing-subscriber = { workspace = true, optional = true }
 
 libwayshot.workspace = true
 
-clap = { version = "4.5.54", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
+clap_complete = { version = "4.6", optional = true }
+clap_complete_nushell = { version = "4.6", optional = true }
 
 image = { workspace = true, features = [
 	"jpeg",
@@ -75,24 +81,24 @@ image = { workspace = true, features = [
 	"qoi",
 	"webp",
 ] }
-jpegxl-rs = { version = "0.11", optional = true }
+jpegxl-rs = { version = "0.14", optional = true }
 
-dialoguer = { version = "0.12.0", features = ["fuzzy-select"] }
-eyre = "0.6.12"
-chrono = "0.4.41"
+dialoguer = { version = "0.12", features = ["fuzzy-select"] }
+eyre = "0.6"
+chrono = "0.4"
 
-wl-clipboard-rs = { version = "0.9.3", optional = true }
+wl-clipboard-rs = { version = "0.9", optional = true }
 rustix = { workspace = true, features = ["process", "runtime"], optional = true }
 
-shellexpand = "3.1.1"
-toml = { version = "0.9.10", default-features = false, features = [
+shellexpand = "3.1"
+toml = { version = "1.0", default-features = false, features = [
 	"parse",
 	"serde",
 ] }
-serde = { version = "1.0.219", features = ["derive"] }
-dirs = "6.0.0"
-libwaysip = { version = "0.6.0", optional = true }
-notify-rust = { version = "4.11.7", optional = true }
+serde = { version = "1.0", features = ["derive"] }
+dirs = "6.0"
+libwaysip = { version = "0.6", optional = true }
+notify-rust = { version = "4.12", optional = true }
 
 [[bin]]
 name = "wayshot"

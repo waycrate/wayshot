@@ -5,6 +5,8 @@
 cursor = false
 # freeze screen when selecting region (--geometry) or point (--color)? false = live selection (like --no-freeze)
 freeze = true
+# delay in milliseconds before taking the screenshot; omit or leave unset for no delay
+# delay = 0
 # should copy screenshot to clipborad?
 clipboard = false
 # should write screenshot as file in filesystem?

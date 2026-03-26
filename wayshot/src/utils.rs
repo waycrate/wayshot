@@ -25,6 +25,42 @@ use libwayshot::{
 
 use crate::config::{Jxl, Png};
 
+// ─── Shell completions ────────────────────────────────────────────────────────
+
+#[cfg(feature = "completions")]
+pub fn print_completions(shell: crate::cli::Shell) {
+    use clap::CommandFactory;
+    use clap_complete::generate;
+    let mut cmd = crate::cli::Cli::command();
+    let mut out = std::io::stdout().lock();
+    match shell {
+        crate::cli::Shell::Bash => {
+            generate(clap_complete::shells::Bash, &mut cmd, "wayshot", &mut out)
+        }
+        crate::cli::Shell::Elvish => {
+            generate(clap_complete::shells::Elvish, &mut cmd, "wayshot", &mut out)
+        }
+        crate::cli::Shell::Fish => {
+            generate(clap_complete::shells::Fish, &mut cmd, "wayshot", &mut out)
+        }
+        crate::cli::Shell::Pwsh => generate(
+            clap_complete::shells::PowerShell,
+            &mut cmd,
+            "wayshot",
+            &mut out,
+        ),
+        crate::cli::Shell::Zsh => {
+            generate(clap_complete::shells::Zsh, &mut cmd, "wayshot", &mut out)
+        }
+        crate::cli::Shell::Nushell => generate(
+            clap_complete_nushell::Nushell,
+            &mut cmd,
+            "wayshot",
+            &mut out,
+        ),
+    }
+}
+
 // ─── Region helpers ───────────────────────────────────────────────────────────
 
 #[cfg(any(feature = "selector", feature = "color_picker"))]

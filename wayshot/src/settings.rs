@@ -35,6 +35,8 @@ pub(crate) struct AppSettings {
     pub(crate) cursor: bool,
     /// When true, freeze the screen before region/point selection; when false, select on live display.
     pub(crate) freeze: bool,
+    /// Milliseconds to wait before capturing; `None` means no delay.
+    pub(crate) delay: Option<u32>,
     /// Final encoding format, after resolving extension / flag / config precedence.
     pub(crate) encoding: EncodingFormat,
     /// Destination file path, or `None` to skip file output.
@@ -64,6 +66,10 @@ impl AppSettings {
         // ── Freeze ─────────────────────────────────────────────────────────────
         // Freeze screen before selection; false when CLI --no-freeze or config freeze = false.
         let freeze = !cli.no_freeze && base.freeze.unwrap_or(true);
+
+        // ── Delay ─────────────────────────────────────────────────────────────
+        // Wait N ms before capture; CLI overrides config; None = no delay.
+        let delay = cli.delay.or(base.delay);
 
         // ── Encoding ──────────────────────────────────────────────────────────
         // Resolution order:
@@ -133,6 +139,7 @@ impl AppSettings {
             command,
             cursor,
             freeze,
+            delay,
             encoding,
             file,
             stdout_print,
