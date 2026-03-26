@@ -43,7 +43,7 @@ jobs:
                   cargo llvm-cov --all-features -p wayshot --lcov --output-path lcov-wayshot.info
 
             - name: Upload libwayshot coverage to Codecov
-              uses: codecov/codecov-action@v5
+              uses: codecov/codecov-action@v6
               with:
                   files: ./lcov-libwayshot.info
                   flags: libwayshot
@@ -54,7 +54,7 @@ jobs:
                   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
             - name: Upload wayshot coverage to Codecov
-              uses: codecov/codecov-action@v5
+              uses: codecov/codecov-action@v6
               with:
                   files: ./lcov-wayshot.info
                   flags: wayshot
