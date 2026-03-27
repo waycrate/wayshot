@@ -145,7 +145,7 @@ To build with a reduced set, use *--no-default-features* together with *--featur
 
 	cargo build --no-default-features --features clipboard,logger
 
-Available features: *avif*, *clipboard*, *color_picker*, *completions*, *jxl*, *logger*, *notifications*, *selector*
+Available features: *avif*, *clipboard*, *color_picker*, *completions*, *jpeg*, *jxl*, *logger*, *notifications*, *pnm*, *qoi*, *selector*, *webp*
 
 # SEE ALSO
 	- wayshot(5)
