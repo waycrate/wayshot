@@ -96,7 +96,7 @@ impl Default for File {
         File {
             path: Some(env::current_dir().unwrap_or_default()),
             name_format: Some("wayshot-%Y_%m_%d-%H_%M_%S".to_string()),
-            encoding: Some(EncodingFormat::Png),
+            encoding: Some(EncodingFormat::default()),
         }
     }
 }

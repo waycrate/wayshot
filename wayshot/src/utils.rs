@@ -125,15 +125,19 @@ pub fn get_region_point(conn: &libwayshot::WayshotConnection) -> Result<LogicalR
 #[serde(rename_all = "snake_case")]
 pub enum EncodingFormat {
     /// JPG/JPEG encoder.
+    #[cfg(feature = "jpeg")]
     Jpg,
     /// PNG encoder (default).
     #[default]
     Png,
     /// PPM encoder.
+    #[cfg(feature = "pnm")]
     Ppm,
     /// QOI encoder.
+    #[cfg(feature = "qoi")]
     Qoi,
     /// WebP encoder.
+    #[cfg(feature = "webp")]
     Webp,
     /// AVIF encoder. Requires the `avif` Cargo feature.
     #[cfg(feature = "avif")]
@@ -146,10 +150,14 @@ pub enum EncodingFormat {
 impl From<EncodingFormat> for image::ImageFormat {
     fn from(format: EncodingFormat) -> Self {
         match format {
+            #[cfg(feature = "jpeg")]
             EncodingFormat::Jpg => image::ImageFormat::Jpeg,
             EncodingFormat::Png => image::ImageFormat::Png,
+            #[cfg(feature = "pnm")]
             EncodingFormat::Ppm => image::ImageFormat::Pnm,
+            #[cfg(feature = "qoi")]
             EncodingFormat::Qoi => image::ImageFormat::Qoi,
+            #[cfg(feature = "webp")]
             EncodingFormat::Webp => image::ImageFormat::WebP,
             #[cfg(feature = "avif")]
             EncodingFormat::Avif => image::ImageFormat::Avif,
@@ -190,10 +198,14 @@ impl Display for EncodingFormat {
 impl From<EncodingFormat> for &str {
     fn from(format: EncodingFormat) -> Self {
         match format {
+            #[cfg(feature = "jpeg")]
             EncodingFormat::Jpg => "jpg",
             EncodingFormat::Png => "png",
+            #[cfg(feature = "pnm")]
             EncodingFormat::Ppm => "ppm",
+            #[cfg(feature = "qoi")]
             EncodingFormat::Qoi => "qoi",
+            #[cfg(feature = "webp")]
             EncodingFormat::Webp => "webp",
             #[cfg(feature = "avif")]
             EncodingFormat::Avif => "avif",
@@ -208,10 +220,14 @@ impl FromStr for EncodingFormat {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
+            #[cfg(feature = "jpeg")]
             "jpg" | "jpeg" => Self::Jpg,
             "png" => Self::Png,
+            #[cfg(feature = "pnm")]
             "ppm" => Self::Ppm,
+            #[cfg(feature = "qoi")]
             "qoi" => Self::Qoi,
+            #[cfg(feature = "webp")]
             "webp" => Self::Webp,
             #[cfg(feature = "avif")]
             "avif" => Self::Avif,
@@ -284,6 +300,13 @@ pub fn encode_image(
             jxl.get_encoder_speed(),
         ),
         EncodingFormat::Png => encode_to_png_bytes(image, png.get_compression(), png.get_filter()),
+        #[cfg(any(
+            feature = "jpeg",
+            feature = "pnm",
+            feature = "qoi",
+            feature = "webp",
+            feature = "avif"
+        ))]
         _ => {
             let mut buf = Cursor::new(Vec::new());
             image.write_to(&mut buf, encoding.into())?;

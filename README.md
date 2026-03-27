@@ -88,17 +88,20 @@ features can be selectively disabled:
 cargo build --no-default-features --features clipboard,logger,notifications
 ```
 
-| Feature         | What it adds                                                    | Extra dependency   |
-| --------------- | --------------------------------------------------------------- | ------------------ |
-| `avif`          | AVIF encoding (`--encoding avif`)                               | rav1e (via image)  |
-| `clipboard`     | `--clipboard` flag, copy to Wayland clipboard                   | wl-clipboard-rs    |
-| `color_picker`  | `--color` flag, freeze screen and pick a pixel color            | —                  |
-| `egl`           | EGL/OpenGL GPU capture backend (DMA-BUF → EGLImage)             | gl, r-egl-wayland  |
-| `jxl`           | JPEG-XL encoding (`--encoding jxl`)                             | libjxl / jpegxl-rs |
-| `logger`        | `--log-level` flag, tracing output to stderr                    | tracing-subscriber |
-| `notifications` | Desktop notifications after each capture                        | notify-rust        |
-| `selector`      | `--geometry` flag, interactive region selection                 | libwaysip          |
-| `completions`   | `--completions <SHELL>` flag, generate shell completion scripts | clap_complete      |
+| Feature         | What it adds                                                    | Extra dependency          |
+| --------------- | --------------------------------------------------------------- | ------------------------- |
+| `jpeg`          | JPEG encoding (`--encoding` / `.jpg`)                           | via `image`               |
+| `pnm`           | PNM/PPM encoding (`--encoding` / `.ppm`)                        | via `image`               |
+| `qoi`           | QOI encoding (`--encoding` / `.qoi`)                            | via `image`               |
+| `webp`          | WebP encoding (`--encoding` / `.webp`)                          | via `image`               |
+| `avif`          | AVIF encoding (`--encoding` / `.avif`)                          | rav1e (via `image`)       |
+| `clipboard`     | `--clipboard` flag, copy to Wayland clipboard                   | wl-clipboard-rs           |
+| `color_picker`  | `--color` flag, freeze screen and pick a pixel color            | —                         |
+| `jxl`           | JPEG-XL encoding (`--encoding` / `.jxl`)                        | libjxl / `jpegxl-rs`      |
+| `logger`        | `--log-level` flag, tracing output to stderr                    | tracing-subscriber        |
+| `notifications` | Desktop notifications after each capture                        | notify-rust               |
+| `selector`      | `--geometry` flag, interactive region selection                 | libwaysip                 |
+| `completions`   | `--completions <SHELL>` flag, generate shell completion scripts | clap_complete (+ nushell) |
 
 ## Clipboard without the built-in feature
 

@@ -19,7 +19,25 @@ repository.workspace = true
 #
 #   cargo build --no-default-features --features clipboard
 #
-default = ["avif", "clipboard", "color_picker", "completions", "jxl", "logger", "notifications", "selector"]
+default = [
+	"jpeg",
+	"pnm",
+	"qoi",
+	"webp",
+	"avif",
+	"jxl",
+	"clipboard",
+	"color_picker",
+	"completions",
+	"logger",
+	"notifications",
+	"selector",
+]
+
+jpeg = ["image/jpeg"]
+pnm = ["image/pnm"]
+qoi = ["image/qoi"]
+webp = ["image/webp"]
 
 # Copies the screenshot to the Wayland clipboard via wl-clipboard-rs.
 # The image is served by a forked child process so it persists after wayshot exits.
@@ -74,13 +92,7 @@ clap = { version = "4.6", features = ["derive"] }
 clap_complete = { version = "4.6", optional = true }
 clap_complete_nushell = { version = "4.6", optional = true }
 
-image = { workspace = true, features = [
-	"jpeg",
-	"png",
-	"pnm",
-	"qoi",
-	"webp",
-] }
+image = { workspace = true, features = ["png"] }
 jpegxl-rs = { version = "0.14", optional = true }
 
 dialoguer = { version = "0.12", features = ["fuzzy-select"] }
