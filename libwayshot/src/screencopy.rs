@@ -7,7 +7,6 @@ use std::{
 use gbm::BufferObject;
 use image::{ColorType, DynamicImage, ImageBuffer, Pixel, Rgba};
 use memmap2::MmapMut;
-use r_egl_wayland::{EGL_INSTALCE, r_egl as egl};
 use rustix::{
     fs::{self, SealFlags},
     io, shm,
@@ -41,21 +40,6 @@ pub struct DMAFrameGuard {
 impl Drop for DMAFrameGuard {
     fn drop(&mut self) {
         self.buffer.destroy();
-    }
-}
-
-pub struct EGLImageGuard {
-    pub image: egl::Image,
-    pub(crate) egl_display: egl::Display,
-}
-
-impl Drop for EGLImageGuard {
-    fn drop(&mut self) {
-        EGL_INSTALCE
-            .destroy_image(self.egl_display, self.image)
-            .unwrap_or_else(|e| {
-                tracing::error!("EGLimage destruction had error: {e}");
-            });
     }
 }
 

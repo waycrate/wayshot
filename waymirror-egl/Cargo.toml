@@ -14,4 +14,4 @@ r-egl-wayland.workspace = true
 wayland-client.workspace = true
 wayland-egl = "0.32"
 wayland-protocols = { workspace = true, features = ["client"] }
-libwayshot.workspace = true
+libwayshot = { workspace = true, features = ["egl", "png"] }

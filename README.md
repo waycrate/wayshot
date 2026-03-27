@@ -17,7 +17,6 @@
 
 [xdg-desktop-portal-luminous](https://github.com/waycrate/xdg-desktop-portal-luminous) is a xdg-desktop-portal backend for wlroots based compositors, providing screenshot and screencast capabilities.
 
-
 # Some usage examples:
 
 NOTE: Read `man 7 wayshot` for more examples.
@@ -89,16 +88,17 @@ features can be selectively disabled:
 cargo build --no-default-features --features clipboard,logger,notifications
 ```
 
-| Feature        | What it adds                                          | Extra dependency      |
-|----------------|-------------------------------------------------------|-----------------------|
-| `avif`         | AVIF encoding (`--encoding avif`)                     | rav1e (via image)     |
-| `clipboard`    | `--clipboard` flag, copy to Wayland clipboard         | wl-clipboard-rs       |
-| `color_picker` | `--color` flag, freeze screen and pick a pixel color  | —                     |
-| `jxl`          | JPEG-XL encoding (`--encoding jxl`)                   | libjxl / jpegxl-rs    |
-| `logger`       | `--log-level` flag, tracing output to stderr          | tracing-subscriber    |
-| `notifications`| Desktop notifications after each capture              | notify-rust           |
-| `selector`     | `--geometry` flag, interactive region selection       | libwaysip             |
-| `completions`  | `--completions <SHELL>` flag, generate shell completion scripts | clap_complete |
+| Feature         | What it adds                                                    | Extra dependency   |
+| --------------- | --------------------------------------------------------------- | ------------------ |
+| `avif`          | AVIF encoding (`--encoding avif`)                               | rav1e (via image)  |
+| `clipboard`     | `--clipboard` flag, copy to Wayland clipboard                   | wl-clipboard-rs    |
+| `color_picker`  | `--color` flag, freeze screen and pick a pixel color            | —                  |
+| `egl`           | EGL/OpenGL GPU capture backend (DMA-BUF → EGLImage)             | gl, r-egl-wayland  |
+| `jxl`           | JPEG-XL encoding (`--encoding jxl`)                             | libjxl / jpegxl-rs |
+| `logger`        | `--log-level` flag, tracing output to stderr                    | tracing-subscriber |
+| `notifications` | Desktop notifications after each capture                        | notify-rust        |
+| `selector`      | `--geometry` flag, interactive region selection                 | libwaysip          |
+| `completions`   | `--completions <SHELL>` flag, generate shell completion scripts | clap_complete      |
 
 ## Clipboard without the built-in feature
 
@@ -118,18 +118,18 @@ Alternatively, set `stdout = true` in your config file to always write to stdout
 
 ## Compile time dependencies:
 
--   scdoc (If present, man-pages will be generated.)
--   rustup
--   make
--   pkg-config
--   libjxl _(optional — only needed when the `jxl` feature is enabled)_
+- scdoc (If present, man-pages will be generated.)
+- rustup
+- make
+- pkg-config
+- libjxl _(optional — only needed when the `jxl` feature is enabled)_
 
 ## Compiling:
 
--   `git clone https://github.com/waycrate/wayshot && cd wayshot`
--   `make setup`
--   `make`
--   `sudo make install`
+- `git clone https://github.com/waycrate/wayshot && cd wayshot`
+- `make setup`
+- `make`
+- `sudo make install`
 
 # Support:
 
