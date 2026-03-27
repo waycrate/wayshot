@@ -16,7 +16,7 @@ jobs:
                     - name: default
                       cargo_args: --workspace --release
                     - name: minimal
-                      cargo_args: --workspace --release --no-default-features --features "egl,png"
+                      cargo_args: --workspace --release --no-default-features
 
         name: ${{ matrix.name }}
         runs-on: ubuntu-latest
