@@ -19,7 +19,7 @@ repository.workspace = true
 #
 #   cargo build --no-default-features --features clipboard
 #
-default = ["avif", "clipboard", "color_picker", "completions", "egl", "jxl", "logger", "notifications", "selector"]
+default = ["avif", "clipboard", "color_picker", "completions", "jxl", "logger", "notifications", "selector"]
 
 # Copies the screenshot to the Wayland clipboard via wl-clipboard-rs.
 # The image is served by a forked child process so it persists after wayshot exits.
@@ -59,11 +59,6 @@ notifications = ["dep:notify-rust"]
 # Adds the --completions <SHELL> CLI flag for generating shell completion scripts.
 # Pulls in: clap_complete, clap_complete_nushell
 completions = ["dep:clap_complete", "dep:clap_complete_nushell"]
-
-# EGL/OpenGL capture backend (DMA-BUF → EGLImage → GL texture).
-# Required for capture_target_frame_eglimage and related APIs in libwayshot.
-# Pulls in: gl, r-egl-wayland (via libwayshot)
-egl = ["libwayshot/egl"]
 
 [build-dependencies]
 flate2 = "1.1"
