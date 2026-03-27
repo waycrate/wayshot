@@ -3,17 +3,17 @@
 name: check_typos
 
 on: # yamllint disable-line rule:truthy
-  push:
-  pull_request:
-    branches:
-      - "**"
+    push:
+    pull_request:
+        branches:
+            - "**"
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+    build:
+        runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v6
+        steps:
+            - uses: actions/checkout@v6
 
-      - name: typos-action
-        uses: crate-ci/typos@v1
+            - name: typos-action
+              uses: crate-ci/typos@v1

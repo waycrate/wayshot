@@ -6,7 +6,7 @@ env:
     CARGO_TERM_COLOR: always
 
 jobs:
-    fmt-clippy:
+    fmt:
         runs-on: ubuntu-latest
         container:
             image: archlinux:latest
@@ -17,17 +17,38 @@ jobs:
 
             - uses: dtolnay/rust-toolchain@stable
               with:
-                  components: clippy rustfmt
+                  components: rustfmt
+
+            - name: Check formatting
+              run: cargo fmt -- --check
+
+    clippy:
+        runs-on: ubuntu-latest
+        container:
+            image: archlinux:latest
+
+        strategy:
+            matrix:
+                features:
+                    - "--all-features"
+                    - "--no-default-features"
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: clippy
 
             - name: Build Cache
               uses: Swatinem/rust-cache@v2
+              with:
+                  key: ${{ matrix.features }}
 
             - name: Install wayland dependencies
               run: |
                   pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl
 
-            - name: Check formatting
-              run: cargo fmt -- --check
-
-            - name: Clippy check
-              run: cargo clippy --all-features -- -D warnings
+            - name: Clippy (${{ matrix.features }})
+              run: cargo clippy ${{ matrix.features }} -- -D warnings
