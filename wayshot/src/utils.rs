@@ -300,6 +300,13 @@ pub fn encode_image(
             jxl.get_encoder_speed(),
         ),
         EncodingFormat::Png => encode_to_png_bytes(image, png.get_compression(), png.get_filter()),
+        #[cfg(any(
+            feature = "jpeg",
+            feature = "pnm",
+            feature = "qoi",
+            feature = "webp",
+            feature = "avif"
+        ))]
         _ => {
             let mut buf = Cursor::new(Vec::new());
             image.write_to(&mut buf, encoding.into())?;
