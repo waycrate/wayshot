@@ -145,12 +145,7 @@ To build with a reduced set, use *--no-default-features* together with *--featur
 
 	cargo build --no-default-features --features clipboard,logger
 
-Available features: *avif*, *clipboard*, *color_picker*, *egl*, *jxl*, *logger*, *notifications*, *selector*
-
-*egl*
-	EGL/OpenGL GPU capture backend (DMA-BUF → EGLImage → GL texture). Enables zero-copy
-	screen capture via the GPU without pulling pixel data into CPU memory. Required for
-	the EGL capture APIs in libwayshot. Pulls in: gl, r-egl-wayland.
+Available features: *avif*, *clipboard*, *color_picker*, *completions*, *jxl*, *logger*, *notifications*, *selector*
 
 # SEE ALSO
 	- wayshot(5)
