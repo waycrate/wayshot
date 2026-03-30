@@ -876,8 +876,8 @@ impl WayshotConnection {
         // On copy the Ready / Failed events are fired by the frame object, so here we check for them.
         loop {
             // Basically reads, if frame state is not None then...
-            if let Some(state) = state.state {
-                match state {
+            if let Some(frame_state) = state.state {
+                match frame_state {
                     FrameState::Failed => {
                         tracing::error!("Frame copy failed");
                         return Err(Error::FramecopyFailed);
@@ -887,6 +887,7 @@ impl WayshotConnection {
                         return Err(Error::FramecopyFailedWithReason(reason));
                     }
                     FrameState::Finished => {
+                        event_queue.roundtrip(&mut state)?;
                         tracing::trace!("Frame copy finished");
                         return Ok(DMAFrameGuard {
                             buffer: dmabuf_wlbuf,
@@ -949,8 +950,8 @@ impl WayshotConnection {
         // On copy the Ready / Failed events are fired by the frame object, so here we check for them.
         loop {
             // Basically reads, if frame state is not None then...
-            if let Some(state) = state.state {
-                match state {
+            if let Some(frame_state) = state.state {
+                match frame_state {
                     FrameState::Failed => {
                         tracing::error!("Frame copy failed");
                         return Err(Error::FramecopyFailed);
@@ -960,8 +961,8 @@ impl WayshotConnection {
                         return Err(Error::FramecopyFailedWithReason(reason));
                     }
                     FrameState::Finished => {
+                        event_queue.roundtrip(&mut state)?;
                         tracing::trace!("Frame copy finished");
-
                         return Ok(DMAFrameGuard {
                             buffer: dmabuf_wlbuf,
                         });
@@ -1028,13 +1029,14 @@ impl WayshotConnection {
         // On copy the Ready / Failed events are fired by the frame object, so here we check for them.
         loop {
             // Basically reads, if frame state is not None then...
-            if let Some(state) = state.state {
-                match state {
+            if let Some(frame_state) = state.state {
+                match frame_state {
                     FrameState::Failed | FrameState::FailedWithReason(_) => {
                         tracing::error!("Frame copy failed");
                         return Err(Error::FramecopyFailed);
                     }
                     FrameState::Finished => {
+                        event_queue.roundtrip(&mut state)?;
                         tracing::trace!("Frame copy finished");
                         return Ok(FrameGuard {
                             buffer,
@@ -1087,8 +1089,8 @@ impl WayshotConnection {
         // On copy the Ready / Failed events are fired by the frame object, so here we check for them.
         loop {
             // Basically reads, if frame state is not None then...
-            if let Some(state) = state.state {
-                match state {
+            if let Some(frame_state) = state.state {
+                match frame_state {
                     FrameState::Failed => {
                         tracing::error!("Frame copy failed");
                         return Err(Error::FramecopyFailed);
@@ -1098,6 +1100,7 @@ impl WayshotConnection {
                         return Err(Error::FramecopyFailedWithReason(reason));
                     }
                     FrameState::Finished => {
+                        event_queue.roundtrip(&mut state)?;
                         tracing::trace!("Frame copy finished");
                         return Ok(FrameGuard {
                             buffer,
