@@ -1075,4 +1075,492 @@ mod dispatch_tests {
         assert!(state.formats.is_empty());
         assert!(state.dmabuf_formats.is_empty());
     }
+
+    #[test]
+    fn capture_frame_state_initial_state_is_none() {
+        let state = CaptureFrameState::new(false);
+        assert!(state.state.is_none());
+        assert!(state.toplevels.is_empty());
+    }
+
+    #[test]
+    fn frame_state_variants_and_equality() {
+        use crate::dispatch::FrameState;
+        use wayland_client::WEnum;
+        use wayland_protocols::ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason;
+
+        assert_eq!(FrameState::Failed, FrameState::Failed);
+        assert_eq!(FrameState::Finished, FrameState::Finished);
+        assert_ne!(FrameState::Failed, FrameState::Finished);
+
+        let reason = WEnum::<FailureReason>::Unknown(42);
+        let s1 = FrameState::FailedWithReason(reason);
+        let s2 = FrameState::FailedWithReason(WEnum::<FailureReason>::Unknown(42));
+        assert_eq!(s1, s2);
+        assert_ne!(s1, FrameState::Failed);
+    }
+}
+
+#[cfg(test)]
+mod screencopy_tests_ext {
+    use crate::region::{LogicalRegion, Size};
+    use crate::screencopy::{DMAFrameFormat, FrameCopy, FrameData, FrameFormat, create_shm_fd};
+    use image::ColorType;
+    use memmap2::MmapOptions;
+    use wayland_client::protocol::{wl_output, wl_shm};
+
+    fn make_frame_copy(
+        format: wl_shm::Format,
+        width: u32,
+        height: u32,
+        color_converted: bool,
+    ) -> FrameCopy {
+        let stride = width * 4;
+        let len = (stride * height) as usize;
+        let mmap = MmapOptions::new().len(len).map_anon().unwrap();
+        FrameCopy {
+            frame_format: FrameFormat {
+                format,
+                size: Size { width, height },
+                stride,
+            },
+            frame_color_type: ColorType::Rgba8,
+            frame_data: FrameData::Mmap(mmap),
+            transform: wl_output::Transform::Normal,
+            logical_region: LogicalRegion::default(),
+            physical_size: Size { width, height },
+            color_converted,
+        }
+    }
+
+    #[test]
+    fn dma_frame_format_fields() {
+        let fmt = DMAFrameFormat {
+            format: 0x34325241, // AR24
+            size: Size {
+                width: 1920,
+                height: 1080,
+            },
+        };
+        assert_eq!(fmt.format, 0x34325241);
+        assert_eq!(fmt.size.width, 1920);
+        assert_eq!(fmt.size.height, 1080);
+    }
+
+    #[test]
+    fn frame_copy_convert_color_already_converted_is_idempotent() {
+        let mut fc = make_frame_copy(wl_shm::Format::Argb8888, 4, 4, true);
+        let result = fc.convert_color_inplace();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ColorType::Rgba8);
+    }
+
+    #[test]
+    fn frame_copy_convert_color_supported_format_succeeds() {
+        let mut fc = make_frame_copy(wl_shm::Format::Argb8888, 4, 4, false);
+        let result = fc.convert_color_inplace();
+        assert!(result.is_ok());
+        assert!(fc.color_converted);
+    }
+
+    #[test]
+    fn frame_copy_convert_color_unsupported_format_errors() {
+        let stride = 4 * 4;
+        let mmap = MmapOptions::new().len(stride * 4).map_anon().unwrap();
+        let mut fc = FrameCopy {
+            frame_format: FrameFormat {
+                format: wl_shm::Format::Argb2101010, // unsupported
+                size: Size {
+                    width: 4,
+                    height: 4,
+                },
+                stride: stride as u32,
+            },
+            frame_color_type: ColorType::Rgba8,
+            frame_data: FrameData::Mmap(mmap),
+            transform: wl_output::Transform::Normal,
+            logical_region: LogicalRegion::default(),
+            physical_size: Size {
+                width: 4,
+                height: 4,
+            },
+            color_converted: false,
+        };
+        assert!(fc.convert_color_inplace().is_err());
+    }
+
+    #[test]
+    fn frame_copy_try_from_rgba8_produces_image() {
+        use image::DynamicImage;
+        let fc = make_frame_copy(wl_shm::Format::Xbgr8888, 2, 2, false);
+        // color_converted=false but frame_color_type=Rgba8 and format is ConvertNone
+        // TryFrom uses frame_color_type, not format
+        let result = DynamicImage::try_from(&fc);
+        assert!(result.is_ok());
+        let img = result.unwrap();
+        assert_eq!(img.width(), 2);
+        assert_eq!(img.height(), 2);
+    }
+
+    #[test]
+    fn frame_copy_try_from_invalid_color_type_errors() {
+        use image::DynamicImage;
+        let stride = 4 * 4;
+        let mmap = MmapOptions::new().len(stride * 4).map_anon().unwrap();
+        let fc = FrameCopy {
+            frame_format: FrameFormat {
+                format: wl_shm::Format::Xbgr8888,
+                size: Size {
+                    width: 4,
+                    height: 4,
+                },
+                stride: stride as u32,
+            },
+            frame_color_type: ColorType::L8, // unsupported
+            frame_data: FrameData::Mmap(mmap),
+            transform: wl_output::Transform::Normal,
+            logical_region: LogicalRegion::default(),
+            physical_size: Size {
+                width: 4,
+                height: 4,
+            },
+            color_converted: false,
+        };
+        assert!(DynamicImage::try_from(&fc).is_err());
+    }
+
+    #[test]
+    fn frame_copy_get_image_succeeds_for_supported_format() {
+        let mut fc = make_frame_copy(wl_shm::Format::Abgr8888, 4, 4, false);
+        let result = fc.get_image();
+        assert!(result.is_ok());
+        let img = result.unwrap();
+        assert_eq!(img.width(), 4);
+        assert_eq!(img.height(), 4);
+    }
+
+    #[test]
+    fn frame_copy_into_mmap_rgba_image_buffer_succeeds() {
+        let fc = make_frame_copy(wl_shm::Format::Xbgr8888, 4, 4, false);
+        // frame_color_type is Rgba8, so this should succeed
+        let result = fc.into_mmap_rgba_image_buffer();
+        assert!(result.is_ok());
+        let buf = result.unwrap();
+        assert_eq!(buf.width(), 4);
+        assert_eq!(buf.height(), 4);
+    }
+
+    #[test]
+    fn frame_copy_into_mmap_rgba_image_buffer_fails_for_non_rgba8() {
+        let stride = 4 * 3;
+        let mmap = MmapOptions::new().len(stride * 4).map_anon().unwrap();
+        let fc = FrameCopy {
+            frame_format: FrameFormat {
+                format: wl_shm::Format::Bgr888,
+                size: Size {
+                    width: 4,
+                    height: 4,
+                },
+                stride: stride as u32,
+            },
+            frame_color_type: ColorType::Rgb8,
+            frame_data: FrameData::Mmap(mmap),
+            transform: wl_output::Transform::Normal,
+            logical_region: LogicalRegion::default(),
+            physical_size: Size {
+                width: 4,
+                height: 4,
+            },
+            color_converted: true,
+        };
+        assert!(fc.into_mmap_rgba_image_buffer().is_err());
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    #[test]
+    fn create_shm_fd_returns_valid_fd() {
+        let result = create_shm_fd();
+        assert!(result.is_ok());
+    }
+}
+
+#[cfg(test)]
+mod convert_tests_ext {
+    use crate::convert::create_converter;
+
+    #[test]
+    fn convert_bgr10_black_pixel_gives_black_output() {
+        let converter =
+            create_converter(wayland_client::protocol::wl_shm::Format::Abgr2101010).unwrap();
+        // All-zero pixel: R=0, G=0, B=0, A=0
+        let mut data = vec![0x00u8, 0x00, 0x00, 0x00];
+        converter.convert_inplace(&mut data);
+        assert_eq!(data[0], 0); // B
+        assert_eq!(data[1], 0); // G
+        assert_eq!(data[2], 0); // R
+        assert_eq!(data[3], 255); // A always 255
+    }
+
+    #[test]
+    fn convert_bgr10_max_alpha_does_not_affect_output_alpha() {
+        let converter =
+            create_converter(wayland_client::protocol::wl_shm::Format::Xbgr2101010).unwrap();
+        // Full alpha (top 2 bits), zero RGB
+        let mut data = vec![0x00u8, 0x00, 0x00, 0xC0];
+        converter.convert_inplace(&mut data);
+        assert_eq!(data[3], 255); // alpha is always forced to 255
+    }
+
+    #[test]
+    fn convert_rgb8_empty_data_no_panic() {
+        let converter =
+            create_converter(wayland_client::protocol::wl_shm::Format::Argb8888).unwrap();
+        let mut data: Vec<u8> = vec![];
+        converter.convert_inplace(&mut data); // should not panic
+        assert!(data.is_empty());
+    }
+
+    #[test]
+    fn convert_none_empty_data_no_panic() {
+        let converter =
+            create_converter(wayland_client::protocol::wl_shm::Format::Xbgr8888).unwrap();
+        let mut data: Vec<u8> = vec![];
+        converter.convert_inplace(&mut data);
+        assert!(data.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod image_util_tests_ext {
+    use crate::image_util::{prepare_mmap_rgba_image, rotate_image_buffer};
+    use crate::region::Size;
+    use image::{DynamicImage, ImageBuffer, Rgba, RgbaImage};
+    use memmap2::MmapOptions;
+    use wayland_client::protocol::wl_output::Transform;
+
+    fn make_image(w: u32, h: u32) -> DynamicImage {
+        let buf: RgbaImage =
+            ImageBuffer::from_raw(w, h, (0..w * h * 4).map(|i| i as u8).collect()).unwrap();
+        DynamicImage::ImageRgba8(buf)
+    }
+
+    fn make_mmap_image(w: u32, h: u32) -> ImageBuffer<Rgba<u8>, memmap2::MmapMut> {
+        let len = (w * h * 4) as usize;
+        let mmap = MmapOptions::new().len(len).map_anon().unwrap();
+        ImageBuffer::from_raw(w, h, mmap).unwrap()
+    }
+
+    #[test]
+    fn rotate_image_buffer_flipped90_swaps_dimensions() {
+        let image = make_image(10, 20);
+        let logical_size = Size {
+            width: 20,
+            height: 10,
+        };
+        let out = rotate_image_buffer(image, Transform::Flipped90, logical_size, 1.0);
+        assert_eq!(out.width(), 20);
+        assert_eq!(out.height(), 10);
+    }
+
+    #[test]
+    fn rotate_image_buffer_flipped180_same_dimensions() {
+        let image = make_image(8, 6);
+        let logical_size = Size {
+            width: 8,
+            height: 6,
+        };
+        let out = rotate_image_buffer(image, Transform::Flipped180, logical_size, 1.0);
+        assert_eq!(out.width(), 8);
+        assert_eq!(out.height(), 6);
+    }
+
+    #[test]
+    fn rotate_image_buffer_flipped270_swaps_dimensions() {
+        let image = make_image(10, 20);
+        let logical_size = Size {
+            width: 20,
+            height: 10,
+        };
+        let out = rotate_image_buffer(image, Transform::Flipped270, logical_size, 1.0);
+        assert_eq!(out.width(), 20);
+        assert_eq!(out.height(), 10);
+    }
+
+    #[test]
+    fn rotate_image_buffer_scales_up_when_scale_ratio_exceeds_current() {
+        // Image is 10x10, logical_size is 10x10, but max_scale=2.0 means we expect upscaling
+        let image = make_image(10, 10);
+        let logical_size = Size {
+            width: 10,
+            height: 10,
+        };
+        let out = rotate_image_buffer(image, Transform::_90, logical_size, 2.0);
+        // After _90 rotation: 10x10 stays 10x10
+        // scale = 10/10 = 1.0, scaling_left = 2.0/1.0 = 2.0 > 1.0 → scale up to 20x20
+        assert_eq!(out.width(), 20);
+        assert_eq!(out.height(), 20);
+    }
+
+    #[test]
+    fn prepare_mmap_rgba_image_normal_no_scale_returns_mmap_variant() {
+        use crate::image_util::PreparedImage;
+        let image = make_mmap_image(10, 10);
+        let logical_size = Size {
+            width: 10,
+            height: 10,
+        };
+        let result = prepare_mmap_rgba_image(image, Transform::Normal, logical_size, 1.0);
+        assert!(matches!(result, PreparedImage::RgbaMmap(_)));
+    }
+
+    #[test]
+    fn prepare_mmap_rgba_image_normal_with_scale_returns_dynamic_variant() {
+        use crate::image_util::PreparedImage;
+        let image = make_mmap_image(10, 10);
+        // max_scale=2.0, current image scale=1.0 → scaling_left=2.0 → needs resize
+        let logical_size = Size {
+            width: 10,
+            height: 10,
+        };
+        let result = prepare_mmap_rgba_image(image, Transform::Normal, logical_size, 2.0);
+        assert!(matches!(result, PreparedImage::Dynamic(_)));
+    }
+
+    #[test]
+    fn prepare_mmap_rgba_image_rotated_90_returns_dynamic_variant() {
+        use crate::image_util::PreparedImage;
+        let image = make_mmap_image(10, 20);
+        // After _90 rotation width becomes 20, logical_size.width=20 → scale=1.0
+        let logical_size = Size {
+            width: 20,
+            height: 10,
+        };
+        let result = prepare_mmap_rgba_image(image, Transform::_90, logical_size, 1.0);
+        assert!(matches!(result, PreparedImage::Dynamic(_)));
+    }
+
+    #[test]
+    fn prepare_mmap_rgba_image_flipped_returns_dynamic_variant() {
+        use crate::image_util::PreparedImage;
+        let image = make_mmap_image(8, 6);
+        let logical_size = Size {
+            width: 8,
+            height: 6,
+        };
+        let result = prepare_mmap_rgba_image(image, Transform::Flipped, logical_size, 1.0);
+        assert!(matches!(result, PreparedImage::Dynamic(_)));
+    }
+}
+
+#[cfg(all(test, unix))]
+mod region_tests_ext {
+    use crate::region::TopLevel;
+    use std::os::unix::net::UnixStream;
+    use wayland_backend::client::Backend;
+    use wayland_client::Proxy;
+    use wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1;
+
+    fn dummy_toplevel_handle() -> ExtForeignToplevelHandleV1 {
+        let (client, server) = UnixStream::pair().expect("unix stream");
+        Box::leak(Box::new(server));
+        let backend = Backend::connect(client).expect("backend");
+        let weak = backend.downgrade();
+        Box::leak(Box::new(backend));
+        ExtForeignToplevelHandleV1::inert(weak)
+    }
+
+    #[test]
+    fn toplevel_id_and_title_formats_app_id_and_title() {
+        let handle = dummy_toplevel_handle();
+        let mut toplevel = TopLevel::new(handle);
+        toplevel.app_id = "com.example.myapp".to_string();
+        toplevel.title = "My App Window".to_string();
+        assert_eq!(toplevel.id_and_title(), "com.example.myapp My App Window");
+    }
+
+    #[test]
+    fn toplevel_new_has_empty_fields_and_active_true() {
+        let handle = dummy_toplevel_handle();
+        let toplevel = TopLevel::new(handle);
+        assert!(toplevel.title.is_empty());
+        assert!(toplevel.app_id.is_empty());
+        assert!(toplevel.identifier.is_empty());
+        assert!(toplevel.active);
+    }
+
+    #[test]
+    fn toplevel_id_and_title_empty_fields() {
+        let handle = dummy_toplevel_handle();
+        let toplevel = TopLevel::new(handle);
+        assert_eq!(toplevel.id_and_title(), " ");
+    }
+
+    #[test]
+    fn toplevel_as_ref_returns_handle() {
+        use std::mem;
+        let handle = dummy_toplevel_handle();
+        let toplevel = TopLevel::new(handle);
+        let handle_ref: &ExtForeignToplevelHandleV1 = toplevel.as_ref();
+        assert!(std::ptr::eq(handle_ref, &toplevel.handle));
+        mem::forget(toplevel);
+    }
+}
+
+#[cfg(all(test, unix))]
+mod lib_tests {
+    use crate::WayshotTarget;
+    use crate::region::TopLevel;
+    use std::mem;
+    use std::os::unix::net::UnixStream;
+    use wayland_backend::client::Backend;
+    use wayland_client::Proxy;
+    use wayland_client::protocol::wl_output::WlOutput;
+    use wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1;
+
+    fn inert_wl_output() -> WlOutput {
+        let (client, server) = UnixStream::pair().expect("unix stream");
+        Box::leak(Box::new(server));
+        let backend = Backend::connect(client).expect("backend");
+        let weak = backend.downgrade();
+        Box::leak(Box::new(backend));
+        WlOutput::inert(weak)
+    }
+
+    fn inert_toplevel_handle() -> ExtForeignToplevelHandleV1 {
+        let (client, server) = UnixStream::pair().expect("unix stream");
+        Box::leak(Box::new(server));
+        let backend = Backend::connect(client).expect("backend");
+        let weak = backend.downgrade();
+        Box::leak(Box::new(backend));
+        ExtForeignToplevelHandleV1::inert(weak)
+    }
+
+    #[test]
+    fn wayshot_target_screen_is_not_alive_when_inert() {
+        let output = inert_wl_output();
+        let target = WayshotTarget::Screen(output);
+        // Inert objects are not alive
+        assert!(!target.is_alive());
+        mem::forget(target);
+    }
+
+    #[test]
+    fn wayshot_target_toplevel_is_not_alive_when_inert() {
+        let handle = inert_toplevel_handle();
+        let target = WayshotTarget::Toplevel(handle);
+        assert!(!target.is_alive());
+        mem::forget(target);
+    }
+
+    #[test]
+    fn wayshot_target_from_toplevel() {
+        let handle = inert_toplevel_handle();
+        let toplevel = TopLevel::new(handle);
+        let target = WayshotTarget::from(toplevel);
+        match target {
+            WayshotTarget::Toplevel(_) => {}
+            _ => panic!("expected WayshotTarget::Toplevel"),
+        }
+        mem::forget(target);
+    }
 }
