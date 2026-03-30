@@ -66,6 +66,7 @@ impl WayshotConnection {
     /// This will run once to get the device provided by ext-image-copy. If you did not init the
     /// dmabuf at the first, you can try to use this way to init one
     pub fn try_init_dmabuf(&mut self, target: WayshotTarget) -> Result<()> {
+        self.find_dmabuf = true;
         if self.dmabuf_state.is_some() {
             return Ok(());
         }

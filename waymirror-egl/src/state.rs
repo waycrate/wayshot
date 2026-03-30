@@ -129,12 +129,9 @@ impl WaylandEGLState {
             Some(egl_context),
         )?;
 
-        let wayshot = WayshotConnection::from_connection_with_dmabuf(
-            server_connection,
-            "/dev/dri/renderD128",
-        )
-        .unwrap();
+        let mut wayshot = WayshotConnection::from_connection(server_connection).unwrap();
         let target = WayshotTarget::Screen(wayshot.get_all_outputs()[0].wl_output.clone());
+        wayshot.try_init_dmabuf(target.clone()).unwrap();
         let cast = init_cast(&wayshot, target, 0, egl_display);
         Ok((
             Self {
