@@ -7,6 +7,22 @@ use wayland_client::protocol::wl_output::Transform;
 
 use crate::region::Size;
 
+/// When we still need to upscale this much to align with the composite (`scaling_left` > 1),
+/// prefer a stronger filter — e.g. mixed-DPI layouts with a large correction factor.
+const SCALING_LEFT_THRESHOLD: f64 = 2.0;
+
+fn resize_filter_for_scale(max_scale: f64, scaling_left: f64) -> FilterType {
+    if scaling_left >= SCALING_LEFT_THRESHOLD {
+        return FilterType::Lanczos3;
+    }
+    let is_integer_dpi = (max_scale - max_scale.round()).abs() < 1e-3;
+    if is_integer_dpi {
+        FilterType::Triangle
+    } else {
+        FilterType::CatmullRom
+    }
+}
+
 pub(crate) enum PreparedImage {
     Dynamic(DynamicImage),
     RgbaMmap(ImageBuffer<Rgba<u8>, MmapMut>),
@@ -75,8 +91,9 @@ pub(crate) fn rotate_image_buffer(
 
     let new_width = (rotated_image.width() as f64 * scaling_left).round() as u32;
     let new_height = (rotated_image.height() as f64 * scaling_left).round() as u32;
-    tracing::debug!("Resizing image to {new_width}x{new_height}");
-    image::imageops::resize(&rotated_image, new_width, new_height, FilterType::Gaussian).into()
+    let filter = resize_filter_for_scale(max_scale, scaling_left);
+    tracing::debug!("Resizing image to {new_width}x{new_height} with {filter:?}");
+    image::imageops::resize(&rotated_image, new_width, new_height, filter).into()
 }
 
 #[tracing::instrument(skip(image))]
@@ -101,9 +118,10 @@ pub(crate) fn prepare_mmap_rgba_image(
 
         let new_width = (image.width() as f64 * scaling_left).round() as u32;
         let new_height = (image.height() as f64 * scaling_left).round() as u32;
-        tracing::debug!("Resizing image to {new_width}x{new_height}");
+        let filter = resize_filter_for_scale(max_scale, scaling_left);
+        tracing::debug!("Resizing image to {new_width}x{new_height} with {filter:?}");
         return PreparedImage::Dynamic(
-            image::imageops::resize(&image, new_width, new_height, FilterType::Gaussian).into(),
+            image::imageops::resize(&image, new_width, new_height, filter).into(),
         );
     }
 
@@ -134,8 +152,9 @@ pub(crate) fn prepare_mmap_rgba_image(
 
     let new_width = (rotated_image.width() as f64 * scaling_left).round() as u32;
     let new_height = (rotated_image.height() as f64 * scaling_left).round() as u32;
-    tracing::debug!("Resizing image to {new_width}x{new_height}");
+    let filter = resize_filter_for_scale(max_scale, scaling_left);
+    tracing::debug!("Resizing image to {new_width}x{new_height} with {filter:?}");
     PreparedImage::Dynamic(
-        image::imageops::resize(&rotated_image, new_width, new_height, FilterType::Gaussian).into(),
+        image::imageops::resize(&rotated_image, new_width, new_height, filter).into(),
     )
 }
