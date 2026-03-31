@@ -16,9 +16,11 @@ pub enum ShotResult {
 
 /// How the screenshot target is determined.
 pub enum CaptureMode {
-    /// Interactive area/region selection via waysip.
+    /// Interactive area/region selection via libwaysip.
     #[cfg(feature = "selector")]
     Geometry,
+    /// A fixed region parsed from a slurp/waysip geometry string.
+    GeometryRegion(libwayshot::LogicalRegion),
     /// A specific toplevel window by its id+title string.
     Toplevel(String),
     /// Interactive fuzzy-select from active toplevel windows.
@@ -42,6 +44,10 @@ pub fn capture(
     match mode {
         #[cfg(feature = "selector")]
         CaptureMode::Geometry => capture_geometry(conn, cursor, freeze),
+        CaptureMode::GeometryRegion(region) => {
+            let image = conn.screenshot(*region, cursor)?;
+            Ok((image, ShotResult::Area))
+        }
         CaptureMode::Toplevel(name) => capture_toplevel_by_name(conn, name, cursor),
         CaptureMode::ChooseToplevel => capture_toplevel_interactive(conn, cursor),
         CaptureMode::Output(name) => capture_output_by_name(conn, name, cursor),
