@@ -153,9 +153,28 @@ impl AppSettings {
     }
 
     fn resolve_capture_mode(cli: &Cli, output: Option<String>) -> CaptureMode {
-        #[cfg(feature = "selector")]
-        if cli.geometry {
-            return CaptureMode::Geometry;
+        if let Some(geometry) = &cli.geometry {
+            match geometry {
+                Some(s) if !s.trim().is_empty() => match utils::parse_slurp_geometry(s) {
+                    Ok(region) => return CaptureMode::GeometryRegion(region),
+                    Err(e) => {
+                        tracing::error!("invalid geometry: {e}");
+                        std::process::exit(1);
+                    }
+                },
+                Some(_) | None => {
+                    #[cfg(feature = "selector")]
+                    return CaptureMode::Geometry;
+                    #[cfg(not(feature = "selector"))]
+                    {
+                        tracing::error!(
+                            "interactive geometry selection requires the selector feature; \
+                             provide a geometry string instead, e.g. wayshot -g \"$(slurp)\""
+                        );
+                        std::process::exit(1);
+                    }
+                }
+            }
         }
         if let Some(ref name) = cli.toplevel {
             CaptureMode::Toplevel(name.clone())
