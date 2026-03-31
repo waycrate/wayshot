@@ -25,10 +25,18 @@ NOTE: Read `man 5 wayshot` for [config file](./config.toml) information.
 
 NOTE: Read `man wayshot` for flag information.
 
-Screenshot and crop region:
+Interactively select a region to capture (requires `selector` feature):
 
 ```bash
 wayshot -g
+```
+
+Capture a region using a geometry string (compatible with `slurp`/`waysip`):
+
+```bash
+wayshot FILE -g "$(slurp)"
+# or with a literal geometry string:
+wayshot -g "783,746 177x251"
 ```
 
 Fullscreen:
