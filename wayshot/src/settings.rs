@@ -164,7 +164,10 @@ impl AppSettings {
                 },
                 Some(_) | None => {
                     #[cfg(feature = "selector")]
-                    return CaptureMode::Geometry;
+                    return CaptureMode::Geometry {
+                        foreground_color: cli.geometry_foreground_color.clone(),
+                        background_color: cli.geometry_background_color.clone(),
+                    };
                     #[cfg(not(feature = "selector"))]
                     {
                         tracing::error!(

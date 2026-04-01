@@ -50,6 +50,8 @@ pub struct Base {
     pub stdout: Option<bool>,
     pub log_level: Option<String>,
     pub notifications: Option<bool>,
+    pub geometry_foreground_color: Option<String>,
+    pub geometry_background_color: Option<String>,
 }
 
 impl Default for Base {
@@ -64,6 +66,8 @@ impl Default for Base {
             stdout: Some(false),
             log_level: Some("info".to_string()),
             notifications: Some(true),
+            geometry_foreground_color: None,
+            geometry_background_color: None,
         }
     }
 }

@@ -134,10 +134,27 @@ pub fn waysip_to_region(
     })
 }
 
+#[cfg(feature = "selector")]
+fn color_from_hex(rgba_hex: String) -> Result<libwaysip::Color, String> {
+    libwaysip::Color::hex_to_color(rgba_hex.clone())
+        .map_err(|e| format!("Failed to parse color \"{rgba_hex}\" as rgba hex: {e}"))
+}
+
 /// Run WaySip area selection and return the chosen region. Used for both freeze and live paths.
 #[cfg(feature = "selector")]
-pub fn get_region_area(conn: &libwayshot::WayshotConnection) -> Result<LogicalRegion, String> {
-    let info = libwaysip::WaySip::new()
+pub fn get_region_area(
+    conn: &libwayshot::WayshotConnection,
+    foreground_color: Option<String>,
+    background_color: Option<String>,
+) -> Result<LogicalRegion, String> {
+    let mut info = libwaysip::WaySip::new();
+    if let Some(color) = foreground_color {
+        info = info.with_border_text_color(color_from_hex(color)?);
+    }
+    if let Some(color) = background_color {
+        info = info.with_background_color(color_from_hex(color)?);
+    }
+    let info = info
         .with_connection(conn.conn.clone())
         .with_selection_type(libwaysip::SelectionType::Area)
         .get()
