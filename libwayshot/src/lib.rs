@@ -1125,7 +1125,7 @@ impl WayshotConnection {
     ) -> Result<(FrameCopy, FrameGuard)> {
         // Create an in memory file and return it's file descriptor.
         let fd = create_shm_fd()?;
-        // Create a writeable memory map backed by a mem_file.
+        // Create a writable memory map backed by a mem_file.
         let mem_file = File::from(fd);
 
         let (frame_format, frame_guard) = self.capture_output_frame_shm_from_file(
