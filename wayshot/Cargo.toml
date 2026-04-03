@@ -71,8 +71,8 @@ logger = ["dep:tracing-subscriber"]
 
 # Sends a desktop notification (via D-Bus / libnotify) after each capture.
 # Disable removes the --silent CLI flag.
-# Pulls in: notify-rust
-notifications = ["dep:notify-rust"]
+# Pulls in: notify-rust, rustix
+notifications = ["dep:notify-rust", "dep:rustix"]
 
 # Adds the --completions <SHELL> CLI flag for generating shell completion scripts.
 # Pulls in: clap_complete, clap_complete_nushell
