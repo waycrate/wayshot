@@ -94,7 +94,11 @@ fn main() -> Result<()> {
 
                     #[cfg(feature = "notifications")]
                     if settings.notifications {
-                        notification::send_success(&shot_result, settings.file.as_deref());
+                        notification::send_success(
+                            &shot_result,
+                            settings.file.as_deref(),
+                            &settings.notification_action,
+                        );
                     }
                     // Silence unused warning when the notifications feature is disabled.
                     #[cfg(not(feature = "notifications"))]

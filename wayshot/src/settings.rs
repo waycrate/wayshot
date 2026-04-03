@@ -51,6 +51,8 @@ pub(crate) struct AppSettings {
     pub(crate) clipboard: bool,
     #[cfg(feature = "notifications")]
     pub(crate) notifications: bool,
+    #[cfg(feature = "notifications")]
+    pub(crate) notification_action: String,
 }
 
 impl AppSettings {
@@ -149,6 +151,12 @@ impl AppSettings {
             clipboard: cli.clipboard || base.clipboard.unwrap_or_default(),
             #[cfg(feature = "notifications")]
             notifications: !cli.silent && base.notifications.unwrap_or(true),
+            #[cfg(feature = "notifications")]
+            notification_action: config
+                .notification
+                .as_ref()
+                .map(|n| n.get_action().to_string())
+                .unwrap_or_else(|| "xdg-open %dir_path%".to_string()),
         }
     }
 

@@ -10,7 +10,7 @@ use crate::screenshot::ShotResult;
 
 const TIMEOUT_MS: i32 = 5000;
 
-pub fn send_success(result: &ShotResult, saved_location: Option<&Path>) {
+pub fn send_success(result: &ShotResult, saved_location: Option<&Path>, action_command: &str) {
     let body = match result {
         ShotResult::Output { name } => format!("Screenshot of output '{name}' saved"),
         ShotResult::Toplevel { name } => format!("Screenshot of toplevel '{name}' saved"),
@@ -25,6 +25,16 @@ pub fn send_success(result: &ShotResult, saved_location: Option<&Path>) {
         .timeout(TIMEOUT_MS);
 
     if let Some(path) = saved_location {
+        let dir_path = path
+            .parent()
+            .unwrap_or(Path::new("."))
+            .to_string_lossy()
+            .to_string();
+        let file_path = path.to_string_lossy().to_string();
+        let resolved_command = action_command
+            .replace("%dir_path%", &dir_path)
+            .replace("%file_path%", &file_path);
+
         notification.body(&format!("{body}\nClick to see location"));
         notification.action("open_location", "Open Folder");
         notification.action("default", "Open Folder");
@@ -34,12 +44,14 @@ pub fn send_success(result: &ShotResult, saved_location: Option<&Path>) {
                 if let Ok(handle) = notification.show() {
                     handle.wait_for_action(|action| {
                         if action == "open_location" || action == "default" {
-                            let parent = path.parent().unwrap_or(Path::new("."));
-                            let _ = Command::new("xdg-open")
-                                .arg(parent)
-                                .stdout(std::process::Stdio::null())
-                                .stderr(std::process::Stdio::null())
-                                .spawn();
+                            let parts: Vec<&str> = resolved_command.split_whitespace().collect();
+                            if let Some((program, args)) = parts.split_first() {
+                                let _ = Command::new(program)
+                                    .args(args)
+                                    .stdout(std::process::Stdio::null())
+                                    .stderr(std::process::Stdio::null())
+                                    .spawn();
+                            }
                         }
                     });
                 }

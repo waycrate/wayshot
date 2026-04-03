@@ -11,6 +11,7 @@ pub struct Config {
     pub base: Option<Base>,
     pub file: Option<File>,
     pub encoding: Option<Encoding>,
+    pub notification: Option<NotificationConfig>,
 }
 
 impl Default for Config {
@@ -19,6 +20,7 @@ impl Default for Config {
             base: Some(Base::default()),
             file: Some(File::default()),
             encoding: Some(Encoding::default()),
+            notification: Some(NotificationConfig::default()),
         }
     }
 }
@@ -220,5 +222,29 @@ impl Png {
             "adaptive" => image::codecs::png::FilterType::Adaptive,
             _ => image::codecs::png::FilterType::Adaptive,
         }
+    }
+}
+
+const DEFAULT_NOTIFICATION_ACTION: &str = "xdg-open %dir_path%";
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NotificationConfig {
+    /// Shell command to run when the notification is clicked.
+    pub action: Option<String>,
+}
+
+impl Default for NotificationConfig {
+    fn default() -> Self {
+        NotificationConfig {
+            action: Some(DEFAULT_NOTIFICATION_ACTION.to_string()),
+        }
+    }
+}
+
+impl NotificationConfig {
+    pub fn get_action(&self) -> &str {
+        self.action
+            .as_deref()
+            .unwrap_or(DEFAULT_NOTIFICATION_ACTION)
     }
 }
