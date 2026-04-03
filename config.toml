@@ -76,3 +76,11 @@ distance = 1
 # For lossless, generally it will produce smaller files.
 # For lossy, higher effort should more accurately reach the target quality.
 effort = 7
+
+[notification]
+# Command to run when the notification is clicked.
+# Available placeholders:
+#   %dir_path%  - parent directory of the saved screenshot
+#   %file_path% - full path to the saved screenshot file
+# Default: "xdg-open %dir_path%"
+# action = "xdg-open %dir_path%"

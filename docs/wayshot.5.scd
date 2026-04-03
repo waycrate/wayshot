@@ -222,6 +222,27 @@ This section documents the *[file]* table of the configuration file
 
 	Default: _7_
 
+# NOTIFICATION
+
+This section documents the *[notification]* table of the configuration file.
+
+_Requires the_ *notifications* _feature (enabled by default)._
+
+*action* = _"<string>"_
+
+	Command to execute when the user clicks the notification.
+	The following placeholders are substituted at runtime:
+
+	- _%dir_path%_: Parent directory of the saved screenshot file.
+	- _%file_path%_: Full path to the saved screenshot file.
+
+	Examples:
+		- action = "xdg-open %dir_path%" -> opens the folder containing the screenshot
+		- action = "xdg-open %file_path%" -> opens the screenshot file directly
+		- action = "my-viewer %file_path%" -> opens the file with a custom viewer
+
+	Default: _"xdg-open %dir_path%"_
+
 # SEE ALSO
 	- wayshot(1)
 	- wayshot(7)

@@ -241,6 +241,7 @@ impl Default for NotificationConfig {
     }
 }
 
+#[cfg(feature = "notifications")]
 impl NotificationConfig {
     pub fn get_action(&self) -> &str {
         self.action
