@@ -29,14 +29,14 @@ Interactively select a region to capture (requires `selector` feature):
 
 ```bash
 wayshot -g
+# optionally, with custom background/foreground colors:
+wayshot FILE -g --geometry-background-color 00000050 --geometry-foreground-color ffffffff
 ```
 
 Capture a region using a geometry string (compatible with `slurp`/`waysip`):
 
 ```bash
 wayshot FILE -g "$(slurp)"
-# optionally, with custom background/foreground colors:
-wayshot FILE -g "$(slurp)" --geometry-background-color 00000050 --geometry-foreground-color ffffffff
 # or with a literal geometry string:
 wayshot -g "783,746 177x251"
 ```
