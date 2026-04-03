@@ -10,6 +10,7 @@ use tracing::Level;
 pub struct Config {
     pub base: Option<Base>,
     pub file: Option<File>,
+    pub geometry: Option<Geometry>,
     pub encoding: Option<Encoding>,
 }
 
@@ -18,6 +19,7 @@ impl Default for Config {
         Config {
             base: Some(Base::default()),
             file: Some(File::default()),
+            geometry: Some(Geometry::default()),
             encoding: Some(Encoding::default()),
         }
     }
@@ -101,6 +103,21 @@ impl Default for File {
             path: Some(env::current_dir().unwrap_or_default()),
             name_format: Some("wayshot-%Y_%m_%d-%H_%M_%S".to_string()),
             encoding: Some(EncodingFormat::default()),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Geometry {
+    pub foreground_color: Option<String>,
+    pub background_color: Option<String>,
+}
+
+impl Default for Geometry {
+    fn default() -> Self {
+        Geometry {
+            foreground_color: Some("#000000ff".to_string()),
+            background_color: Some("#66666680".to_string()),
         }
     }
 }

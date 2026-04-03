@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf};
 
 use crate::cli::Cli;
-use crate::config::{self, Config};
+use crate::config::{self, Config, Geometry};
 use crate::screenshot::CaptureMode;
 use crate::utils::{self, EncodingFormat};
 
@@ -57,6 +57,7 @@ impl AppSettings {
     pub(crate) fn resolve(cli: &Cli, config: &Config) -> Self {
         let base = config.base.clone().unwrap_or_default();
         let file_config = config.file.clone().unwrap_or_default();
+        let geometry_config = config.geometry.clone().unwrap_or_default();
         let encoding_config = config.encoding.clone().unwrap_or_default();
 
         // ── Cursor ────────────────────────────────────────────────────────────
@@ -132,7 +133,7 @@ impl AppSettings {
                 break 'cmd Command::ColorPicker;
             }
             let output = cli.output.clone().or_else(|| base.output.clone());
-            Command::Screenshot(Self::resolve_capture_mode(cli, output))
+            Command::Screenshot(Self::resolve_capture_mode(cli, output, geometry_config))
         };
 
         AppSettings {
@@ -152,7 +153,11 @@ impl AppSettings {
         }
     }
 
-    fn resolve_capture_mode(cli: &Cli, output: Option<String>) -> CaptureMode {
+    fn resolve_capture_mode(
+        cli: &Cli,
+        output: Option<String>,
+        geometry_config: Geometry,
+    ) -> CaptureMode {
         if let Some(geometry) = &cli.geometry {
             match geometry {
                 Some(s) if !s.trim().is_empty() => match utils::parse_slurp_geometry(s) {
@@ -165,8 +170,14 @@ impl AppSettings {
                 Some(_) | None => {
                     #[cfg(feature = "selector")]
                     return CaptureMode::Geometry {
-                        foreground_color: cli.geometry_foreground_color.clone(),
-                        background_color: cli.geometry_background_color.clone(),
+                        foreground_color: cli
+                            .geometry_foreground_color
+                            .clone()
+                            .or(geometry_config.foreground_color),
+                        background_color: cli
+                            .geometry_background_color
+                            .clone()
+                            .or(geometry_config.background_color),
                     };
                     #[cfg(not(feature = "selector"))]
                     {
