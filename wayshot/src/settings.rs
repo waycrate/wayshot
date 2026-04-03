@@ -181,6 +181,7 @@ impl AppSettings {
                     };
                     #[cfg(not(feature = "selector"))]
                     {
+                        let _ = geometry_config; // suppress clippy unused warning
                         tracing::error!(
                             "interactive geometry selection requires the selector feature; \
                              provide a geometry string instead, e.g. wayshot -g \"$(slurp)\""
