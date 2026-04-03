@@ -51,6 +51,8 @@ color_picker = []
 
 # Interactive screen-region selection via libwaysip (Wayland selection overlay).
 # Adds the --geometry CLI flag for interactive region selection.
+# Adds the --geometry-foreground-color and --geometry-background-color CLI flags for
+# setting the foreground and background colors.
 # Pulls in: libwaysip
 selector = ["dep:libwaysip"]
 
