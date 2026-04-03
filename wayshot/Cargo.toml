@@ -46,8 +46,8 @@ webp = ["image/webp"]
 clipboard = ["dep:wl-clipboard-rs", "dep:rustix"]
 
 # Adds the --color CLI flag: freeze the screen, click a pixel, print its RGBA/hex value.
-# No additional dependencies.
-color_picker = []
+# Pulls in: libwaysip
+color_picker = ["dep:libwaysip"]
 
 # Interactive screen-region selection via libwaysip (Wayland selection overlay).
 # Adds the --geometry CLI flag for interactive region selection.
