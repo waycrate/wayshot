@@ -225,27 +225,8 @@ impl Png {
     }
 }
 
-const DEFAULT_NOTIFICATION_ACTION: &str = "xdg-open %dir_path%";
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct NotificationConfig {
     /// Shell command to run when the notification is clicked.
     pub action: Option<String>,
-}
-
-impl Default for NotificationConfig {
-    fn default() -> Self {
-        NotificationConfig {
-            action: Some(DEFAULT_NOTIFICATION_ACTION.to_string()),
-        }
-    }
-}
-
-#[cfg(feature = "notifications")]
-impl NotificationConfig {
-    pub fn get_action(&self) -> &str {
-        self.action
-            .as_deref()
-            .unwrap_or(DEFAULT_NOTIFICATION_ACTION)
-    }
 }

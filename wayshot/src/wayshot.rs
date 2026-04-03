@@ -97,7 +97,7 @@ fn main() -> Result<()> {
                         notification::send_success(
                             &shot_result,
                             settings.file.as_deref(),
-                            &settings.notification_action,
+                            settings.notification_action.as_deref(),
                         );
                     }
                     // Silence unused warning when the notifications feature is disabled.
