@@ -79,8 +79,6 @@ effort = 7
 
 [notification]
 # Command to run when the notification is clicked.
-# Available placeholders:
-#   %dir_path%  - parent directory of the saved screenshot
-#   %file_path% - full path to the saved screenshot file
-# Default: "xdg-open %dir_path%"
-# action = "xdg-open %dir_path%"
+# The command is run exactly as provided with no arguments appended.
+# If not set, opens the screenshot directory with xdg-open.
+# action = "xdg-open PATH"
