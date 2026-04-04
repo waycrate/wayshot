@@ -18,7 +18,10 @@ pub enum ShotResult {
 pub enum CaptureMode {
     /// Interactive area/region selection via libwaysip.
     #[cfg(feature = "selector")]
-    Geometry,
+    Geometry {
+        foreground_color: Option<String>,
+        background_color: Option<String>,
+    },
     /// A fixed region parsed from a slurp/waysip geometry string.
     GeometryRegion(libwayshot::LogicalRegion),
     /// A specific toplevel window by its id+title string.
@@ -43,7 +46,16 @@ pub fn capture(
 ) -> Result<(image::DynamicImage, ShotResult)> {
     match mode {
         #[cfg(feature = "selector")]
-        CaptureMode::Geometry => capture_geometry(conn, cursor, freeze),
+        CaptureMode::Geometry {
+            foreground_color,
+            background_color,
+        } => capture_geometry(
+            conn,
+            cursor,
+            freeze,
+            foreground_color.clone(),
+            background_color.clone(),
+        ),
         CaptureMode::GeometryRegion(region) => {
             let image = conn.screenshot(*region, cursor)?;
             Ok((image, ShotResult::Area))
@@ -62,14 +74,20 @@ fn capture_geometry(
     conn: &WayshotConnection,
     cursor: bool,
     freeze: bool,
+    foreground_color: Option<String>,
+    background_color: Option<String>,
 ) -> Result<(image::DynamicImage, ShotResult)> {
     let image = if freeze {
         conn.screenshot_freeze(
-            |w_conn| get_region_area(w_conn).map_err(libwayshot::Error::FreezeCallbackError),
+            move |w_conn| {
+                get_region_area(w_conn, foreground_color.clone(), background_color.clone())
+                    .map_err(libwayshot::Error::FreezeCallbackError)
+            },
             cursor,
         )?
     } else {
-        let region = get_region_area(conn).map_err(|e| eyre::eyre!("{e}"))?;
+        let region = get_region_area(conn, foreground_color, background_color)
+            .map_err(|e| eyre::eyre!("{e}"))?;
         conn.screenshot(region, cursor)?
     };
     Ok((image, ShotResult::Area))

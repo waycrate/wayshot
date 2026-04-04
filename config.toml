@@ -29,6 +29,12 @@ name_format = "wayshot-%Y_%m_%d-%H_%M_%S"
 # possible values: jpg, png, ppm, qoi, webp, avif, jxl
 encoding = "png"
 
+[geometry]
+# RGBA foreground color when selecting a region (--geometry). Example: #ffffffff
+foreground_color = "#000000ff"
+# RGBA background color when selecting a region (--geometry). Example: #00000050
+background_color = "#66666680"
+
 [encoding.png]
 # PNG encoder settings
 # For detailed documentation, see: https://docs.rs/image/latest/image/codecs/png/struct.PngEncoder.html

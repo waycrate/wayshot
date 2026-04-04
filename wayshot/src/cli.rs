@@ -78,6 +78,16 @@ pub struct Cli {
     #[arg(short, long, value_name = "GEOMETRY", num_args = 0..=1, verbatim_doc_comment)]
     pub geometry: Option<Option<String>>,
 
+    /// Background color (rgba hex) while selecting a region (geometry).
+    /// Example: #00000050
+    #[arg(long, value_name = "HEX_COLOR")]
+    pub geometry_background_color: Option<String>,
+
+    /// Foreground color (rgba hex) while selecting a region (geometry).
+    /// Example: #ffffffff
+    #[arg(long, value_name = "HEX_COLOR")]
+    pub geometry_foreground_color: Option<String>,
+
     /// Capture a specific output/display by name.
     #[arg(short, long, conflicts_with = "geometry")]
     pub output: Option<String>,

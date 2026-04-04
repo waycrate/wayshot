@@ -64,6 +64,12 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 	_Note:_ passing a file path directly after *-g* is no longer supported; place the path
 	before the flag or use *--* to separate arguments (e.g. *wayshot -g -- file.png*).
 
+*--geometry-background-color <RGBA_HEX_COLOR>*
+	Background color (rgba hex) while selecting a region (*--geometry*). Example: #00000050
+
+*--geometry-foreground-color <RGBA_HEX_COLOR>*
+	Foreground color (rgba hex) while selecting a region (*--geometry*). Example: #ffffffff
+
 *-o*, *--output <OUTPUT>*
 	Capture a specific output/display by name. Use *--list-outputs* to discover names.
 
