@@ -107,7 +107,7 @@ cargo build --no-default-features --features clipboard,logger,notifications
 | `color_picker`  | `--color` flag, freeze screen and pick a pixel color            | —                         |
 | `jxl`           | JPEG-XL encoding (`--encoding` / `.jxl`)                        | libjxl / `jpegxl-rs`      |
 | `logger`        | `--log-level` flag, tracing output to stderr                    | tracing-subscriber        |
-| `notifications` | Desktop notifications after each capture                        | notify-rust               |
+| `notifications` | Desktop notifications after each capture; configurable click action | notify-rust, rustix       |
 | `selector`      | `--geometry` flag, interactive region selection                 | libwaysip                 |
 | `completions`   | `--completions <SHELL>` flag, generate shell completion scripts | clap_complete (+ nushell) |
 

@@ -76,3 +76,9 @@ distance = 1
 # For lossless, generally it will produce smaller files.
 # For lossy, higher effort should more accurately reach the target quality.
 effort = 7
+
+[notification]
+# Command to run when the notification is clicked.
+# The command is run exactly as provided with no arguments appended.
+# If not set, opens the screenshot directory with xdg-open.
+# action = "xdg-open PATH"

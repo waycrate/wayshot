@@ -222,6 +222,23 @@ This section documents the *[file]* table of the configuration file
 
 	Default: _7_
 
+# NOTIFICATION
+
+This section documents the *[notification]* table of the configuration file.
+
+_Requires the_ *notifications* _feature (enabled by default)._
+
+*action* = _"<string>"_
+
+	Command to execute when the user clicks the notification.
+	The command is run exactly as provided with no arguments appended.
+	If not set, opens the screenshot directory with xdg-open.
+
+	Examples:
+		- action = "xdg-open /home/user/Pictures" -> opens a fixed folder
+
+	Default: _xdg-open <screenshot directory>_
+
 # SEE ALSO
 	- wayshot(1)
 	- wayshot(7)

@@ -11,6 +11,7 @@ pub struct Config {
     pub base: Option<Base>,
     pub file: Option<File>,
     pub encoding: Option<Encoding>,
+    pub notification: Option<NotificationConfig>,
 }
 
 impl Default for Config {
@@ -19,6 +20,7 @@ impl Default for Config {
             base: Some(Base::default()),
             file: Some(File::default()),
             encoding: Some(Encoding::default()),
+            notification: Some(NotificationConfig::default()),
         }
     }
 }
@@ -221,4 +223,10 @@ impl Png {
             _ => image::codecs::png::FilterType::Adaptive,
         }
     }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct NotificationConfig {
+    /// Shell command to run when the notification is clicked.
+    pub action: Option<String>,
 }
