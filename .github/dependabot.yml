@@ -11,10 +11,6 @@ updates:
 
   # Rust projects
   - package-ecosystem: "cargo"
-    directories:
-      - "/"
-      - "/wayshot"
-      - "/libwayshot"
-      - "/libwayshot/examples/waymirror-egl"
+    directory: "/"
     schedule:
       interval: "weekly"
