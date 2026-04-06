@@ -112,7 +112,7 @@ toml = { version = "1.0", default-features = false, features = [
 serde = { version = "1.0", features = ["derive"] }
 dirs = "6.0"
 libwaysip = { version = "0.6", optional = true }
-notify-rust = { version = "4.12", optional = true }
+notify-rust = { version = "4.14", optional = true }
 
 [[bin]]
 name = "wayshot"
