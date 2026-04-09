@@ -68,11 +68,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.1] - 2025-12-15
 
-### Added
-- Add api for the screencast
+### libwayshot 0.5.0
 
-### Fixed
-- Fix that outputcapture may not get the frameformat sometime
+#### Added
+
+- public `screencast` module and helpers, split from the screenshot-oriented surface ([`279896a`](https://github.com/waycrate/wayshot/commit/279896a060adaa385a8c6b59a38864468c2a18d8), [@Decodetalkers](https://github.com/Decodetalkers)).
+- size API on output / screencast capture ([`c4dc48e`](https://github.com/waycrate/wayshot/commit/c4dc48e2de9592de1dee3fe8f7eee36673dd73c7), [@Decodetalkers](https://github.com/Decodetalkers)).
+
+#### Changed
+
+- screencast capture path refined for OBS-style integration ([`d481448`](https://github.com/waycrate/wayshot/commit/d481448cece7f4ebffb1858a52d8d901bd69cf69), [@Decodetalkers](https://github.com/Decodetalkers)).
+
+#### Fixed
+
+- output capture sometimes missed the negotiated frame format ([`c4dc48e`](https://github.com/waycrate/wayshot/commit/c4dc48e2de9592de1dee3fe8f7eee36673dd73c7), [@Decodetalkers](https://github.com/Decodetalkers)).
+
+#### Breaking Changes
+
+- `Size` is now generic (`Size<T = u32>`) ([`279896a`](https://github.com/waycrate/wayshot/commit/279896a060adaa385a8c6b59a38864468c2a18d8), [@Decodetalkers](https://github.com/Decodetalkers)).
+  - **Migration:** specify `Size<u32>` (or another `T`) where type inference no longer resolves, and update patterns that assumed a non-generic `Size`.
 
 [1.4.1]: https://github.com/waycrate/wayshot/compare/1.4.0...v1.4.1
 
