@@ -51,18 +51,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.2] - 2025-12-18
 
-### Added
-- (libwayshot): Enable ext-image-copy by @xonx4l in #245
-- (libwayshot): Add dmabuf screen logic for screencast part by @Decodetalkers in #248
+### libwayshot 0.6.0
 
-### Changed
-- (libwayshot): Handle gbm errors instead of panicking by @dhruvDev23 in #247
+#### Added
 
-### Fixed
-- (wayshot): Fix the problem that area selector cannot cross screens
+- **ext-image-copy** path enabled for capture ([#245](https://github.com/waycrate/wayshot/pull/245), [@xonx4l](https://github.com/xonx4l)).
+- DMabuf screen logic for the screencast path (refresh / GBM discovery, libwaysip bump, docs) ([#248](https://github.com/waycrate/wayshot/pull/248), [@Decodetalkers](https://github.com/Decodetalkers)).
 
-### New Contributors
-- @dhruvDev23 made their first contribution in #247
+#### Changed
+
+- return **GBM** errors instead of panicking ([#247](https://github.com/waycrate/wayshot/pull/247), [@dhruvDev23](https://github.com/dhruvDev23); first contribution).
+
+#### Fixed
+
+- region / screenshot capture mis-sized under **ext-image-copy** (also fixes cross-output area selection in the CLI) ([`e9ba46b`](https://github.com/waycrate/wayshot/commit/e9ba46be0fca25bf784e34bb9c2321b75ae6b55d), [@Decodetalkers](https://github.com/Decodetalkers)).
 
 [1.4.2]: https://github.com/waycrate/wayshot/compare/1.4.1...v1.4.2
 
