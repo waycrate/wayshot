@@ -21,10 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.5] - 2026-01-20
 
-### Fixed
-- Hot fix: reexport ExtForeignToplevelHandle and fix ci
+### libwayshot 0.7.2
 
-[1.4.5]: https://github.com/waycrate/wayshot/compare/1.4.5...v1.4.4
+#### Fixed
+
+- `reexport` now exposes **`ExtForeignToplevelHandleV1`** (the handle type), not **`ExtForeignToplevelListV1`** ([`2259223`](https://github.com/waycrate/wayshot/commit/2259223eb224bf6c98f04e05e10b53e4d5cd2f2f), [@Decodetalkers](https://github.com/Decodetalkers)).
+
+[1.4.5]: https://github.com/waycrate/wayshot/compare/1.4.4...v1.4.5
 
 ## [1.4.4] - 2026-01-20
 
