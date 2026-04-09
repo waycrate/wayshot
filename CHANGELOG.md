@@ -7,17 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.6] - 2026-03-09
 
-### Fixed
-- fix problems that the state ext-image-copy only contains one format
-- fix publish ci
-- make image buffer without clone by @Nuhia-Arefin
-- remove needless unwrap by @oxsamlt
-- fix changelog format by @Anshi321
-- add size, position api for OutputInfo
-- add silent options for cli by @Suyansh-Dev
-- caching coverage by @Suyansh-Dev
+### libwayshot 0.7.3
 
-[1.4.6]: https://github.com/waycrate/wayshot/compare/1.4.6...v1.4.5
+#### Added
+
+- **`size`** and **`position`** fields on **`OutputInfo`** ([`b5c5896`](https://github.com/waycrate/wayshot/commit/b5c58965a42ba3ac2ac918874b079d27553f248b), [@Decodetalkers](https://github.com/Decodetalkers)).
+
+#### Changed
+
+- screencast / capture API cleanup ([`9722235`](https://github.com/waycrate/wayshot/commit/972223507577ef7f40d49bf035e9238f5eca7cd4), [@Decodetalkers](https://github.com/Decodetalkers)).
+
+#### Fixed
+
+- **ext-image-copy** frame state can advertise **multiple** SHM formats; handle the full set instead of assuming one ([#307](https://github.com/waycrate/wayshot/pull/307), [@Decodetalkers](https://github.com/Decodetalkers)).
+- replace `unwrap()` calls with proper **`Result`** handling ([#294](https://github.com/waycrate/wayshot/pull/294), [@0xsamalt](https://github.com/0xsamalt)).
+- avoid cloning the image buffer where a shared view is enough ([#290](https://github.com/waycrate/wayshot/pull/290), [@Nuhiat-Arefin](https://github.com/Nuhiat-Arefin)).
+
+### wayshot
+
+#### Added
+
+- **`--silent`** (quiet non-error output) ([#280](https://github.com/waycrate/wayshot/pull/280), [@Suryansh-Dey](https://github.com/Suryansh-Dey)).
+
+[1.4.6]: https://github.com/waycrate/wayshot/compare/1.4.5...v1.4.6
 
 ## [1.4.5] - 2026-01-20
 
