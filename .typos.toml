@@ -1,2 +1,6 @@
 [default.extend-words]
 paeth = "paeth"
+
+# Git short hashes are not dictionary words (e.g. `ba` in e9ba46b).
+[default.extend-identifiers]
+e9ba46b = "e9ba46b"
