@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/tag/v1.4.6)** (compare [`v1.4.6...HEAD`](https://github.com/waycrate/wayshot/compare/v1.4.6...HEAD)).
+
+### libwayshot
+
+#### Added
+
+- optional **image** formats behind explicit Cargo features (JPEG, WebP, AVIF, …), with **PNG** still in defaults ([#324](https://github.com/waycrate/wayshot/pull/324), [@Gigas002](https://github.com/Gigas002)).
+- optional **`egl`** feature and EGL path decoupled from a minimal default build ([#320](https://github.com/waycrate/wayshot/pull/320), [@Gigas002](https://github.com/Gigas002)).
+
+#### Changed
+
+- initialize **DRM** only when the capture path needs it ([#326](https://github.com/waycrate/wayshot/pull/326), [@Decodetalkers](https://github.com/Decodetalkers)).
+
+#### Fixed
+
+- wait for frame completion after **`FrameState::Finished`** to avoid corrupted frames ([#328](https://github.com/waycrate/wayshot/pull/328), [@HiFiveJazz](https://github.com/HiFiveJazz)).
+- simpler resize / filter path for the region selector ([#329](https://github.com/waycrate/wayshot/pull/329), [@Gigas002](https://github.com/Gigas002)).
+
+### wayshot
+
+#### Added
+
+- Cargo **features** gating **clipboard**, **color picker**, **logger**, **notifications**, **selector**, **AVIF**, and **JPEG XL** ([#306](https://github.com/waycrate/wayshot/pull/306), [@Gigas002](https://github.com/Gigas002)).
+- split CLI implementation into focused modules (`clipboard`, `color_picker`, `notification`, `logger`, `screenshot`, …) ([#306](https://github.com/waycrate/wayshot/pull/306), [@Gigas002](https://github.com/Gigas002)).
+- **Freeze** before capture is **on by default**; set **`freeze`** in config, or pass **`--no-freeze`** on the CLI to disable (same idea as notifications) ([#309](https://github.com/waycrate/wayshot/pull/309), [@Gigas002](https://github.com/Gigas002)).
+- **`--delay`** before taking the shot ([#318](https://github.com/waycrate/wayshot/pull/318), [@Gigas002](https://github.com/Gigas002)).
+- **shell completions** generation ([#319](https://github.com/waycrate/wayshot/pull/319), [@Gigas002](https://github.com/Gigas002)).
+- optional **geometry string** after **`-g`** (e.g. `wayshot out.png -g $"$(waysip -d)"`) ([#333](https://github.com/waycrate/wayshot/pull/333), [@Gigas002](https://github.com/Gigas002)).
+- **`--geometry-foreground-color`** and **`--geometry-background-color`** for the region overlay ([#335](https://github.com/waycrate/wayshot/pull/335), [@saghen](https://github.com/saghen)).
+- **`--open-location`** to open the saved image path ([#283](https://github.com/waycrate/wayshot/pull/283), [@Suryansh-Dey](https://github.com/Suryansh-Dey)).
+
+#### Changed
+
+- **Nix** flake dev shell and package ([#336](https://github.com/waycrate/wayshot/pull/336), [@saghen](https://github.com/saghen)).
+- CI split into workflow files, plus **`cargo deny`** and related checks ([#315](https://github.com/waycrate/wayshot/pull/315), [@Gigas002](https://github.com/Gigas002)).
+
+#### Fixed
+
+- **`color_picker`** / **`selector`** feature wiring and docs ([#339](https://github.com/waycrate/wayshot/pull/339), [@saghen](https://github.com/saghen)).
+- **Dependabot** GitHub Actions config regression ([#345](https://github.com/waycrate/wayshot/pull/345), [@Gigas002](https://github.com/Gigas002)).
+
+#### Breaking Changes
+
+- **wayshot** and **waymirror-egl** are **GPL-3.0**; **libwayshot** stays **BSD-2-Clause** ([#311](https://github.com/waycrate/wayshot/pull/311), [@Gigas002](https://github.com/Gigas002)).
+  - **Migration:** confirm licensing and redistribution obligations for anything you ship or vendor; see `LICENSE-GPL` and `LICENSE-BSD`.
+- **`-g` / `--geometry`** accepts an optional **geometry string** (e.g. from slurp / `waysip -d`); a token immediately after **`-g`** is now treated as that string, not the output file ([#333](https://github.com/waycrate/wayshot/pull/333), [@Gigas002](https://github.com/Gigas002)).
+  - **Migration:** if you relied on **`wayshot -g FILE`** (output path right after **`-g`**), use **`wayshot FILE -g`** instead. Invocations like **`wayshot -g --clipboard`** are unchanged.
+
 ## [1.4.6] - 2026-03-09
 
 ### libwayshot 0.7.3
@@ -199,3 +249,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - embedded region selection on adjacent outputs ([#199](https://github.com/waycrate/wayshot/pull/199), [@Pestdoktor](https://github.com/Pestdoktor)).
 
 [1.4.0]: https://github.com/waycrate/wayshot/compare/1.3.1...v1.4.0
+
+[Unreleased]: https://github.com/waycrate/wayshot/compare/v1.4.6...HEAD
