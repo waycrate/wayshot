@@ -37,15 +37,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### libwayshot 0.7.0
 
-### Changed
-- (libwayshot): use the r-egl lib which maintained by waycrate instead of khornos-egl
-- (libwayshot): remove the Instance uses of egl lib. we only use the static feature
-- (libwayshot): make tidy up of the api
-- (libwayshot): Fix the problem that libwayshot panic when there is no support for ext-foreign-toplevel-list
-- (waymirror-egl): tidy up the project, and add it to the workspace. Now it is usable, though still has bugs about keyboard
+#### Added
 
-### Breaking Changes
-- There are breaking changes in libwayshot, but it is just some tidy up for the api, mainly the order of params
+- **Color capture** (sampling) API ([#258](https://github.com/waycrate/wayshot/pull/258), [@Decodetalkers](https://github.com/Decodetalkers)).
+- **Screencast EGL** path, **r-egl-wayland** integration, static EGL (no `egl::Instance`), DMabuf `AsRef` usage, and **waymirror-egl** rework ([#270](https://github.com/waycrate/wayshot/pull/270), [@Decodetalkers](https://github.com/Decodetalkers)).
+
+#### Changed
+
+- **Error** types and handling ([#252](https://github.com/waycrate/wayshot/pull/252), [@dhruvDev23](https://github.com/dhruvDev23)).
+- **libdrm**-oriented buffer logic where applicable ([#270](https://github.com/waycrate/wayshot/pull/270), [@Decodetalkers](https://github.com/Decodetalkers)).
+- Rotation: do not swap width/height when the image buffer is already correctly oriented ([#256](https://github.com/waycrate/wayshot/pull/256), [@AndreasBackx](https://github.com/AndreasBackx)).
+
+#### Fixed
+
+- Avoid panic when **ext-foreign-toplevel-list** is unavailable; degrade gracefully ([#266](https://github.com/waycrate/wayshot/pull/266), [@Decodetalkers](https://github.com/Decodetalkers)).
+- EGL capture: roundtrip errors, **FD leaks**, and incorrect color in some paths ([#270](https://github.com/waycrate/wayshot/pull/270), [@Decodetalkers](https://github.com/Decodetalkers)).
+
+#### Breaking Changes
+
+- Many capture / screenshot entry points now take arguments in a fixed order: **target → options → cursor → optional region** ([#270](https://github.com/waycrate/wayshot/pull/270), [@Decodetalkers](https://github.com/Decodetalkers)).
+  - **Migration:** update call sites to the new parameter order; consult current `libwayshot` method signatures.
+- **`WayshotTarget`** / foreign toplevel handles must be chosen from targets libwayshot already knows about (not an arbitrary foreign id alone) ([#270](https://github.com/waycrate/wayshot/pull/270), [@Decodetalkers](https://github.com/Decodetalkers)).
+  - **Migration:** enumerate toplevels via libwayshot, then select the matching target.
+- **`try_init_buf`** no longer returns the initialized buffer from the same return channel; use `()` / `Error` only ([#270](https://github.com/waycrate/wayshot/pull/270), [@Decodetalkers](https://github.com/Decodetalkers)).
+  - **Migration:** follow the updated init + capture flow in the docs / examples.
+
+### wayshot
+
+#### Added
+
+- **JPEG XL**-specific options in the config file ([#255](https://github.com/waycrate/wayshot/pull/255), [@Gigas002](https://github.com/Gigas002)).
+- **PNG**-specific encoder options in the config file ([#268](https://github.com/waycrate/wayshot/pull/268), [@Gigas002](https://github.com/Gigas002)).
 
 [1.4.3]: https://github.com/waycrate/wayshot/compare/1.4.2...v1.4.3
 
