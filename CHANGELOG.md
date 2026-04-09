@@ -154,7 +154,7 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 
 #### Fixed
 
-- region / screenshot capture mis-sized under **ext-image-copy** (also fixes cross-output area selection in the CLI) ([`e9ba46b`](https://github.com/waycrate/wayshot/commit/e9ba46be0fca25bf784e34bb9c2321b75ae6b55d), [@Decodetalkers](https://github.com/Decodetalkers)).
+- region and screenshot capture had **incorrect dimensions** under **ext-image-copy** (also fixes cross-output area selection in the CLI) ([`e9ba46b`](https://github.com/waycrate/wayshot/commit/e9ba46be0fca25bf784e34bb9c2321b75ae6b55d), [@Decodetalkers](https://github.com/Decodetalkers)).
 
 [1.4.2]: https://github.com/waycrate/wayshot/compare/1.4.1...v1.4.2
 
