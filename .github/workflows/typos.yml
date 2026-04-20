@@ -8,6 +8,9 @@ on: # yamllint disable-line rule:truthy
         branches:
             - "**"
 
+permissions:
+    contents: read
+
 jobs:
     build:
         runs-on: ubuntu-latest

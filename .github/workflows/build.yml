@@ -2,6 +2,10 @@ name: Build
 
 on: [push, pull_request]
 
+permissions:
+    contents: read
+    actions: write
+
 env:
     CARGO_TERM_COLOR: always
 
