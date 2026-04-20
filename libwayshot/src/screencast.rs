@@ -87,7 +87,7 @@ impl WayshotConnection {
     /// This will save a screencast status for you
     /// We suggest you to use this api to do screencast
     /// Same with create_screencast_with_shm, but now it is with dmabuf
-    /// And bind the a [crate::egl::EglDisplay], to support the egl
+    /// And bind the a `EglDisplay`, to support the egl
     #[cfg(feature = "egl")]
     pub fn create_screencast_with_egl(
         &self,

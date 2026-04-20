@@ -2,6 +2,12 @@ name: Documentation
 
 on: [push, pull_request]
 
+env:
+    CARGO_TERM_COLOR: always
+
+permissions:
+    contents: read
+
 jobs:
     docs:
         runs-on: ubuntu-latest
@@ -15,3 +21,22 @@ jobs:
                   sudo apt update
                   sudo apt install --no-install-recommends scdoc
                   for file in $(find . -type f -iwholename "./docs/*.scd"); do scdoc < $file > /dev/null; done
+
+    rust-doc:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v6
+            - uses: dtolnay/rust-toolchain@stable
+            - name: Build cache
+              uses: Swatinem/rust-cache@v2
+            - name: Install system dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y \
+                    pkg-config \
+                    libwayland-dev
+            - name: Doc
+              run: cargo doc --workspace --no-deps --all-features
+              env:
+                  RUSTDOCFLAGS: -D warnings
