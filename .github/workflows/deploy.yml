@@ -81,7 +81,7 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: taiki-e/create-gh-release-action@f67cf7b2dadd83d36b981e674a6b08063997ce68 # v1.10.0
+            - uses: taiki-e/create-gh-release-action@eba8ea96c86cca8a37f1b56e94b4d13301fba651 # v1.11.0
               with:
                   branch: main
                   changelog: CHANGELOG.md
