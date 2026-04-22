@@ -89,7 +89,7 @@ fn main() -> Result<()> {
 
                     #[cfg(feature = "clipboard")]
                     if settings.clipboard {
-                        clipboard::copy_to_clipboard(encoded)?;
+                        clipboard::copy_to_clipboard(encoded, settings.encoding)?;
                     }
 
                     #[cfg(feature = "notifications")]
