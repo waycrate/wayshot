@@ -19,6 +19,7 @@ exceptions = [
     # wayshot depends on GPL-3.0 so we need to make an exception
     { allow = ["GPL-3.0-only", "GPL-3.0-or-later"], crate = "wayshot" },
     { allow = ["AGPL-3.0-only", "AGPL-3.0-or-later"], crate = "jxl-encoder" },
+    { allow = ["AGPL-3.0-only", "AGPL-3.0-or-later"], crate = "jxl-encoder-simd" },
     # waymirror-egl depends on CECILL-2.1 so we need to make an exception
     { allow = ["CECILL-2.1"], crate = "gl_loader" },
 ]
