@@ -10,7 +10,7 @@
 
       perSystem = { pkgs, system, ... }:
         let
-          deps = with pkgs; [ pango libgbm libjxl libGL wayland ];
+          deps = with pkgs; [ pango libgbm libGL wayland ];
         in
         {
           packages.default = pkgs.rustPlatform.buildRustPackage {
