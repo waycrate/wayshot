@@ -29,7 +29,7 @@ jobs:
 
             - name: Install wayland dependencies
               run: |
-                  pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl github-cli git
+                  pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo github-cli git
 
             - name: Build
               run: cargo build --workspace --release
@@ -55,7 +55,7 @@ jobs:
 
             - name: Install wayland dependencies
               run: |
-                  pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl github-cli git
+                  pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo github-cli git
 
             - name: Obtain crates.io token
               uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe # v1.0.4
