@@ -5,7 +5,7 @@ use image::{
     codecs::png::{CompressionType, FilterType, PngEncoder},
 };
 #[cfg(feature = "jxl")]
-use jpegxl_rs::encode::{EncoderResult, EncoderSpeed};
+use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
 use serde::{Deserialize, Serialize};
 use std::{
     env,
@@ -361,7 +361,7 @@ pub fn encode_image(
             image,
             jxl.get_lossless(),
             jxl.get_distance(),
-            jxl.get_encoder_speed(),
+            jxl.get_effort(),
         ),
         EncodingFormat::Png => encode_to_png_bytes(image, png.get_compression(), png.get_filter()),
         #[cfg(any(
@@ -384,20 +384,21 @@ fn encode_to_jxl_bytes(
     image: &DynamicImage,
     lossless: bool,
     distance: f32,
-    speed: EncoderSpeed,
+    effort: u8,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    // Alpha channel causes artefacts in jpegxl-rs; screenshots don't need it.
-    // See: https://github.com/inflation/jpegxl-rs/issues/96
     let pixels_rgb8 = image.to_rgb8();
     let pixels = pixels_rgb8.as_raw();
-    let mut encoder = jpegxl_rs::encoder_builder()
-        .lossless(lossless)
-        .quality(distance)
-        .speed(speed)
-        .build()?;
-    let EncoderResult { data, .. } =
-        encoder.encode::<u8, u8>(pixels, image.width(), image.height())?;
-    Ok(data.to_vec())
+    let w = image.width();
+    let h = image.height();
+    if lossless {
+        Ok(LosslessConfig::new()
+            .with_effort(effort)
+            .encode(pixels, w, h, PixelLayout::Rgb8)?)
+    } else {
+        Ok(LossyConfig::new(distance)
+            .with_effort(effort)
+            .encode(pixels, w, h, PixelLayout::Rgb8)?)
+    }
 }
 
 fn encode_to_png_bytes(

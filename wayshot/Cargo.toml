@@ -60,11 +60,11 @@ selector = ["dep:libwaysip"]
 # Disable to significantly reduce compile time on platforms where AVIF output is not needed.
 avif = ["image/avif"]
 
-# JPEG-XL encoding support via jpegxl-rs.
+# JPEG-XL encoding support via jxl-encoder.
 # Adds the `jxl` variant to --encoding and the [encoding.jxl] config section.
-# Disable to drop the jpegxl-rs dependency (useful on platforms without libjxl).
-# Pulls in: jpegxl-rs
-jxl = ["dep:jpegxl-rs"]
+# Disable to drop the jxl-encoder dependency if JPEG XL output is not needed.
+# Pulls in: jxl-encoder
+jxl = ["dep:jxl-encoder"]
 
 # Initialises the tracing subscriber and exposes the --log-level CLI flag.
 # Disable to suppress all stderr log output entirely.
@@ -95,7 +95,7 @@ clap_complete = { version = "4.6", optional = true }
 clap_complete_nushell = { version = "4.6", optional = true }
 
 image = { workspace = true, features = ["png"] }
-jpegxl-rs = { version = "0.14", optional = true }
+jxl-encoder = { version = "0.3", optional = true }
 
 dialoguer = { version = "0.12", features = ["fuzzy-select"] }
 eyre = "0.6"
