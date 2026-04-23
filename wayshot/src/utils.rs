@@ -395,9 +395,12 @@ fn encode_to_jxl_bytes(
             .with_effort(effort)
             .encode(pixels, w, h, PixelLayout::Rgb8)?)
     } else {
-        Ok(LossyConfig::new(distance)
-            .with_effort(effort)
-            .encode(pixels, w, h, PixelLayout::Rgb8)?)
+        Ok(LossyConfig::new(distance).with_effort(effort).encode(
+            pixels,
+            w,
+            h,
+            PixelLayout::Rgb8,
+        )?)
     }
 }
 
