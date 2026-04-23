@@ -42,6 +42,7 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 
 - **Nix** flake dev shell and package ([#336](https://github.com/waycrate/wayshot/pull/336), [@saghen](https://github.com/saghen)).
 - CI split into workflow files, plus **`cargo deny`** and related checks ([#315](https://github.com/waycrate/wayshot/pull/315), [@Gigas002](https://github.com/Gigas002)).
+- JPEG XL (**`jxl`** feature): **[jxl-encoder](https://github.com/imazen/jxl-encoder)** (pure Rust, **AGPL-3.0-or-later**) replaces **jpegxl-rs** and system **libjxl**. **`[encoding.jxl]`** keys (`lossless`, `distance`, `effort`) are unchanged; encoded files may differ slightly from libjxl at the same settings. CI and the Nix flake no longer install **libjxl**.
 
 #### Fixed
 

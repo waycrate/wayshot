@@ -107,7 +107,7 @@ cargo build --no-default-features --features clipboard,logger,notifications
 | `avif`          | AVIF encoding (`--encoding` / `.avif`)                          | rav1e (via `image`)       |
 | `clipboard`     | `--clipboard` flag, copy to Wayland clipboard                   | wl-clipboard-rs           |
 | `color_picker`  | `--color` flag, freeze screen and pick a pixel color            | —                         |
-| `jxl`           | JPEG-XL encoding (`--encoding` / `.jxl`)                        | libjxl / `jpegxl-rs`      |
+| `jxl`           | JPEG-XL encoding (`--encoding` / `.jxl`)                        | `jxl-encoder` |
 | `logger`        | `--log-level` flag, tracing output to stderr                    | tracing-subscriber        |
 | `notifications` | Desktop notifications after each capture; configurable click action | notify-rust, rustix       |
 | `selector`      | `--geometry` flag, interactive region selection                 | libwaysip                 |
@@ -135,7 +135,6 @@ Alternatively, set `stdout = true` in your config file to always write to stdout
 - rustup
 - make
 - pkg-config
-- libjxl _(optional — only needed when the `jxl` feature is enabled)_
 
 ## Compiling:
 
