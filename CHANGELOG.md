@@ -42,6 +42,7 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 
 - **Nix** flake dev shell and package ([#336](https://github.com/waycrate/wayshot/pull/336), [@saghen](https://github.com/saghen)).
 - CI split into workflow files, plus **`cargo deny`** and related checks ([#315](https://github.com/waycrate/wayshot/pull/315), [@Gigas002](https://github.com/Gigas002)).
+- JPEG XL (**`jxl`** feature): **[jxl-encoder](https://github.com/imazen/jxl-encoder)** (pure Rust, **AGPL-3.0-or-later**) replaces **jpegxl-rs** and system **libjxl**. **`[encoding.jxl]`** keys (`lossless`, `distance`, `effort`) are unchanged; encoded files may differ slightly from libjxl at the same settings. CI and the Nix flake no longer install **libjxl**.
 
 #### Fixed
 
@@ -51,9 +52,9 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 #### Breaking Changes
 
 - **wayshot** and **waymirror-egl** are **GPL-3.0**; **libwayshot** stays **BSD-2-Clause** ([#311](https://github.com/waycrate/wayshot/pull/311), [@Gigas002](https://github.com/Gigas002)).
-  - **Migration:** confirm licensing and redistribution obligations for anything you ship or vendor; see `LICENSE-GPL` and `LICENSE-BSD`.
+    - **Migration:** confirm licensing and redistribution obligations for anything you ship or vendor; see `LICENSE-GPL` and `LICENSE-BSD`.
 - **`-g` / `--geometry`** accepts an optional **geometry string** (e.g. from slurp / `waysip -d`); a token immediately after **`-g`** is now treated as that string, not the output file ([#333](https://github.com/waycrate/wayshot/pull/333), [@Gigas002](https://github.com/Gigas002)).
-  - **Migration:** if you relied on **`wayshot -g FILE`** (output path right after **`-g`**), use **`wayshot FILE -g`** instead. Invocations like **`wayshot -g --clipboard`** are unchanged.
+    - **Migration:** if you relied on **`wayshot -g FILE`** (output path right after **`-g`**), use **`wayshot FILE -g`** instead. Invocations like **`wayshot -g --clipboard`** are unchanged.
 
 ## [1.4.6] - 2026-03-09
 
@@ -124,11 +125,11 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 #### Breaking Changes
 
 - Many capture / screenshot entry points now take arguments in a fixed order: **target → options → cursor → optional region** ([#270](https://github.com/waycrate/wayshot/pull/270), [@Decodetalkers](https://github.com/Decodetalkers)).
-  - **Migration:** update call sites to the new parameter order; consult current `libwayshot` method signatures.
+    - **Migration:** update call sites to the new parameter order; consult current `libwayshot` method signatures.
 - **`WayshotTarget`** / foreign toplevel handles must be chosen from targets libwayshot already knows about (not an arbitrary foreign id alone) ([#270](https://github.com/waycrate/wayshot/pull/270), [@Decodetalkers](https://github.com/Decodetalkers)).
-  - **Migration:** enumerate toplevels via libwayshot, then select the matching target.
+    - **Migration:** enumerate toplevels via libwayshot, then select the matching target.
 - **`try_init_buf`** no longer returns the initialized buffer from the same return channel; use `()` / `Error` only ([#270](https://github.com/waycrate/wayshot/pull/270), [@Decodetalkers](https://github.com/Decodetalkers)).
-  - **Migration:** follow the updated init + capture flow in the docs / examples.
+    - **Migration:** follow the updated init + capture flow in the docs / examples.
 
 ### wayshot
 
@@ -178,7 +179,7 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 #### Breaking Changes
 
 - `Size` is now generic (`Size<T = u32>`) ([`279896a`](https://github.com/waycrate/wayshot/commit/279896a060adaa385a8c6b59a38864468c2a18d8), [@Decodetalkers](https://github.com/Decodetalkers)).
-  - **Migration:** specify `Size<u32>` (or another `T`) where type inference no longer resolves, and update patterns that assumed a non-generic `Size`.
+    - **Migration:** specify `Size<u32>` (or another `T`) where type inference no longer resolves, and update patterns that assumed a non-generic `Size`.
 
 [1.4.1]: https://github.com/waycrate/wayshot/compare/1.4.0...v1.4.1
 
@@ -215,9 +216,9 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 #### Breaking Changes
 
 - legacy `screenshot` APIs deprecated or restricted where **ext-image-copy** differs from **zwlr-screencopy**; use **`screenshot_freeze`** instead ([`c0065d3`](https://github.com/waycrate/wayshot/commit/c0065d37547bc18729d052a6e89628c34c3d3097), [`21cfa0f`](https://github.com/waycrate/wayshot/commit/21cfa0f36c7c3b7ce6ba4998f0e9ae6808d93ec0), [@Decodetalkers](https://github.com/Decodetalkers)). Some paths (e.g. color picker) keep the old API on purpose ([`73df58e`](https://github.com/waycrate/wayshot/commit/73df58ef030c97e89d2b77f0a3788ef26ef00b83)).
-  - **Migration:** move affected call sites to **`screenshot_freeze`**; re-read deprecation on the symbols you use.
+    - **Migration:** move affected call sites to **`screenshot_freeze`**; re-read deprecation on the symbols you use.
 - `FrameGuard` carries side / transform metadata ([`1af8f788`](https://github.com/waycrate/wayshot/commit/1af8f78840c3f20b74e0225a747505f8a4eaf73f), [@Decodetalkers](https://github.com/Decodetalkers)).
-  - **Migration:** update construction and pattern matches to include the new fields.
+    - **Migration:** update construction and pattern matches to include the new fields.
 
 ### wayshot
 
@@ -239,9 +240,9 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 #### Breaking Changes
 
 - colored output, help text, and option renames (“friendly CLI”) ([#134](https://github.com/waycrate/wayshot/pull/134), [@Gigas002](https://github.com/Gigas002)).
-  - **Migration:** update scripts and wrappers that parse `--help`, grep for old long option names, or assume plain stderr; use the current kebab-case flags and check `wayshot --help` for aliases where the old spellings still work.
+    - **Migration:** update scripts and wrappers that parse `--help`, grep for old long option names, or assume plain stderr; use the current kebab-case flags and check `wayshot --help` for aliases where the old spellings still work.
 - region selection uses **libwaysip** in-process instead of spawning **slurp** ([#152](https://github.com/waycrate/wayshot/pull/152), [`586ee25`](https://github.com/waycrate/wayshot/commit/586ee258f824a6fc71d796272ffa9635236cc226), [@Decodetalkers](https://github.com/Decodetalkers)).
-  - **Migration:** drop expectations that `slurp` is run externally or that `-s` forwards arguments to slurp; adjust automation that wrapped or mocked slurp; rely on wayshot’s built-in selector (and libwaysip behavior) only.
+    - **Migration:** drop expectations that `slurp` is run externally or that `-s` forwards arguments to slurp; adjust automation that wrapped or mocked slurp; rely on wayshot’s built-in selector (and libwaysip behavior) only.
 
 #### Fixed
 
@@ -249,5 +250,4 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 - embedded region selection on adjacent outputs ([#199](https://github.com/waycrate/wayshot/pull/199), [@Pestdoktor](https://github.com/Pestdoktor)).
 
 [1.4.0]: https://github.com/waycrate/wayshot/compare/1.3.1...v1.4.0
-
 [Unreleased]: https://github.com/waycrate/wayshot/compare/v1.4.6...HEAD

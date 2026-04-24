@@ -34,7 +34,7 @@ jobs:
               uses: Swatinem/rust-cache@v2
             - name: Install system dependencies
               run: |
-                  pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl
+                  pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo
             - name: Doc
               run: cargo doc --workspace --no-deps --all-features
               env:

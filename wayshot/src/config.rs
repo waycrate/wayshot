@@ -1,6 +1,4 @@
 use crate::utils::EncodingFormat;
-#[cfg(feature = "jxl")]
-use jpegxl_rs::encode::EncoderSpeed;
 use serde::{Deserialize, Serialize};
 use std::{env, io::Read, path::PathBuf};
 #[cfg(feature = "logger")]
@@ -167,23 +165,7 @@ impl Jxl {
     }
 
     pub fn get_effort(&self) -> u8 {
-        self.effort.unwrap_or(7)
-    }
-
-    pub fn get_encoder_speed(&self) -> EncoderSpeed {
-        match self.get_effort() {
-            1 => EncoderSpeed::Lightning,
-            2 => EncoderSpeed::Thunder,
-            3 => EncoderSpeed::Falcon,
-            4 => EncoderSpeed::Cheetah,
-            5 => EncoderSpeed::Hare,
-            6 => EncoderSpeed::Wombat,
-            7 => EncoderSpeed::Squirrel,
-            8 => EncoderSpeed::Kitten,
-            9 => EncoderSpeed::Tortoise,
-            10 => EncoderSpeed::Glacier,
-            _ => EncoderSpeed::Squirrel,
-        }
+        self.effort.unwrap_or(7).clamp(1, 10)
     }
 }
 
