@@ -105,14 +105,14 @@ wl-clipboard-rs = { version = "0.9", optional = true }
 rustix = { workspace = true, features = ["process", "runtime"], optional = true }
 
 shellexpand = "3.1"
-toml = { version = "1.0", default-features = false, features = [
+toml = { version = "1.1", default-features = false, features = [
 	"parse",
 	"serde",
 ] }
 serde = { version = "1.0", features = ["derive"] }
 dirs = "6.0"
 libwaysip = { version = "0.6", optional = true }
-notify-rust = { version = "4.16", optional = true }
+notify-rust = { version = "4.17", optional = true }
 
 [[bin]]
 name = "wayshot"
