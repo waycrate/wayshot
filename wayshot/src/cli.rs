@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 
+#[cfg(any(feature = "completions", feature = "color_picker"))]
+use clap::ValueEnum;
 use clap::{
     Parser,
-    ValueEnum,
     builder::{
         Styles,
         styling::{AnsiColor, Effects},
