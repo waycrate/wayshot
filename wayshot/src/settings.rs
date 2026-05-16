@@ -17,7 +17,7 @@ pub(crate) enum Command {
     ListToplevels,
     /// Pick a pixel color interactively and exit.
     #[cfg(feature = "color_picker")]
-    ColorPicker,
+    ColorPicker(crate::cli::ColorFormat),
     /// Capture a screenshot using the given mode.
     Screenshot(CaptureMode),
 }
@@ -131,8 +131,8 @@ impl AppSettings {
                 break 'cmd Command::ListToplevels;
             }
             #[cfg(feature = "color_picker")]
-            if cli.color {
-                break 'cmd Command::ColorPicker;
+            if let Some(fmt) = cli.color.clone() {
+                break 'cmd Command::ColorPicker(fmt);
             }
             let output = cli.output.clone().or_else(|| base.output.clone());
             Command::Screenshot(Self::resolve_capture_mode(cli, output, geometry_config))
