@@ -24,6 +24,7 @@ pub fn send_success(
     };
 
     let mut notification = build_base_notification(config, true);
+    notification.urgency(Urgency::Normal);
     notification.body(&body);
 
     if let Some(path) = saved_location {
@@ -68,6 +69,7 @@ pub fn send_success(
 
 pub fn send_failure(error: &Error, config: &NotificationConfig) {
     let _ = build_base_notification(config, false)
+        .urgency(Urgency::Critical)
         .body(&error.to_string())
         .show();
 }
@@ -93,10 +95,6 @@ fn build_base_notification(config: &NotificationConfig, is_success: bool) -> Not
         n.icon(icon);
     }
 
-    if let Some(urgency) = &config.urgency {
-        n.urgency(parse_urgency(urgency));
-    }
-
     if let Some(sound) = &config.sound_name {
         n.sound_name(sound);
     }
@@ -110,12 +108,4 @@ fn build_base_notification(config: &NotificationConfig, is_success: bool) -> Not
     }
 
     n
-}
-
-fn parse_urgency(s: &str) -> Urgency {
-    match s.to_lowercase().as_str() {
-        "low" => Urgency::Low,
-        "critical" => Urgency::Critical,
-        _ => Urgency::Normal,
-    }
 }

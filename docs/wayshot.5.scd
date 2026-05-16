@@ -261,13 +261,6 @@ _Requires the_ *notifications* _feature (enabled by default)._
 
 	Default: _5000_
 
-*urgency* = _"low"_ | _"normal"_ | _"critical"_
-
-	Urgency level of the notification.
-	Most notification servers do not dismiss *critical* notifications automatically.
-
-	Default: _"normal"_
-
 *app_name* = _"<string>"_
 
 	Application name field sent with the notification.

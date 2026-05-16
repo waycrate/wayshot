@@ -236,8 +236,6 @@ pub struct NotificationConfig {
     pub icon: Option<String>,
     /// Duration in milliseconds. -1 = never expire, 0 = server default.
     pub timeout_ms: Option<i32>,
-    /// Urgency level: "low", "normal", or "critical".
-    pub urgency: Option<String>,
     /// Application name shown in the notification.
     pub app_name: Option<String>,
     /// Title for the success notification.

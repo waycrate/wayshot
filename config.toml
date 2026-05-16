@@ -96,10 +96,6 @@ effort = 7
 # -1 = never expire, 0 = server default, positive = milliseconds.
 # timeout_ms = 5000
 
-# Urgency level: "low", "normal", or "critical".
-# Critical notifications do not time out on most servers.
-# urgency = "normal"
-
 # Application name shown in the notification.
 # app_name = "wayshot"
 
