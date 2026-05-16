@@ -171,7 +171,11 @@ impl AppSettings {
                         std::process::exit(1);
                     }
                 },
-                Some(_) | None => {
+                Some(_) => {
+                    tracing::error!("geometry string is empty or incorrect");
+                    std::process::exit(1);
+                }
+                None => {
                     #[cfg(feature = "selector")]
                     return CaptureMode::Geometry {
                         foreground_color: cli
