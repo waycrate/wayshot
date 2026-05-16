@@ -52,7 +52,7 @@ pub(crate) struct AppSettings {
     #[cfg(feature = "notifications")]
     pub(crate) notifications: bool,
     #[cfg(feature = "notifications")]
-    pub(crate) notification_action: Option<String>,
+    pub(crate) notification: config::NotificationConfig,
 }
 
 impl AppSettings {
@@ -153,7 +153,7 @@ impl AppSettings {
             #[cfg(feature = "notifications")]
             notifications: !cli.silent && base.notifications.unwrap_or(true),
             #[cfg(feature = "notifications")]
-            notification_action: config.notification.as_ref().and_then(|n| n.action.clone()),
+            notification: config.notification.clone().unwrap_or_default(),
         }
     }
 

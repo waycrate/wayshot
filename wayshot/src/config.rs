@@ -232,4 +232,22 @@ impl Png {
 pub struct NotificationConfig {
     /// Shell command to run when the notification is clicked.
     pub action: Option<String>,
+    /// Notification icon name (e.g. "camera-photo").
+    pub icon: Option<String>,
+    /// Duration in milliseconds. -1 = never expire, 0 = server default.
+    pub timeout_ms: Option<i32>,
+    /// Urgency level: "low", "normal", or "critical".
+    pub urgency: Option<String>,
+    /// Application name shown in the notification.
+    pub app_name: Option<String>,
+    /// Title for the success notification.
+    pub success_summary: Option<String>,
+    /// Title for the failure notification.
+    pub failure_summary: Option<String>,
+    /// XDG sound name to play (e.g. "message-new-instant").
+    pub sound_name: Option<String>,
+    /// Transient hint: notification won't persist in notification center.
+    pub transient: Option<bool>,
+    /// Notification category hint (e.g. "transfer.complete", "im.received").
+    pub category: Option<String>,
 }

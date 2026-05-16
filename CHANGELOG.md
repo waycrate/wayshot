@@ -30,6 +30,7 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 #### Added
 
 - Cargo **features** gating **clipboard**, **color picker**, **logger**, **notifications**, **selector**, **AVIF**, and **JPEG XL** ([#306](https://github.com/waycrate/wayshot/pull/306), [@Gigas002](https://github.com/Gigas002)).
+- extended **`[notification]`** config: `icon`, `timeout_ms`, `urgency`, `app_name`, `success_summary`, `failure_summary`, `sound_name`, `transient`, `category` ([@Gigas002](https://github.com/Gigas002)).
 - split CLI implementation into focused modules (`clipboard`, `color_picker`, `notification`, `logger`, `screenshot`, …) ([#306](https://github.com/waycrate/wayshot/pull/306), [@Gigas002](https://github.com/Gigas002)).
 - **Freeze** before capture is **on by default**; set **`freeze`** in config, or pass **`--no-freeze`** on the CLI to disable (same idea as notifications) ([#309](https://github.com/waycrate/wayshot/pull/309), [@Gigas002](https://github.com/Gigas002)).
 - **`--delay`** before taking the shot ([#318](https://github.com/waycrate/wayshot/pull/318), [@Gigas002](https://github.com/Gigas002)).
