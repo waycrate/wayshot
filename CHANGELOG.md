@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/tag/v1.4.6)** (compare [`v1.4.6...HEAD`](https://github.com/waycrate/wayshot/compare/v1.4.6...HEAD)).
+## [1.5.0] - 2026-05-26
 
-### libwayshot
+### libwayshot 0.8.0
 
 #### Added
 
@@ -24,6 +24,12 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 
 - wait for frame completion after **`FrameState::Finished`** to avoid corrupted frames ([#328](https://github.com/waycrate/wayshot/pull/328), [@HiFiveJazz](https://github.com/HiFiveJazz)).
 - simpler resize / filter path for the region selector ([#329](https://github.com/waycrate/wayshot/pull/329), [@Gigas002](https://github.com/Gigas002)).
+- incorrect color channel assignment in **ext-image-copy** format handling ([`bd0af7d`](https://github.com/waycrate/wayshot/commit/bd0af7d7c89cea083a051adcb1dbf1dacfe46e3c), [@Gigas002](https://github.com/Gigas002)).
+
+#### Breaking Changes
+
+- image encodings other than **PNG** require explicit Cargo features ([#324](https://github.com/waycrate/wayshot/pull/324), [@Gigas002](https://github.com/Gigas002)).
+    - **Migration:** enable the codecs you need (`jpeg`, `webp`, `avif`, …) in `Cargo.toml` when building or depending on **libwayshot**.
 
 ### wayshot
 
@@ -36,7 +42,11 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 - **shell completions** generation ([#319](https://github.com/waycrate/wayshot/pull/319), [@Gigas002](https://github.com/Gigas002)).
 - optional **geometry string** after **`-g`** (e.g. `wayshot out.png -g $"$(waysip -d)"`) ([#333](https://github.com/waycrate/wayshot/pull/333), [@Gigas002](https://github.com/Gigas002)).
 - **`--geometry-foreground-color`** and **`--geometry-background-color`** for the region overlay ([#335](https://github.com/waycrate/wayshot/pull/335), [@saghen](https://github.com/saghen)).
+- **`[geometry]`** config (**`foreground_color`**, **`background_color`**) for the region overlay ([`252c175`](https://github.com/waycrate/wayshot/commit/252c175f187b07b78c74f979ed2d06e42d8ca56b), [@saghen](https://github.com/saghen)).
+- **`[notification]`** **`action`** config for a custom shell command when the notification is clicked ([`8039061`](https://github.com/waycrate/wayshot/commit/803906125b8c1a54c6c793d3e1dcd7beb684b62b), [@Suryansh-Dey](https://github.com/Suryansh-Dey)).
+- **`--color`** optional output **format** (`plain`, `hex`, `hex-alpha`, `rgb`, `rgba`, `hsl`) ([`d32e90c`](https://github.com/waycrate/wayshot/commit/d32e90c639def18ed22e4b7ddce029e9faf4e632), [@Gigas002](https://github.com/Gigas002) and [@0xsamalt](https://github.com/0xsamalt)).
 - **`--open-location`** to open the saved image path ([#283](https://github.com/waycrate/wayshot/pull/283), [@Suryansh-Dey](https://github.com/Suryansh-Dey)).
+- **`--silent`** alias **`--no-notifications`** ([`19a605b`](https://github.com/waycrate/wayshot/commit/19a605b4fb0d5f6fc8b14401ff1a2522403cb50e), [@Gigas002](https://github.com/Gigas002)).
 
 #### Changed
 
@@ -48,6 +58,8 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 
 - **`color_picker`** / **`selector`** feature wiring and docs ([#339](https://github.com/waycrate/wayshot/pull/339), [@saghen](https://github.com/saghen)).
 - **Dependabot** GitHub Actions config regression ([#345](https://github.com/waycrate/wayshot/pull/345), [@Gigas002](https://github.com/Gigas002)).
+- clipboard uses explicit **MIME** types per encoding instead of autodetect ([`be5683b`](https://github.com/waycrate/wayshot/commit/be5683b116be0ad8e9a7ecbc0ade34d611df6685), [@RustyCoderX](https://github.com/RustyCoderX)).
+- empty **`-g`** geometry string no longer falls through to interactive region selection ([`99ba370`](https://github.com/waycrate/wayshot/commit/99ba370aeede6c23f75a723261e01c763067ff4d), [@Gigas002](https://github.com/Gigas002)).
 
 #### Breaking Changes
 
@@ -250,4 +262,5 @@ Changes on `main` since **[1.4.6](https://github.com/waycrate/wayshot/releases/t
 - embedded region selection on adjacent outputs ([#199](https://github.com/waycrate/wayshot/pull/199), [@Pestdoktor](https://github.com/Pestdoktor)).
 
 [1.4.0]: https://github.com/waycrate/wayshot/compare/1.3.1...v1.4.0
-[Unreleased]: https://github.com/waycrate/wayshot/compare/v1.4.6...HEAD
+[1.5.0]: https://github.com/waycrate/wayshot/compare/v1.4.6...v1.5.0
+[Unreleased]: https://github.com/waycrate/wayshot/compare/v1.5.0...HEAD
