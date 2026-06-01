@@ -88,3 +88,29 @@ effort = 7
 # The command is run exactly as provided with no arguments appended.
 # If not set, opens the screenshot directory with xdg-open.
 # action = "xdg-open PATH"
+
+# Icon name shown in the notification (uses icon theme lookup).
+# icon = "camera-photo"
+
+# How long the notification is visible, in milliseconds.
+# -1 = never expire, 0 = server default, positive = milliseconds.
+# timeout_ms = 5000
+
+# Application name shown in the notification.
+# app_name = "wayshot"
+
+# Custom title for the success notification.
+# success_summary = "Screenshot Taken"
+
+# Custom title for the failure notification.
+# failure_summary = "Screenshot Failed"
+
+# XDG sound name to play when the notification appears.
+# sound_name = "message-new-instant"
+
+# If true, the notification is transient and won't persist in notification
+# center / history after it is dismissed.
+# transient = false
+
+# Notification category hint (e.g. "transfer.complete", "im.received").
+# category = "transfer.complete"
