@@ -14,6 +14,9 @@ pub mod region;
 pub mod screencast;
 mod screencopy;
 
+#[cfg(test)]
+mod tests;
+
 use std::{
     collections::HashSet, fs::File, os::fd::AsFd, path::Path, sync::atomic::Ordering, thread,
 };
