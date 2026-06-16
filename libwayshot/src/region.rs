@@ -68,7 +68,7 @@ pub struct LogicalRegion {
 ///
 /// Example:
 ///
-/// ````ignore
+/// ```text
 /// ┌─────────────┐
 /// │             │
 /// │  ┌──────────┼──────┐
@@ -84,7 +84,7 @@ pub struct LogicalRegion {
 /// │             │
 /// │    Screen 1 │
 /// └─────────────┘
-/// ````
+/// ```
 #[derive(Debug, Copy, Clone)]
 pub struct EmbeddedRegion {
     /// The coordinate sysd

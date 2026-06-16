@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-#[cfg(feature = "completions")]
+#[cfg(any(feature = "completions", feature = "color_picker"))]
 use clap::ValueEnum;
 use clap::{
     Parser,
@@ -24,6 +24,20 @@ pub enum Shell {
     Pwsh,
     Zsh,
     Nushell,
+}
+
+/// Output format for the color picker (`--color`).
+#[cfg(feature = "color_picker")]
+#[derive(ValueEnum, Clone, Debug, Default, PartialEq)]
+pub enum ColorFormat {
+    /// Print all channels in human-readable form (RGBA, float, hex).
+    #[default]
+    Plain,
+    Hex,
+    HexAlpha,
+    Rgb,
+    Rgba,
+    Hsl,
 }
 
 fn get_styles() -> Styles {
@@ -66,14 +80,34 @@ pub struct Cli {
     pub list_toplevels: bool,
 
     /// Click a point on screen and print its color values.
+    /// Optionally accepts a format: plain (default), hex, hex-alpha, rgb, rgba, hsl.
     #[cfg(feature = "color_picker")]
-    #[arg(long, conflicts_with_all = ["geometry", "output", "choose_output"])]
-    pub color: bool,
+    #[arg(
+        long,
+        value_name = "FORMAT",
+        conflicts_with_all = ["geometry", "output", "choose_output"],
+        default_missing_value = "plain",
+        num_args = 0..=1,
+    )]
+    pub color: Option<ColorFormat>,
 
     // ─── Capture target (what to capture) ────────────────────────────────────
-    /// Interactively select a screen region to capture.
-    #[arg(short, long)]
-    pub geometry: bool,
+    /// Select a screen region to capture.
+    /// Without a value: interactively select a region (requires the `selector` feature).
+    /// With a value: parse the geometry string in slurp/grim format "x,y widthxheight".
+    ///   Example: wayshot -g "$(slurp)" or wayshot -g "783,746 177x251"
+    #[arg(short, long, value_name = "GEOMETRY", num_args = 0..=1, verbatim_doc_comment)]
+    pub geometry: Option<Option<String>>,
+
+    /// Background color (rgba hex) while selecting a region (geometry).
+    /// Example: #00000050
+    #[arg(long, value_name = "HEX_COLOR")]
+    pub geometry_background_color: Option<String>,
+
+    /// Foreground color (rgba hex) while selecting a region (geometry).
+    /// Example: #ffffffff
+    #[arg(long, value_name = "HEX_COLOR")]
+    pub geometry_foreground_color: Option<String>,
 
     /// Capture a specific output/display by name.
     #[arg(short, long, conflicts_with = "geometry")]

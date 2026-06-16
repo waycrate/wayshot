@@ -222,6 +222,94 @@ This section documents the *[file]* table of the configuration file
 
 	Default: _7_
 
+# NOTIFICATION
+
+This section documents the *[notification]* table of the configuration file.
+
+_Requires the_ *notifications* _feature (enabled by default)._
+
+*action* = _"<string>"_
+
+	Command to execute when the user clicks the notification.
+	The command is run exactly as provided with no arguments appended.
+	If not set, opens the screenshot directory with xdg-open.
+
+	Examples:
+		- action = "xdg-open /home/user/Pictures" -> opens a fixed folder
+
+	Default: _xdg-open <screenshot directory>_
+
+*icon* = _"<string>"_
+
+	Icon name passed to the notification daemon. The daemon resolves it
+	against its own configured icon theme — not *XDG_ICON_THEME*. Set the
+	theme in your daemon's configuration (e.g. *icon_theme* in dunstrc).
+
+	Examples:
+		- icon = "accessories-camera" (candy-icons theme)
+		- icon = "camera-photo"
+
+	Default: _unset_ (daemon chooses its own default)
+
+*timeout_ms* = _<integer>_
+
+	How long the notification stays visible, in milliseconds.
+
+	- _-1_: never expire
+	- _0_: use the notification server's default
+	- positive integer: display for this many milliseconds
+
+	Default: _5000_
+
+*app_name* = _"<string>"_
+
+	Application name field sent with the notification.
+	Visible in some notification daemons and used for daemon-side filtering rules.
+
+	Default: _"wayshot"_
+
+*success_summary* = _"<string>"_
+
+	Title shown in the notification after a successful screenshot.
+
+	Default: _"Screenshot Taken"_
+
+*failure_summary* = _"<string>"_
+
+	Title shown in the notification when a screenshot fails.
+
+	Default: _"Screenshot Failed"_
+
+*sound_name* = _"<string>"_
+
+	XDG sound name hint sent with the notification.
+	Only respected by notification daemons that implement the freedesktop sound
+	hint (e.g. GNOME Shell, KDE Plasma). Standalone daemons such as *dunst* and
+	*mako* ignore this field — use their scripting feature to play sounds instead.
+
+	Example: sound_name = "message-new-instant"
+
+	Default: _unset_
+
+*transient* = _true_ | _false_
+
+	When true, marks the notification as transient. Transient notifications are
+	not stored in notification history or the notification center after dismissal.
+	Support depends on the notification daemon.
+
+	Default: _false_
+
+*category* = _"<string>"_
+
+	Notification category hint (freedesktop standard).
+	Can be used by notification daemons for filtering or styling rules.
+
+	Examples:
+		- category = "transfer.complete"
+		- category = "im.received"
+
+	Default: _unset_
+
 # SEE ALSO
 	- wayshot(1)
 	- wayshot(7)

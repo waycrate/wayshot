@@ -46,11 +46,13 @@ webp = ["image/webp"]
 clipboard = ["dep:wl-clipboard-rs", "dep:rustix"]
 
 # Adds the --color CLI flag: freeze the screen, click a pixel, print its RGBA/hex value.
-# No additional dependencies.
-color_picker = []
+# Requires the `selector` feature (uses libwaysip for point selection).
+color_picker = ["selector"]
 
 # Interactive screen-region selection via libwaysip (Wayland selection overlay).
 # Adds the --geometry CLI flag for interactive region selection.
+# Adds the --geometry-foreground-color and --geometry-background-color CLI flags for
+# setting the foreground and background colors.
 # Pulls in: libwaysip
 selector = ["dep:libwaysip"]
 
@@ -58,11 +60,11 @@ selector = ["dep:libwaysip"]
 # Disable to significantly reduce compile time on platforms where AVIF output is not needed.
 avif = ["image/avif"]
 
-# JPEG-XL encoding support via jpegxl-rs.
+# JPEG-XL encoding support via jxl-encoder.
 # Adds the `jxl` variant to --encoding and the [encoding.jxl] config section.
-# Disable to drop the jpegxl-rs dependency (useful on platforms without libjxl).
-# Pulls in: jpegxl-rs
-jxl = ["dep:jpegxl-rs"]
+# Disable to drop the jxl-encoder dependency if JPEG XL output is not needed.
+# Pulls in: jxl-encoder
+jxl = ["dep:jxl-encoder"]
 
 # Initialises the tracing subscriber and exposes the --log-level CLI flag.
 # Disable to suppress all stderr log output entirely.
@@ -71,8 +73,8 @@ logger = ["dep:tracing-subscriber"]
 
 # Sends a desktop notification (via D-Bus / libnotify) after each capture.
 # Disable removes the --silent CLI flag.
-# Pulls in: notify-rust
-notifications = ["dep:notify-rust"]
+# Pulls in: notify-rust, rustix
+notifications = ["dep:notify-rust", "dep:rustix"]
 
 # Adds the --completions <SHELL> CLI flag for generating shell completion scripts.
 # Pulls in: clap_complete, clap_complete_nushell
@@ -93,7 +95,7 @@ clap_complete = { version = "4.6", optional = true }
 clap_complete_nushell = { version = "4.6", optional = true }
 
 image = { workspace = true, features = ["png"] }
-jpegxl-rs = { version = "0.14", optional = true }
+jxl-encoder = { version = "0.3", optional = true }
 
 dialoguer = { version = "0.12", features = ["fuzzy-select"] }
 eyre = "0.6"
@@ -103,14 +105,14 @@ wl-clipboard-rs = { version = "0.9", optional = true }
 rustix = { workspace = true, features = ["process", "runtime"], optional = true }
 
 shellexpand = "3.1"
-toml = { version = "1.0", default-features = false, features = [
+toml = { version = "1.1", default-features = false, features = [
 	"parse",
 	"serde",
 ] }
 serde = { version = "1.0", features = ["derive"] }
 dirs = "6.0"
 libwaysip = { version = "0.6", optional = true }
-notify-rust = { version = "4.12", optional = true }
+notify-rust = { version = "4.17", optional = true }
 
 [[bin]]
 name = "wayshot"

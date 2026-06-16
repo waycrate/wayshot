@@ -14,6 +14,15 @@ Interactively select a screen region using the waysip overlay (requires *selecto
 
 	wayshot -g
 
+Optionally, with custom background/foreground colors:
+
+	wayshot -g --geometry-background-color 00000050 --geometry-foreground-color ffffffff
+
+Capture a region using a geometry string in slurp/grim format "_x_,_y_ _width_x_height_":
+
+	wayshot FILE -g "$(slurp)"
+	wayshot -g "783,746 177x251"
+
 # CAPTURE FULLSCREEN
 
 Capture all connected outputs:

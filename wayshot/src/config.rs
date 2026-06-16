@@ -1,6 +1,4 @@
 use crate::utils::EncodingFormat;
-#[cfg(feature = "jxl")]
-use jpegxl_rs::encode::EncoderSpeed;
 use serde::{Deserialize, Serialize};
 use std::{env, io::Read, path::PathBuf};
 #[cfg(feature = "logger")]
@@ -10,7 +8,9 @@ use tracing::Level;
 pub struct Config {
     pub base: Option<Base>,
     pub file: Option<File>,
+    pub geometry: Option<Geometry>,
     pub encoding: Option<Encoding>,
+    pub notification: Option<NotificationConfig>,
 }
 
 impl Default for Config {
@@ -18,7 +18,9 @@ impl Default for Config {
         Config {
             base: Some(Base::default()),
             file: Some(File::default()),
+            geometry: Some(Geometry::default()),
             encoding: Some(Encoding::default()),
+            notification: Some(NotificationConfig::default()),
         }
     }
 }
@@ -50,6 +52,8 @@ pub struct Base {
     pub stdout: Option<bool>,
     pub log_level: Option<String>,
     pub notifications: Option<bool>,
+    pub geometry_foreground_color: Option<String>,
+    pub geometry_background_color: Option<String>,
 }
 
 impl Default for Base {
@@ -64,6 +68,8 @@ impl Default for Base {
             stdout: Some(false),
             log_level: Some("info".to_string()),
             notifications: Some(true),
+            geometry_foreground_color: None,
+            geometry_background_color: None,
         }
     }
 }
@@ -97,6 +103,21 @@ impl Default for File {
             path: Some(env::current_dir().unwrap_or_default()),
             name_format: Some("wayshot-%Y_%m_%d-%H_%M_%S".to_string()),
             encoding: Some(EncodingFormat::default()),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Geometry {
+    pub foreground_color: Option<String>,
+    pub background_color: Option<String>,
+}
+
+impl Default for Geometry {
+    fn default() -> Self {
+        Geometry {
+            foreground_color: Some("#000000ff".to_string()),
+            background_color: Some("#66666680".to_string()),
         }
     }
 }
@@ -144,23 +165,7 @@ impl Jxl {
     }
 
     pub fn get_effort(&self) -> u8 {
-        self.effort.unwrap_or(7)
-    }
-
-    pub fn get_encoder_speed(&self) -> EncoderSpeed {
-        match self.get_effort() {
-            1 => EncoderSpeed::Lightning,
-            2 => EncoderSpeed::Thunder,
-            3 => EncoderSpeed::Falcon,
-            4 => EncoderSpeed::Cheetah,
-            5 => EncoderSpeed::Hare,
-            6 => EncoderSpeed::Wombat,
-            7 => EncoderSpeed::Squirrel,
-            8 => EncoderSpeed::Kitten,
-            9 => EncoderSpeed::Tortoise,
-            10 => EncoderSpeed::Glacier,
-            _ => EncoderSpeed::Squirrel,
-        }
+        self.effort.unwrap_or(7).clamp(1, 10)
     }
 }
 
@@ -221,4 +226,26 @@ impl Png {
             _ => image::codecs::png::FilterType::Adaptive,
         }
     }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct NotificationConfig {
+    /// Shell command to run when the notification is clicked.
+    pub action: Option<String>,
+    /// Notification icon name (e.g. "camera-photo").
+    pub icon: Option<String>,
+    /// Duration in milliseconds. -1 = never expire, 0 = server default.
+    pub timeout_ms: Option<i32>,
+    /// Application name shown in the notification.
+    pub app_name: Option<String>,
+    /// Title for the success notification.
+    pub success_summary: Option<String>,
+    /// Title for the failure notification.
+    pub failure_summary: Option<String>,
+    /// XDG sound name to play (e.g. "message-new-instant").
+    pub sound_name: Option<String>,
+    /// Transient hint: notification won't persist in notification center.
+    pub transient: Option<bool>,
+    /// Notification category hint (e.g. "transfer.complete", "im.received").
+    pub category: Option<String>,
 }

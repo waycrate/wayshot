@@ -63,7 +63,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         #[cfg(feature = "color_picker")]
-        Command::ColorPicker => color_picker::pick(&connection, settings.freeze),
+        Command::ColorPicker(format) => color_picker::pick(&connection, settings.freeze, format),
         Command::Screenshot(mode) => {
             if let Some(ms) = settings.delay {
                 std::thread::sleep(Duration::from_millis(ms as u64));
@@ -89,12 +89,16 @@ fn main() -> Result<()> {
 
                     #[cfg(feature = "clipboard")]
                     if settings.clipboard {
-                        clipboard::copy_to_clipboard(encoded)?;
+                        clipboard::copy_to_clipboard(encoded, settings.encoding)?;
                     }
 
                     #[cfg(feature = "notifications")]
                     if settings.notifications {
-                        notification::send_success(&shot_result);
+                        notification::send_success(
+                            &shot_result,
+                            settings.file.as_deref(),
+                            &settings.notification,
+                        );
                     }
                     // Silence unused warning when the notifications feature is disabled.
                     #[cfg(not(feature = "notifications"))]
@@ -105,7 +109,7 @@ fn main() -> Result<()> {
                 Err(e) => {
                     #[cfg(feature = "notifications")]
                     if settings.notifications {
-                        notification::send_failure(&e);
+                        notification::send_failure(&e, &settings.notification);
                     }
                     Err(e)
                 }

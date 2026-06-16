@@ -364,7 +364,7 @@ impl WayshotConnection {
     /// # Parameters
     /// - `output`: Reference to the [WayshotTarget] to inspect.
     /// # Returns
-    /// - A vector of [`FrameFormat`] if screen capture succeeds.
+    /// - A vector of `FrameFormat` if screen capture succeeds.
     /// - [`Error::ProtocolNotFound`] if wlr-screencopy protocol is not found.
     pub fn get_available_frame_formats(&self, target: &WayshotTarget) -> Result<Vec<FrameFormat>> {
         let state = match target {
@@ -390,7 +390,7 @@ impl WayshotConnection {
     /// - `frame_format`: `wl_shm::Format` to use for screen capture.
     /// - `capture_region`: Optional region specifying a sub-area of the output to capture. If `None`, the entire output is captured.
     /// # Returns
-    /// - A [`FrameGuard`] instance that holds the screen capture result, if screen capture is successful and frame_format is supported.
+    /// - A `FrameGuard` instance that holds the screen capture result, if screen capture is successful and frame_format is supported.
     /// - [`Error::FramecopyFailed`] if screen capture fails.
     /// - [`Error::NoSupportedBufferFormat`] if frame_format is not supported for the given output.
     pub fn capture_output_frame_shm_fd_with_format<T: AsFd>(
@@ -450,7 +450,7 @@ impl WayshotConnection {
 
         Ok((frame_format, frame_guard))
     }
-    /// Helper function/wrapper that uses the OpenGL extension OES_EGL_image to convert the EGLImage obtained from [`WayshotConnection::capture_output_frame_eglimage`]
+    /// Helper function/wrapper that uses the OpenGL extension OES_EGL_image to convert the EGLImage obtained from [`WayshotConnection::capture_target_frame_eglimage`]
     /// into a OpenGL texture.
     /// - The caller is supposed to setup everything required for the texture binding. An example call may look like:
     /// ```no_run, ignore
@@ -736,8 +736,8 @@ impl WayshotConnection {
         Ok((state, event_queue, frame, frame_format))
     }
 
-    /// Capture the target the the current state, the result include [CaptureFrameState],
-    /// [EventQueue<CaptureFrameState>] and a [WayshotFrame]
+    /// Capture the target the the current state, the result include `CaptureFrameState`,
+    /// `EventQueue<CaptureFrameState>` and a [WayshotFrame]
     pub fn capture_target_frame_get_state(
         &self,
         target: &WayshotTarget,
@@ -1128,7 +1128,7 @@ impl WayshotConnection {
     ) -> Result<(FrameCopy, FrameGuard)> {
         // Create an in memory file and return it's file descriptor.
         let fd = create_shm_fd()?;
-        // Create a writeable memory map backed by a mem_file.
+        // Create a writable memory map backed by a mem_file.
         let mem_file = File::from(fd);
 
         let (frame_format, frame_guard) = self.capture_output_frame_shm_from_file(

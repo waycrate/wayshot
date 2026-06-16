@@ -298,7 +298,6 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
             ext_image_copy_capture_session_v1::Event::BufferSize { width, height } => {
                 state.session_size.width = width;
                 state.session_size.height = height;
-                //formats is guaranteed to have at least one element due to the check above
                 for format in &mut state.formats {
                     format.size = Size { width, height };
                     format.stride = 4 * width;
@@ -325,8 +324,6 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
                     size: state.session_size,
                     stride: 4 * state.session_size.width,
                 });
-                let set_format = &mut state.formats[0];
-                set_format.format = format;
             }
             ext_image_copy_capture_session_v1::Event::DmabufDevice { device } => {
                 if !state.find_gbm {

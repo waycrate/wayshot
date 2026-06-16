@@ -1,4 +1,5 @@
 target
+result
 *.gz
 *.out
 .direnv

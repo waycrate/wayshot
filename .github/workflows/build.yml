@@ -2,6 +2,10 @@ name: Build
 
 on: [push, pull_request]
 
+permissions:
+    contents: read
+    actions: write
+
 env:
     CARGO_TERM_COLOR: always
 
@@ -34,7 +38,7 @@ jobs:
 
             - name: Install wayland dependencies
               run: |
-                  pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl
+                  pacman -Syu --noconfirm egl-wayland egl-gbm wayland base-devel mesa pango cairo
 
             - name: Build (${{ matrix.name }})
               run: cargo build ${{ matrix.cargo_args }}

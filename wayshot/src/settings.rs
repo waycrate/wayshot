@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf};
 
 use crate::cli::Cli;
-use crate::config::{self, Config};
+use crate::config::{self, Config, Geometry};
 use crate::screenshot::CaptureMode;
 use crate::utils::{self, EncodingFormat};
 
@@ -17,7 +17,7 @@ pub(crate) enum Command {
     ListToplevels,
     /// Pick a pixel color interactively and exit.
     #[cfg(feature = "color_picker")]
-    ColorPicker,
+    ColorPicker(crate::cli::ColorFormat),
     /// Capture a screenshot using the given mode.
     Screenshot(CaptureMode),
 }
@@ -51,12 +51,15 @@ pub(crate) struct AppSettings {
     pub(crate) clipboard: bool,
     #[cfg(feature = "notifications")]
     pub(crate) notifications: bool,
+    #[cfg(feature = "notifications")]
+    pub(crate) notification: config::NotificationConfig,
 }
 
 impl AppSettings {
     pub(crate) fn resolve(cli: &Cli, config: &Config) -> Self {
         let base = config.base.clone().unwrap_or_default();
         let file_config = config.file.clone().unwrap_or_default();
+        let geometry_config = config.geometry.clone().unwrap_or_default();
         let encoding_config = config.encoding.clone().unwrap_or_default();
 
         // ── Cursor ────────────────────────────────────────────────────────────
@@ -128,11 +131,11 @@ impl AppSettings {
                 break 'cmd Command::ListToplevels;
             }
             #[cfg(feature = "color_picker")]
-            if cli.color {
-                break 'cmd Command::ColorPicker;
+            if let Some(fmt) = cli.color.clone() {
+                break 'cmd Command::ColorPicker(fmt);
             }
             let output = cli.output.clone().or_else(|| base.output.clone());
-            Command::Screenshot(Self::resolve_capture_mode(cli, output))
+            Command::Screenshot(Self::resolve_capture_mode(cli, output, geometry_config))
         };
 
         AppSettings {
@@ -149,13 +152,52 @@ impl AppSettings {
             clipboard: cli.clipboard || base.clipboard.unwrap_or_default(),
             #[cfg(feature = "notifications")]
             notifications: !cli.silent && base.notifications.unwrap_or(true),
+            #[cfg(feature = "notifications")]
+            notification: config.notification.clone().unwrap_or_default(),
         }
     }
 
-    fn resolve_capture_mode(cli: &Cli, output: Option<String>) -> CaptureMode {
-        #[cfg(feature = "selector")]
-        if cli.geometry {
-            return CaptureMode::Geometry;
+    fn resolve_capture_mode(
+        cli: &Cli,
+        output: Option<String>,
+        geometry_config: Geometry,
+    ) -> CaptureMode {
+        if let Some(geometry) = &cli.geometry {
+            match geometry {
+                Some(s) if !s.trim().is_empty() => match utils::parse_slurp_geometry(s) {
+                    Ok(region) => return CaptureMode::GeometryRegion(region),
+                    Err(e) => {
+                        tracing::error!("invalid geometry: {e}");
+                        std::process::exit(1);
+                    }
+                },
+                Some(_) => {
+                    tracing::error!("geometry string is empty or incorrect");
+                    std::process::exit(1);
+                }
+                None => {
+                    #[cfg(feature = "selector")]
+                    return CaptureMode::Geometry {
+                        foreground_color: cli
+                            .geometry_foreground_color
+                            .clone()
+                            .or(geometry_config.foreground_color),
+                        background_color: cli
+                            .geometry_background_color
+                            .clone()
+                            .or(geometry_config.background_color),
+                    };
+                    #[cfg(not(feature = "selector"))]
+                    {
+                        let _ = geometry_config; // suppress clippy unused warning
+                        tracing::error!(
+                            "interactive geometry selection requires the selector feature; \
+                             provide a geometry string instead, e.g. wayshot -g \"$(slurp)\""
+                        );
+                        std::process::exit(1);
+                    }
+                }
+            }
         }
         if let Some(ref name) = cli.toplevel {
             CaptureMode::Toplevel(name.clone())

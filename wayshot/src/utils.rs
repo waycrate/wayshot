@@ -5,7 +5,7 @@ use image::{
     codecs::png::{CompressionType, FilterType, PngEncoder},
 };
 #[cfg(feature = "jxl")]
-use jpegxl_rs::encode::{EncoderResult, EncoderSpeed};
+use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
 use serde::{Deserialize, Serialize};
 use std::{
     env,
@@ -61,6 +61,53 @@ pub fn print_completions(shell: crate::cli::Shell) {
     }
 }
 
+// ─── Slurp-style geometry parser ─────────────────────────────────────────────
+
+/// Parse a geometry string in slurp/grim format: "x,y widthxheight" (e.g. "100,200 300x400").
+pub fn parse_slurp_geometry(s: &str) -> Result<libwayshot::LogicalRegion, String> {
+    let s = s.trim();
+    if s.is_empty() {
+        return Err("geometry string is empty".to_string());
+    }
+    let (pos, size) = s
+        .split_once(|c: char| c.is_ascii_whitespace())
+        .ok_or_else(|| format!("invalid geometry: expected 'x,y widthxheight', got '{s}'"))?;
+    let (x, y) = pos
+        .split_once(',')
+        .ok_or_else(|| format!("invalid position: expected 'x,y', got '{pos}'"))?;
+    let (w, h) = size
+        .split_once('x')
+        .ok_or_else(|| format!("invalid size: expected 'widthxheight', got '{size}'"))?;
+    let x: i32 = x
+        .trim()
+        .parse()
+        .map_err(|_| format!("invalid x coordinate: {x}"))?;
+    let y: i32 = y
+        .trim()
+        .parse()
+        .map_err(|_| format!("invalid y coordinate: {y}"))?;
+    let w: u32 = w
+        .trim()
+        .parse()
+        .map_err(|_| format!("invalid width: {w}"))?;
+    let h: u32 = h
+        .trim()
+        .parse()
+        .map_err(|_| format!("invalid height: {h}"))?;
+    if w == 0 || h == 0 {
+        return Err("width and height must be positive".to_string());
+    }
+    Ok(libwayshot::LogicalRegion {
+        inner: libwayshot::region::Region {
+            position: libwayshot::region::Position { x, y },
+            size: libwayshot::region::Size {
+                width: w,
+                height: h,
+            },
+        },
+    })
+}
+
 // ─── Region helpers ───────────────────────────────────────────────────────────
 
 #[cfg(any(feature = "selector", feature = "color_picker"))]
@@ -87,10 +134,27 @@ pub fn waysip_to_region(
     })
 }
 
+#[cfg(feature = "selector")]
+fn color_from_hex(rgba_hex: String) -> Result<libwaysip::Color, String> {
+    libwaysip::Color::hex_to_color(rgba_hex.clone())
+        .map_err(|e| format!("Failed to parse color \"{rgba_hex}\" as rgba hex: {e}"))
+}
+
 /// Run WaySip area selection and return the chosen region. Used for both freeze and live paths.
 #[cfg(feature = "selector")]
-pub fn get_region_area(conn: &libwayshot::WayshotConnection) -> Result<LogicalRegion, String> {
-    let info = libwaysip::WaySip::new()
+pub fn get_region_area(
+    conn: &libwayshot::WayshotConnection,
+    foreground_color: Option<String>,
+    background_color: Option<String>,
+) -> Result<LogicalRegion, String> {
+    let mut info = libwaysip::WaySip::new();
+    if let Some(color) = foreground_color {
+        info = info.with_border_text_color(color_from_hex(color)?);
+    }
+    if let Some(color) = background_color {
+        info = info.with_background_color(color_from_hex(color)?);
+    }
+    let info = info
         .with_connection(conn.conn.clone())
         .with_selection_type(libwaysip::SelectionType::Area)
         .get()
@@ -297,7 +361,7 @@ pub fn encode_image(
             image,
             jxl.get_lossless(),
             jxl.get_distance(),
-            jxl.get_encoder_speed(),
+            jxl.get_effort(),
         ),
         EncodingFormat::Png => encode_to_png_bytes(image, png.get_compression(), png.get_filter()),
         #[cfg(any(
@@ -320,20 +384,24 @@ fn encode_to_jxl_bytes(
     image: &DynamicImage,
     lossless: bool,
     distance: f32,
-    speed: EncoderSpeed,
+    effort: u8,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    // Alpha channel causes artefacts in jpegxl-rs; screenshots don't need it.
-    // See: https://github.com/inflation/jpegxl-rs/issues/96
     let pixels_rgb8 = image.to_rgb8();
     let pixels = pixels_rgb8.as_raw();
-    let mut encoder = jpegxl_rs::encoder_builder()
-        .lossless(lossless)
-        .quality(distance)
-        .speed(speed)
-        .build()?;
-    let EncoderResult { data, .. } =
-        encoder.encode::<u8, u8>(pixels, image.width(), image.height())?;
-    Ok(data.to_vec())
+    let w = image.width();
+    let h = image.height();
+    if lossless {
+        Ok(LosslessConfig::new()
+            .with_effort(effort)
+            .encode(pixels, w, h, PixelLayout::Rgb8)?)
+    } else {
+        Ok(LossyConfig::new(distance).with_effort(effort).encode(
+            pixels,
+            w,
+            h,
+            PixelLayout::Rgb8,
+        )?)
+    }
 }
 
 fn encode_to_png_bytes(

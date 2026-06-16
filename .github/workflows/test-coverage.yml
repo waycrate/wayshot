@@ -2,6 +2,10 @@ name: Test and coverage
 
 on: [push, pull_request]
 
+permissions:
+    contents: read
+    actions: write
+
 env:
     CARGO_TERM_COLOR: always
 
@@ -24,7 +28,7 @@ jobs:
 
             - name: Install wayland dependencies
               run: |
-                  pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo libjxl
+                  pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo
 
             - name: Install cargo-llvm-cov
               uses: taiki-e/install-action@v2
@@ -43,7 +47,7 @@ jobs:
                   cargo llvm-cov --all-features -p wayshot --lcov --output-path lcov-wayshot.info
 
             - name: Upload libwayshot coverage to Codecov
-              uses: codecov/codecov-action@v6
+              uses: codecov/codecov-action@v7
               with:
                   files: ./lcov-libwayshot.info
                   flags: libwayshot
@@ -54,7 +58,7 @@ jobs:
                   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
             - name: Upload wayshot coverage to Codecov
-              uses: codecov/codecov-action@v6
+              uses: codecov/codecov-action@v7
               with:
                   files: ./lcov-wayshot.info
                   flags: wayshot
