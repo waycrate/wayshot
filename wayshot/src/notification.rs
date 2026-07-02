@@ -18,7 +18,9 @@ pub fn send_success(
 ) {
     let body = match result {
         ShotResult::Output { name } => format!("Screenshot of output '{name}' saved"),
-        ShotResult::Toplevel { name } => format!("Screenshot of toplevel '{name}' saved"),
+        ShotResult::Toplevel { identifier } => {
+            format!("Screenshot of toplevel '{identifier}' saved")
+        }
         ShotResult::Area => "Screenshot of selected area saved".to_string(),
         ShotResult::All => "Screenshot of all outputs saved".to_string(),
     };
