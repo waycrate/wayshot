@@ -61,7 +61,7 @@ pub struct Cli {
     #[arg(long)]
     pub list_outputs_info: bool,
 
-    /// List all active toplevel windows.
+    /// List all active toplevel windows. you will the information about id+title+identifier
     #[arg(long, alias = "list-windows")]
     pub list_toplevels: bool,
 
@@ -96,7 +96,7 @@ pub struct Cli {
     #[arg(long, alias = "choose-output", conflicts_with_all = ["geometry", "output"])]
     pub choose_output: bool,
 
-    /// Capture a specific toplevel window by its "app_id title" string.
+    /// Capture a specific toplevel window by its identifier string.
     #[arg(long, alias = "window", conflicts_with_all = ["geometry", "output", "choose_output", "choose_toplevel"])]
     pub toplevel: Option<String>,
 

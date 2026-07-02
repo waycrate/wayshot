@@ -57,7 +57,7 @@ fn main() -> Result<()> {
         }
         Command::ListToplevels => {
             for tl in connection.get_all_toplevels().iter().filter(|t| t.active) {
-                writeln!(writer, "{}", tl.id_and_title())?;
+                writeln!(writer, "{}", tl.id_title_identifier())?;
             }
             writer.flush()?;
             Ok(())

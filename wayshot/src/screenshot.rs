@@ -9,7 +9,7 @@ use libwayshot::WayshotConnection;
 #[cfg_attr(not(feature = "notifications"), allow(dead_code))]
 pub enum ShotResult {
     Output { name: String },
-    Toplevel { name: String },
+    Toplevel { identifier: String },
     Area,
     All,
 }
@@ -24,7 +24,7 @@ pub enum CaptureMode {
     },
     /// A fixed region parsed from a slurp/waysip geometry string.
     GeometryRegion(libwayshot::LogicalRegion),
-    /// A specific toplevel window by its id+title string.
+    /// A specific toplevel window by its identifier string.
     Toplevel(String),
     /// Interactive fuzzy-select from active toplevel windows.
     ChooseToplevel,
@@ -60,7 +60,7 @@ pub fn capture(
             let image = conn.screenshot(*region, cursor)?;
             Ok((image, ShotResult::Area))
         }
-        CaptureMode::Toplevel(name) => capture_toplevel_by_name(conn, name, cursor),
+        CaptureMode::Toplevel(name) => capture_toplevel_by_identifier(conn, name, cursor),
         CaptureMode::ChooseToplevel => capture_toplevel_interactive(conn, cursor),
         CaptureMode::Output(name) => capture_output_by_name(conn, name, cursor),
         CaptureMode::ChooseOutput => capture_output_interactive(conn, cursor),
@@ -93,21 +93,21 @@ fn capture_geometry(
     Ok((image, ShotResult::Area))
 }
 
-fn capture_toplevel_by_name(
+fn capture_toplevel_by_identifier(
     conn: &WayshotConnection,
-    name: &str,
+    identifier: &str,
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
     let toplevels = conn.get_all_toplevels();
     let toplevel = toplevels
         .iter()
         .filter(|t| t.active)
-        .find(|t| t.id_and_title() == name)
-        .ok_or_else(|| eyre::eyre!("No toplevel window matched '{name}'"))?;
+        .find(|t| t.identifier == identifier)
+        .ok_or_else(|| eyre::eyre!("No toplevel window matched '{identifier}'"))?;
     Ok((
         conn.screenshot_toplevel(toplevel, cursor)?,
         ShotResult::Toplevel {
-            name: name.to_string(),
+            identifier: identifier.to_string(),
         },
     ))
 }
@@ -126,7 +126,7 @@ fn capture_toplevel_interactive(
     Ok((
         conn.screenshot_toplevel(active[idx], cursor)?,
         ShotResult::Toplevel {
-            name: names[idx].clone(),
+            identifier: names[idx].clone(),
         },
     ))
 }

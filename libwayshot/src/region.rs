@@ -51,6 +51,9 @@ impl TopLevel {
     pub fn id_and_title(&self) -> String {
         format!("{} {}", self.app_id, self.title)
     }
+    pub fn id_title_identifier(&self) -> String {
+        format!("{} {} {}", self.app_id, self.title, self.identifier)
+    }
 }
 
 /// `Region` where the coordinate system is the logical coordinate system used
