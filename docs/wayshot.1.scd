@@ -40,7 +40,7 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 	List all connected outputs with their name, description, size, and position.
 
 *--list-toplevels*, *--list-windows*
-	List all active toplevel windows.
+	List all active toplevel windows, with app_id, title and identifier
 
 *--color*
 	Click a pixel and print its RGBA and hex color value. By default the screen is frozen first;
@@ -76,8 +76,8 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 *--choose-output*
 	Present a fuzzy selector for output/display selection.
 
-*--toplevel <APP_ID TITLE>*, *--window <APP_ID TITLE>*
-	Capture a specific toplevel window identified by its "app_id title" string.
+*--toplevel <Identifier>*, *--window <Identifier>*
+	Capture a specific toplevel window identified by its "identifier" string.
 	Use *--list-toplevels* to discover available strings.
 
 *--choose-toplevel*, *--choose-window*
