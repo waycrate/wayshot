@@ -61,7 +61,7 @@ pub struct Cli {
     #[arg(long)]
     pub list_outputs_info: bool,
 
-    /// List all active toplevel windows. you will the information about id+title+identifier
+    /// List all active toplevel windows. You will see the information about id+title+identifier
     #[arg(long, alias = "list-windows")]
     pub list_toplevels: bool,
 
