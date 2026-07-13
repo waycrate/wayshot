@@ -27,7 +27,7 @@ use wayland_protocols::{
 use wayland_protocols_wlr::screencopy::v1::client::zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1;
 
 use crate::{
-    EmbeddedRegion, Error, Result, Size, WayshotConnection, WayshotTarget,
+    Error, Result, Size, WayshotConnection, WayshotTarget,
     dispatch::{CaptureFrameState, DMABUFState, FrameState, WayshotState},
 };
 
@@ -427,13 +427,11 @@ impl WayshotConnection {
         target: WayshotTarget,
         cursor_overlay: bool,
         shm_format: wl_shm::Format,
-        capture_region: Option<EmbeddedRegion>,
         fd: T,
     ) -> Result<WayshotScreenCast> {
         let (event_queue, image_copy_manager, foreign_manager, output_manager, wlr_screencopy) =
             self.screencast_init()?;
-        let (state, _, _) =
-            self.capture_target_frame_get_state(&target, cursor_overlay, capture_region)?;
+        let (state, _, _) = self.capture_target_frame_get_state(&target, cursor_overlay, None)?;
         let Some(frame_format) = state
             .formats
             .iter()
