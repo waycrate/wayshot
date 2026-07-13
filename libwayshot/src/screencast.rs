@@ -45,7 +45,7 @@ pub struct WayshotScreenCast {
     #[cfg(feature = "egl")]
     egl_display: Option<crate::egl::EglDisplay>,
     image_copy_manager: ExtImageCopyCaptureManagerV1,
-    foreign_manager: ExtForeignToplevelImageCaptureSourceManagerV1,
+    foreign_manager: Option<ExtForeignToplevelImageCaptureSourceManagerV1>,
     output_manager: ExtOutputImageCaptureSourceManagerV1,
     event_queue: EventQueue<CaptureFrameState>,
 }
@@ -96,7 +96,13 @@ impl WayshotScreenCast {
                     .create_session(&source, options, &qh, ())
             }
             WayshotTarget::Toplevel(toplevel) => {
-                let source = self.foreign_manager.create_source(toplevel, &qh, ());
+                let source = self
+                    .foreign_manager
+                    .as_ref()
+                    .ok_or(Error::Unsupported(
+                        "foreign_manager is not supported".to_owned(),
+                    ))?
+                    .create_source(toplevel, &qh, ());
 
                 self.image_copy_manager
                     .create_session(&source, options, &qh, ())
@@ -173,7 +179,7 @@ impl WayshotConnection {
     ) -> Result<(
         EventQueue<CaptureFrameState>,
         ExtImageCopyCaptureManagerV1,
-        ExtForeignToplevelImageCaptureSourceManagerV1,
+        Option<ExtForeignToplevelImageCaptureSourceManagerV1>,
         ExtOutputImageCaptureSourceManagerV1,
     )> {
         let event_queue = self.conn.new_event_queue::<CaptureFrameState>();
@@ -185,7 +191,8 @@ impl WayshotConnection {
             .bind::<ExtImageCopyCaptureManagerV1, _, _>(&qh, 1..=1, ())?;
         let toplevel_source_manager = self
             .globals
-            .bind::<ExtForeignToplevelImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())?;
+            .bind::<ExtForeignToplevelImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())
+            .ok();
         let output_source_manager = self
             .globals
             .bind::<ExtOutputImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())?;

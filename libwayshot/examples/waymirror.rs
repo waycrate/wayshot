@@ -47,7 +47,7 @@ fn main() {
         .try_init_dmabuf(WayshotTarget::Screen(output.clone()))
         .expect("Cannot find a drm");
     let cast = wayshot
-        .create_screencast_with_dmabuf(WayshotTarget::Screen(output), true, None)
+        .create_screencast_with_dmabuf(WayshotTarget::Screen(output), true)
         .unwrap();
 
     let view_porter = globals
@@ -56,7 +56,6 @@ fn main() {
     let viewport = view_porter.get_viewport(&base_surface, &qhandle, ());
 
     let mut state = State {
-        wayshot,
         running: true,
         base_surface,
         viewport,
@@ -83,7 +82,6 @@ fn main() {
 }
 
 struct State {
-    wayshot: WayshotConnection,
     running: bool,
     base_surface: wl_surface::WlSurface,
     viewport: wp_viewport::WpViewport,
@@ -96,7 +94,7 @@ struct State {
 
 impl State {
     fn refresh_surface(&mut self) -> libwayshot::Result<()> {
-        self.wayshot.screencast(&mut self.cast)?;
+        self.cast.screencast()?;
 
         self.cast_size = self.cast.current_size();
         self.base_surface.attach(Some(self.cast.buffer()), 0, 0);
