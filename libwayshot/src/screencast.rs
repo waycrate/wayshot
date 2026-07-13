@@ -1,4 +1,4 @@
-use std::os::fd::AsFd;
+use std::{os::fd::AsFd, sync::atomic::Ordering};
 
 use gbm::{BufferObject, BufferObjectFlags};
 use wayland_client::{
@@ -24,6 +24,7 @@ use wayland_protocols::{
         zwp_linux_buffer_params_v1, zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1,
     },
 };
+use wayland_protocols_wlr::screencopy::v1::client::zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1;
 
 use crate::{
     EmbeddedRegion, Error, Result, Size, WayshotConnection, WayshotTarget,
@@ -44,9 +45,10 @@ pub struct WayshotScreenCast {
     bo: Option<BufferObject<()>>,
     #[cfg(feature = "egl")]
     egl_display: Option<crate::egl::EglDisplay>,
-    image_copy_manager: ExtImageCopyCaptureManagerV1,
+    image_copy_manager: Option<ExtImageCopyCaptureManagerV1>,
     foreign_manager: Option<ExtForeignToplevelImageCaptureSourceManagerV1>,
-    output_manager: ExtOutputImageCaptureSourceManagerV1,
+    output_manager: Option<ExtOutputImageCaptureSourceManagerV1>,
+    wlr_screencopy: Option<ZwlrScreencopyManagerV1>,
     event_queue: EventQueue<CaptureFrameState>,
 }
 
@@ -75,12 +77,89 @@ impl WayshotScreenCast {
         &self.buffer
     }
 
+    fn screencast_wlr(&mut self) -> Result<()> {
+        let mut state = CaptureFrameState::new(false);
+        let qh = self.event_queue.handle();
+        let screencopy_manager = self.wlr_screencopy.as_ref().ok_or(Error::Unsupported(
+            "wlr_screencopy is not support".to_owned(),
+        ))?;
+
+        tracing::debug!("Capturing output(shm buffer)...");
+        let WayshotTarget::Screen(output) = &self.target else {
+            unreachable!()
+        };
+
+        let frame = screencopy_manager.capture_output(self.cursor_overlay as i32, output, &qh, ());
+        // Empty internal event buffer until buffer_done is set to true which is when the Buffer done
+        // event is fired, aka the capture from the compositor is successful.
+        while !state.buffer_done.load(Ordering::SeqCst) {
+            self.event_queue.blocking_dispatch(&mut state)?;
+        }
+        if let Some(shm_format) = &self.shm_format {
+            let Some(frame_format) = state
+                .formats
+                .iter()
+                .find(|f| f.format == *shm_format)
+                .copied()
+            else {
+                return Err(Error::NoSupportedBufferFormat);
+            };
+
+            self.current_size = Size {
+                width: frame_format.size.width as i32,
+                height: frame_format.size.height as i32,
+            };
+        } else {
+            let Some(frame_format) = state.formats.first() else {
+                return Err(Error::NoSupportedBufferFormat);
+            };
+            self.current_size = Size {
+                width: frame_format.size.width as i32,
+                height: frame_format.size.height as i32,
+            };
+        }
+        frame.copy(&self.buffer);
+        loop {
+            // Basically reads, if frame state is not None then...
+            if let Some(state) = state.state {
+                match state {
+                    FrameState::Failed => {
+                        tracing::error!("Frame copy failed");
+                        return Err(Error::FramecopyFailed);
+                    }
+                    FrameState::FailedWithReason(reason) => {
+                        tracing::error!("Frame copy failed");
+                        return Err(Error::FramecopyFailedWithReason(reason));
+                    }
+                    FrameState::Finished => {
+                        tracing::trace!("Frame copy finished");
+                        break;
+                    }
+                }
+            }
+
+            self.event_queue.blocking_dispatch(&mut state)?;
+        }
+
+        #[cfg(feature = "egl")]
+        if let (Some(egl_display), Some(bo)) = (self.egl_display.as_ref(), self.dmabuf_bo()) {
+            if state.dmabuf_formats.is_empty() {
+                return Err(Error::NoDMAStateError);
+            }
+            let frame_format = state.dmabuf_formats[0];
+            crate::egl::create_egl_image_and_bind_to_gl_texture(*egl_display, bo, &frame_format)?;
+        }
+        Ok(())
+    }
     /// Do screencast once
     /// Please check the result to see you should update the status
     ///
     /// if with [Error::FramecopyFailedWithReason], you need to update the status, for example,
     /// send the param_changes to pipewire
     pub fn screencast(&mut self) -> Result<()> {
+        if self.target.is_screen() && self.image_copy_manager.is_none() {
+            return self.screencast_wlr();
+        }
         let mut state = CaptureFrameState::new(false);
         let qh = self.event_queue.handle();
         let options = if self.cursor_overlay {
@@ -88,12 +167,20 @@ impl WayshotScreenCast {
         } else {
             Options::empty()
         };
+        let image_copy_manager = self.image_copy_manager.as_ref().ok_or(Error::Unsupported(
+            "image_copy_manager is not supported".to_owned(),
+        ))?;
         let session = match &self.target {
             WayshotTarget::Screen(output) => {
-                let source = self.output_manager.create_source(output, &qh, ());
+                let source = self
+                    .output_manager
+                    .as_ref()
+                    .ok_or(Error::Unsupported(
+                        "output_manager is not supported".to_owned(),
+                    ))?
+                    .create_source(output, &qh, ());
 
-                self.image_copy_manager
-                    .create_session(&source, options, &qh, ())
+                image_copy_manager.create_session(&source, options, &qh, ())
             }
             WayshotTarget::Toplevel(toplevel) => {
                 let source = self
@@ -104,8 +191,7 @@ impl WayshotScreenCast {
                     ))?
                     .create_source(toplevel, &qh, ());
 
-                self.image_copy_manager
-                    .create_session(&source, options, &qh, ())
+                image_copy_manager.create_session(&source, options, &qh, ())
             }
         };
         let frame = session.create_frame(&qh, ());
@@ -178,29 +264,37 @@ impl WayshotConnection {
         &self,
     ) -> Result<(
         EventQueue<CaptureFrameState>,
-        ExtImageCopyCaptureManagerV1,
+        Option<ExtImageCopyCaptureManagerV1>,
         Option<ExtForeignToplevelImageCaptureSourceManagerV1>,
-        ExtOutputImageCaptureSourceManagerV1,
+        Option<ExtOutputImageCaptureSourceManagerV1>,
+        Option<ZwlrScreencopyManagerV1>,
     )> {
         let event_queue = self.conn.new_event_queue::<CaptureFrameState>();
         let qh = event_queue.handle();
+        let screencopy_manager = self
+            .globals
+            .bind::<ZwlrScreencopyManagerV1, _, _>(&qh, 3..=3, ())
+            .ok();
 
         // Bind managers
         let manager = self
             .globals
-            .bind::<ExtImageCopyCaptureManagerV1, _, _>(&qh, 1..=1, ())?;
+            .bind::<ExtImageCopyCaptureManagerV1, _, _>(&qh, 1..=1, ())
+            .ok();
         let toplevel_source_manager = self
             .globals
             .bind::<ExtForeignToplevelImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())
             .ok();
         let output_source_manager = self
             .globals
-            .bind::<ExtOutputImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())?;
+            .bind::<ExtOutputImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())
+            .ok();
         Ok((
             event_queue,
             manager,
             toplevel_source_manager,
             output_source_manager,
+            screencopy_manager,
         ))
     }
     /// This will run once to get the device provided by ext-image-copy. If you did not init the
@@ -250,7 +344,8 @@ impl WayshotConnection {
         let Some(dmabuf_state) = &self.dmabuf_state else {
             return Err(Error::NoDMAStateError);
         };
-        let (event_queue, im_manager, foreign_manager, output_manager) = self.screencast_init()?;
+        let (event_queue, image_copy_manager, foreign_manager, output_manager, wlr_screencopy) =
+            self.screencast_init()?;
         let (state, _, _) = self.capture_target_frame_get_state(&target, cursor_overlay, None)?;
         if state.dmabuf_formats.is_empty() {
             return Err(Error::NoSupportedBufferFormat);
@@ -317,10 +412,11 @@ impl WayshotConnection {
             bo: Some(bo),
             #[cfg(feature = "egl")]
             egl_display: None,
-            image_copy_manager: im_manager,
+            image_copy_manager,
             foreign_manager,
             output_manager,
             event_queue,
+            wlr_screencopy,
         })
     }
     /// This will save a screencast status for you
@@ -333,7 +429,7 @@ impl WayshotConnection {
         capture_region: Option<EmbeddedRegion>,
         fd: T,
     ) -> Result<WayshotScreenCast> {
-        let (event_queue, image_copy_manager, foreign_manager, output_manager) =
+        let (event_queue, image_copy_manager, foreign_manager, output_manager, wlr_screencopy) =
             self.screencast_init()?;
         let (state, _, _) =
             self.capture_target_frame_get_state(&target, cursor_overlay, capture_region)?;
@@ -387,6 +483,7 @@ impl WayshotConnection {
             foreign_manager,
             output_manager,
             event_queue,
+            wlr_screencopy,
         })
     }
 }

@@ -146,6 +146,13 @@ impl WayshotTarget {
             Self::Toplevel(toplevel) => toplevel.is_alive(),
         }
     }
+
+    pub fn is_screen(&self) -> bool {
+        matches!(self, WayshotTarget::Screen(_))
+    }
+    pub fn is_toplevel(&self) -> bool {
+        matches!(self, WayshotTarget::Toplevel(_))
+    }
 }
 
 fn check_toplevel_protocols(globals: &GlobalList, conn: &Connection) -> Result<()> {
