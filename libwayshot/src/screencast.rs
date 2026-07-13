@@ -260,6 +260,7 @@ impl WayshotScreenCast {
 }
 
 impl WayshotConnection {
+    #[allow(clippy::type_complexity)]
     fn screencast_init(
         &self,
     ) -> Result<(
