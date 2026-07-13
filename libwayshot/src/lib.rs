@@ -202,7 +202,7 @@ impl WayshotConnection {
     }
 
     // NOTE: this function says if we need to try receive the gdm information from ext-image-copy
-    fn need_try_find_gbm(&self) -> bool {
+    pub(crate) fn need_try_find_gbm(&self) -> bool {
         !self.has_gbm() && self.find_dmabuf
     }
     ///Create a WayshotConnection struct having DMA-BUF support

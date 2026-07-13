@@ -36,7 +36,6 @@ pub struct WaylandEGLState {
 
     pub xdg_surface: xdg_surface::XdgSurface,
 
-    wayshot: WayshotConnection,
     cast: WayshotScreenCast,
     pub instant: Instant,
 }
@@ -52,7 +51,7 @@ fn init_cast(
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
     }
     connection
-        .create_screencast_with_egl(target, true, None, egl_display)
+        .create_screencast_with_egl(target, true, egl_display)
         .unwrap()
 }
 
@@ -148,7 +147,6 @@ impl WaylandEGLState {
                 gl_texture: 0,
 
                 xdg_surface,
-                wayshot,
                 instant: Instant::now()
                     .checked_add(Duration::from_millis(10))
                     .unwrap(),
@@ -292,6 +290,6 @@ impl WaylandEGLState {
     }
 
     pub fn cast(&mut self) {
-        let _ = self.wayshot.screencast(&mut self.cast);
+        let _ = self.cast.screencast();
     }
 }
