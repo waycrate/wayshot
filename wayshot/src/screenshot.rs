@@ -98,7 +98,7 @@ fn capture_toplevel_by_identifier(
     identifier: &str,
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
-    let toplevels = conn.get_all_toplevels().to_vec();
+    let toplevels = conn.get_all_toplevels();
     let toplevel = toplevels
         .iter()
         .filter(|t| t.active)
@@ -116,7 +116,7 @@ fn capture_toplevel_interactive(
     conn: &mut WayshotConnection,
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
-    let toplevels = conn.get_all_toplevels().to_vec();
+    let toplevels = conn.get_all_toplevels();
     let active: Vec<_> = toplevels.iter().filter(|t| t.active).collect();
     if active.is_empty() {
         bail!("No active toplevel windows found!");
@@ -136,7 +136,7 @@ fn capture_output_by_name(
     name: &str,
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
-    let outputs = conn.get_all_outputs().to_vec();
+    let outputs = conn.get_all_outputs();
     let output = outputs
         .iter()
         .find(|o| o.name == name)
@@ -153,7 +153,7 @@ fn capture_output_interactive(
     conn: &mut WayshotConnection,
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
-    let outputs = conn.get_all_outputs().to_vec();
+    let outputs = conn.get_all_outputs();
     let names: Vec<&str> = outputs.iter().map(|o| o.name.as_str()).collect();
     let idx = fuzzy_select(&names).ok_or_else(|| eyre::eyre!("No output selected!"))?;
     Ok((
