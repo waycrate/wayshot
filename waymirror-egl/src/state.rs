@@ -41,7 +41,7 @@ pub struct WaylandEGLState {
 }
 
 fn init_cast(
-    connection: &libwayshot::WayshotConnection,
+    connection: &mut libwayshot::WayshotConnection,
     target: WayshotTarget,
     gl_texture: GLuint,
     egl_display: egl::Display,
@@ -131,7 +131,7 @@ impl WaylandEGLState {
         let mut wayshot = WayshotConnection::from_connection(server_connection).unwrap();
         let target = WayshotTarget::Screen(wayshot.get_all_outputs()[0].wl_output.clone());
         wayshot.try_init_dmabuf(target.clone()).unwrap();
-        let cast = init_cast(&wayshot, target, 0, egl_display);
+        let cast = init_cast(&mut wayshot, target, 0, egl_display);
         Ok((
             Self {
                 width: 1920,

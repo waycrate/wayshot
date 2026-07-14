@@ -39,7 +39,7 @@ fn main() -> Result<()> {
 
     let settings = AppSettings::resolve(&cli, &config);
 
-    let connection = WayshotConnection::new()?;
+    let mut connection = WayshotConnection::new()?;
     let stdout = io::stdout();
     let mut writer = BufWriter::new(stdout.lock());
 
@@ -63,12 +63,12 @@ fn main() -> Result<()> {
             Ok(())
         }
         #[cfg(feature = "color_picker")]
-        Command::ColorPicker(format) => color_picker::pick(&connection, settings.freeze, format),
+        Command::ColorPicker(format) => color_picker::pick(&mut connection, settings.freeze, format),
         Command::Screenshot(mode) => {
             if let Some(ms) = settings.delay {
                 std::thread::sleep(Duration::from_millis(ms as u64));
             }
-            let result = screenshot::capture(&connection, &mode, settings.cursor, settings.freeze);
+            let result = screenshot::capture(&mut connection, &mode, settings.cursor, settings.freeze);
             match result {
                 Ok((image_buffer, shot_result)) => {
                     let encoded = utils::encode_image(

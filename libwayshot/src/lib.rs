@@ -112,6 +112,7 @@ pub struct WayshotConnection {
     toplevel_capture_support: bool,
     image_copy_support: bool,
     find_dmabuf: bool,
+    registers: WayshotRegisters,
 }
 
 pub enum WayshotFrame {
@@ -155,23 +156,22 @@ impl WayshotTarget {
     }
 }
 
-fn check_toplevel_protocols(globals: &GlobalList, conn: &Connection) -> Result<()> {
-    let event_queue = conn.new_event_queue::<CaptureFrameState>();
-    let qh = event_queue.handle();
-
-    // Bind managers
-    globals.bind::<ExtImageCopyCaptureManagerV1, _, _>(&qh, 1..=1, ())?;
-    globals.bind::<ExtForeignToplevelImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())?;
-    Ok(())
-}
-
-fn check_ext_image_copy_protocols(globals: &GlobalList, conn: &Connection) -> Result<()> {
-    let event_queue = conn.new_event_queue::<CaptureFrameState>();
-    let qh = event_queue.handle();
-
-    // Bind managers
-    globals.bind::<ExtImageCopyCaptureManagerV1, _, _>(&qh, 1..=1, ())?;
-    Ok(())
+#[derive(Debug)]
+pub(crate) struct WayshotRegisters {
+    pub layer_event_queue: EventQueue<LayerShellState>,
+    pub capture_event_queue: EventQueue<CaptureFrameState>,
+    pub output_event_queue: EventQueue<OutputCaptureState>,
+    pub zxdg_output_manager: ZxdgOutputManagerV1,
+    #[allow(unused)]
+    pub toplevel_list: Option<ExtForeignToplevelListV1>,
+    pub layer_shell: Option<ZwlrLayerShellV1>,
+    pub compositor: WlCompositor,
+    pub viewporter: Option<WpViewporter>,
+    pub shm: WlShm,
+    pub screencopy_manager: Option<ZwlrScreencopyManagerV1>,
+    pub image_copy_capture_manager: Option<ExtImageCopyCaptureManagerV1>,
+    pub output_image_management: Option<ExtOutputImageCaptureSourceManagerV1>,
+    pub toplevel_source_manager: Option<ExtForeignToplevelImageCaptureSourceManagerV1>,
 }
 
 impl WayshotConnection {
@@ -181,22 +181,115 @@ impl WayshotConnection {
         Self::from_connection(conn)
     }
 
+    fn check_toplevel_protocols(&mut self) {
+        self.toplevel_capture_support = self.registers.image_copy_capture_manager.is_some()
+            && self.registers.toplevel_source_manager.is_some();
+    }
+
+    fn check_ext_image_copy_protocols(&mut self) {
+        self.image_copy_support = self.registers.image_copy_capture_manager.is_some()
+    }
+    fn init_bindings(conn: &Connection, globals: &GlobalList) -> Result<WayshotRegisters> {
+        let layer_event_queue: EventQueue<LayerShellState> =
+            conn.new_event_queue::<LayerShellState>();
+        let capture_event_queue = conn.new_event_queue::<CaptureFrameState>();
+        let output_event_queue = conn.new_event_queue::<OutputCaptureState>();
+        // Bind to xdg_output global.
+        let zxdg_output_manager = match globals.bind::<ZxdgOutputManagerV1, _, _>(
+            &output_event_queue.handle(),
+            3..=3,
+            (),
+        ) {
+            Ok(x) => x,
+            Err(e) => {
+                tracing::error!(
+                    "Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?"
+                );
+                return Err(Error::Bind(e));
+            }
+        };
+
+        let toplevel_list = globals
+            .bind::<ExtForeignToplevelListV1, _, _>(&capture_event_queue.handle(), 1..=1, ())
+            .ok();
+        let layer_shell = globals
+            .bind::<ZwlrLayerShellV1, _, _>(&layer_event_queue.handle(), 1..=1, ())
+            .ok();
+        let compositor =
+            match globals.bind::<WlCompositor, _, _>(&layer_event_queue.handle(), 3..=3, ()) {
+                Ok(x) => x,
+                Err(e) => {
+                    tracing::error!(
+                        "Failed to create compositor. Does your compositor implement WlCompositor?"
+                    );
+                    tracing::error!("err: {e}");
+                    return Err(Error::ProtocolNotFound(
+                        "WlCompositor not found".to_string(),
+                    ));
+                }
+            };
+        let viewporter = globals
+            .bind::<WpViewporter, _, _>(&layer_event_queue.handle(), 1..=1, ())
+            .ok();
+        let screencopy_manager = globals
+            .bind::<ZwlrScreencopyManagerV1, _, _>(&capture_event_queue.handle(), 3..=3, ())
+            .ok();
+
+        let image_copy_capture_manager = globals
+            .bind::<ExtImageCopyCaptureManagerV1, _, _>(&capture_event_queue.handle(), 1..=1, ())
+            .ok();
+
+        let output_image_management = globals
+            .bind::<ExtOutputImageCaptureSourceManagerV1, _, _>(
+                &capture_event_queue.handle(),
+                1..=1,
+                (),
+            )
+            .ok();
+        let toplevel_source_manager = globals
+            .bind::<ExtForeignToplevelImageCaptureSourceManagerV1, _, _>(
+                &capture_event_queue.handle(),
+                1..=1,
+                (),
+            )
+            .ok();
+        let shm = globals.bind::<WlShm, _, _>(&capture_event_queue.handle(), 1..=1, ())?;
+
+        Ok(WayshotRegisters {
+            layer_event_queue,
+            capture_event_queue,
+            output_event_queue,
+            zxdg_output_manager,
+            toplevel_list,
+            layer_shell,
+            compositor,
+            viewporter,
+            shm,
+            screencopy_manager,
+            image_copy_capture_manager,
+            output_image_management,
+            toplevel_source_manager,
+        })
+    }
+
     /// Recommended if you already have a [`wayland_client::Connection`].
     pub fn from_connection(conn: Connection) -> Result<Self> {
         let (globals, _) = registry_queue_init::<WayshotState>(&conn)?;
+        let registers = Self::init_bindings(&conn, &globals)?;
 
-        let image_copy_support = check_ext_image_copy_protocols(&globals, &conn).is_ok();
-        let toplevel_capture_support = check_toplevel_protocols(&globals, &conn).is_ok();
         let mut initial_state = Self {
             conn,
             globals,
             output_infos: Vec::new(),
             toplevel_infos: Vec::new(),
             dmabuf_state: None,
-            toplevel_capture_support,
-            image_copy_support,
+            toplevel_capture_support: false,
+            image_copy_support: false,
             find_dmabuf: false,
+            registers,
         };
+        initial_state.check_ext_image_copy_protocols();
+        initial_state.check_toplevel_protocols();
 
         initial_state.refresh_outputs()?;
         let _ = initial_state.refresh_toplevels();
@@ -222,13 +315,12 @@ impl WayshotConnection {
         device_path: P,
     ) -> Result<Self> {
         let (globals, evq) = registry_queue_init::<WayshotState>(&conn)?;
+        let registers = Self::init_bindings(&conn, &globals)?;
         let linux_dmabuf =
             globals.bind(&evq.handle(), 4..=ZwpLinuxDmabufV1::interface().version, ())?;
         let gpu = dispatch::Card::open(device_path)?;
         // init a GBM device
         let gbm = GBMDevice::new(gpu)?;
-        let image_copy_support = check_ext_image_copy_protocols(&globals, &conn).is_ok();
-        let toplevel_capture_support = check_toplevel_protocols(&globals, &conn).is_ok();
         let mut initial_state = Self {
             conn,
             globals,
@@ -238,10 +330,13 @@ impl WayshotConnection {
                 linux_dmabuf,
                 gbmdev: gbm,
             }),
-            toplevel_capture_support,
-            image_copy_support,
+            toplevel_capture_support: false,
+            image_copy_support: false,
             find_dmabuf: false,
+            registers,
         };
+        initial_state.check_ext_image_copy_protocols();
+        initial_state.check_toplevel_protocols();
 
         initial_state.refresh_outputs()?;
         let _ = initial_state.refresh_toplevels();
@@ -270,23 +365,10 @@ impl WayshotConnection {
         let mut state = OutputCaptureState {
             outputs: Vec::new(),
         };
-        let mut event_queue = self.conn.new_event_queue::<OutputCaptureState>();
-        let qh = event_queue.handle();
 
-        // Bind to xdg_output global.
-        let zxdg_output_manager = match self.globals.bind::<ZxdgOutputManagerV1, _, _>(
-            &qh,
-            3..=3,
-            (),
-        ) {
-            Ok(x) => x,
-            Err(e) => {
-                tracing::error!(
-                    "Failed to create ZxdgOutputManagerV1 version 3. Does your compositor implement ZxdgOutputManagerV1?"
-                );
-                return Err(Error::Bind(e));
-            }
-        };
+        let event_queue = &mut self.registers.output_event_queue;
+        let qh = event_queue.handle();
+        let zxdg_output_manager = &self.registers.zxdg_output_manager;
 
         // Fetch all outputs; when their names arrive, add them to the list
         let _ = self.conn.display().get_registry(&qh, ());
@@ -325,13 +407,7 @@ impl WayshotConnection {
     pub fn refresh_toplevels(&mut self) -> Result<()> {
         let mut state = CaptureFrameState::new(self.need_try_find_gbm());
 
-        let mut event_queue = self.conn.new_event_queue::<CaptureFrameState>();
-        let qh = event_queue.handle();
-
-        let _toplevel_list = self
-            .globals
-            .bind::<ExtForeignToplevelListV1, _, _>(&qh, 1..=1, ())?;
-
+        let event_queue = &mut self.registers.capture_event_queue;
         event_queue.roundtrip(&mut state)?;
 
         self.toplevel_infos = state.toplevels;
@@ -373,14 +449,17 @@ impl WayshotConnection {
     /// # Returns
     /// - A vector of `FrameFormat` if screen capture succeeds.
     /// - [`Error::ProtocolNotFound`] if wlr-screencopy protocol is not found.
-    pub fn get_available_frame_formats(&self, target: &WayshotTarget) -> Result<Vec<FrameFormat>> {
+    pub fn get_available_frame_formats(
+        &mut self,
+        target: &WayshotTarget,
+    ) -> Result<Vec<FrameFormat>> {
         let state = match target {
             WayshotTarget::Screen(output) => {
-                let (state, _, _) = self.capture_output_frame_get_state(output, 0, None)?;
+                let (state, _) = self.capture_output_frame_get_state(output, 0, None)?;
                 state
             }
             WayshotTarget::Toplevel(toplevel) => {
-                let (state, _, _) = self.capture_toplevel_frame_get_state(toplevel, false)?;
+                let (state, _) = self.capture_toplevel_frame_get_state(toplevel, false)?;
                 state
             }
         };
@@ -401,14 +480,14 @@ impl WayshotConnection {
     /// - [`Error::FramecopyFailed`] if screen capture fails.
     /// - [`Error::NoSupportedBufferFormat`] if frame_format is not supported for the given output.
     pub fn capture_output_frame_shm_fd_with_format<T: AsFd>(
-        &self,
+        &mut self,
         output: &WlOutput,
         cursor_overlay: i32,
         fd: T,
         frame_format: wl_shm::Format,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<FrameGuard> {
-        let (state, event_queue, frame) =
+        let (state, frame) =
             self.capture_output_frame_get_state(output, cursor_overlay, capture_region)?;
         if let Some(format) = state
             .formats
@@ -416,8 +495,7 @@ impl WayshotConnection {
             .find(|f| f.format == frame_format)
             .copied()
         {
-            let frame_guard: FrameGuard =
-                self.image_copy_frame_inner(state, event_queue, frame, format, fd)?;
+            let frame_guard: FrameGuard = self.image_copy_frame_inner(state, frame, format, fd)?;
             Ok(frame_guard)
         } else {
             Err(Error::NoSupportedBufferFormat)
@@ -426,34 +504,32 @@ impl WayshotConnection {
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
     ///  Data will be written to fd.
     pub fn capture_output_frame_shm_fd<T: AsFd>(
-        &self,
+        &mut self,
         output: &WlOutput,
         cursor_overlay: i32,
         fd: T,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(FrameFormat, FrameGuard)> {
-        let (state, event_queue, frame, frame_format) =
+        let (state, frame, frame_format) =
             self.capture_output_frame_get_state_shm(output, cursor_overlay, capture_region)?;
-        let frame_guard =
-            self.image_copy_frame_inner(state, event_queue, frame, frame_format, fd)?;
+        let frame_guard = self.image_copy_frame_inner(state, frame, frame_format, fd)?;
 
         Ok((frame_format, frame_guard))
     }
 
     fn capture_output_frame_shm_from_file(
-        &self,
+        &mut self,
         output: &WlOutput,
         cursor_overlay: bool,
         file: &File,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(FrameFormat, FrameGuard)> {
-        let (state, event_queue, frame, frame_format) =
+        let (state, frame, frame_format) =
             self.capture_output_frame_get_state_shm(output, cursor_overlay as i32, capture_region)?;
 
         file.set_len(frame_format.byte_size())?;
 
-        let frame_guard =
-            self.image_copy_frame_inner(state, event_queue, frame, frame_format, file)?;
+        let frame_guard = self.image_copy_frame_inner(state, frame, frame_format, file)?;
 
         Ok((frame_format, frame_guard))
     }
@@ -479,7 +555,7 @@ impl WayshotConnection {
     /// - If the function was not found, [`Error::EGLImageToTexProcNotFoundError`] is returned
     #[cfg(feature = "egl")]
     pub fn bind_target_frame_to_gl_texture(
-        &self,
+        &mut self,
         target: &WayshotTarget,
         cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
@@ -503,7 +579,7 @@ impl WayshotConnection {
     /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
     #[cfg(feature = "egl")]
     pub fn capture_target_frame_eglimage(
-        &self,
+        &mut self,
         target: &WayshotTarget,
         cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
@@ -535,7 +611,7 @@ impl WayshotConnection {
     /// On error, the EGL [error code](https://registry.khronos.org/EGL/sdk/docs/man/html/eglGetError.xhtml) is returned via this crates Error type
     #[cfg(feature = "egl")]
     pub fn capture_target_frame_eglimage_on_display(
-        &self,
+        &mut self,
         egl_display: crate::egl::EglDisplay,
         target: &WayshotTarget,
         cursor_overlay: bool,
@@ -559,16 +635,17 @@ impl WayshotConnection {
     /// # Errors
     /// - Returns `NoDMAStateError` if the DMA-BUF state is not initialized a the time of initialization of this struct.
     pub fn capture_target_frame_dmabuf(
-        &self,
+        &mut self,
         target: &WayshotTarget,
         cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(DMAFrameFormat, DMAFrameGuard, BufferObject<()>)> {
+        let (state, frame) =
+            self.capture_target_frame_get_state(target, cursor_overlay, capture_region)?;
         let Some(dmabuf_state) = &self.dmabuf_state else {
             return Err(Error::NoDMAStateError);
         };
-        let (state, event_queue, frame) =
-            self.capture_target_frame_get_state(target, cursor_overlay, capture_region)?;
+
         if state.dmabuf_formats.is_empty() {
             return Err(Error::NoSupportedBufferFormat);
         }
@@ -593,7 +670,6 @@ impl WayshotConnection {
         );
         let frame_guard = self.capture_output_frame_inner_dmabuf(
             state,
-            event_queue,
             frame,
             frame_format,
             stride,
@@ -609,36 +685,15 @@ impl WayshotConnection {
     // the current format can lead to color distortion. This function attempts
     // a trial screenshot to determine the screen's properties.
     fn capture_output_frame_get_state_wlr(
-        &self,
+        &mut self,
         mut state: CaptureFrameState,
-        mut event_queue: EventQueue<CaptureFrameState>,
         output: &WlOutput,
         cursor_overlay: i32,
         capture_region: Option<EmbeddedRegion>,
-    ) -> Result<(
-        CaptureFrameState,
-        EventQueue<CaptureFrameState>,
-        WayshotFrame,
-    )> {
+    ) -> Result<(CaptureFrameState, WayshotFrame)> {
+        let event_queue = &mut self.registers.capture_event_queue;
         let qh = event_queue.handle();
-
-        // Instantiating screencopy manager.
-        let screencopy_manager = match self.globals.bind::<ZwlrScreencopyManagerV1, _, _>(
-            &qh,
-            3..=3,
-            (),
-        ) {
-            Ok(x) => x,
-            Err(e) => {
-                tracing::error!(
-                    "Failed to create screencopy manager. Does your compositor implement ZwlrScreencopy?"
-                );
-                tracing::error!("err: {e}");
-                return Err(Error::ProtocolNotFound(
-                    "ZwlrScreencopy Manager not found".to_string(),
-                ));
-            }
-        };
+        let screencopy_manager = self.registers.screencopy_manager.as_ref().unwrap();
 
         tracing::debug!("Capturing output(shm buffer)...");
         let frame = if let Some(embedded_region) = capture_region {
@@ -666,28 +721,31 @@ impl WayshotConnection {
             "Received compositor frame buffer formats: {:#?}",
             state.formats
         );
-        Ok((state, event_queue, WayshotFrame::WlrScreenshot(frame)))
+        Ok((state, WayshotFrame::WlrScreenshot(frame)))
     }
 
     fn capture_output_frame_get_state_ext(
-        &self,
+        &mut self,
         mut state: CaptureFrameState,
-        mut event_queue: EventQueue<CaptureFrameState>,
-        manager: ExtImageCopyCaptureManagerV1,
         cursor_overlay: i32,
         output: &WlOutput,
-    ) -> Result<(
-        CaptureFrameState,
-        EventQueue<CaptureFrameState>,
-        WayshotFrame,
-    )> {
+    ) -> Result<(CaptureFrameState, WayshotFrame)> {
+        let event_queue = &mut self.registers.capture_event_queue;
+        let manager =
+            self.registers
+                .image_copy_capture_manager
+                .as_ref()
+                .ok_or(Error::ProtocolNotFound(
+                    "ExtImageCopyCaptureManagerV1".to_owned(),
+                ))?;
         let qh = event_queue.handle();
-        let output_management = self
-            .globals
-            .bind::<ExtOutputImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())
-            .map_err(|_| {
-                Error::ProtocolNotFound("ExtOutputImageCaptureSourceManagerV1".to_string())
-            })?;
+        let output_management =
+            self.registers
+                .output_image_management
+                .as_ref()
+                .ok_or(Error::ProtocolNotFound(
+                    "ExtOutputImageCaptureSourceManagerV1".to_string(),
+                ))?;
         let source = output_management.create_source(output, &qh, ());
         let options = Options::from_bits(cursor_overlay.try_into().unwrap_or(0))
             .unwrap_or(Options::PaintCursors);
@@ -701,21 +759,16 @@ impl WayshotConnection {
             state.formats
         );
 
-        Ok((state, event_queue, WayshotFrame::ExtImageCopy(frame)))
+        Ok((state, WayshotFrame::ExtImageCopy(frame)))
     }
 
     fn capture_output_frame_get_state_shm(
-        &self,
+        &mut self,
         output: &WlOutput,
         cursor_overlay: i32,
         capture_region: Option<EmbeddedRegion>,
-    ) -> Result<(
-        CaptureFrameState,
-        EventQueue<CaptureFrameState>,
-        WayshotFrame,
-        FrameFormat,
-    )> {
-        let (state, event_queue, frame) =
+    ) -> Result<(CaptureFrameState, WayshotFrame, FrameFormat)> {
+        let (state, frame) =
             self.capture_output_frame_get_state(output, cursor_overlay, capture_region)?;
         // Filter advertised wl_shm formats and select the first one that matches.
         let frame_format = state
@@ -740,21 +793,17 @@ impl WayshotConnection {
             })?;
         tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
 
-        Ok((state, event_queue, frame, frame_format))
+        Ok((state, frame, frame_format))
     }
 
     /// Capture the target the the current state, the result include `CaptureFrameState`,
     /// `EventQueue<CaptureFrameState>` and a [WayshotFrame]
     pub fn capture_target_frame_get_state(
-        &self,
+        &mut self,
         target: &WayshotTarget,
         cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
-    ) -> Result<(
-        CaptureFrameState,
-        EventQueue<CaptureFrameState>,
-        WayshotFrame,
-    )> {
+    ) -> Result<(CaptureFrameState, WayshotFrame)> {
         match target {
             WayshotTarget::Screen(output) => {
                 self.capture_output_frame_get_state(output, cursor_overlay as i32, capture_region)
@@ -771,44 +820,23 @@ impl WayshotConnection {
     // the current format can lead to color distortion. This function attempts
     // a trial screenshot to determine the screen's properties.
     pub fn capture_output_frame_get_state(
-        &self,
+        &mut self,
         output: &WlOutput,
         cursor_overlay: i32,
         capture_region: Option<EmbeddedRegion>,
-    ) -> Result<(
-        CaptureFrameState,
-        EventQueue<CaptureFrameState>,
-        WayshotFrame,
-    )> {
+    ) -> Result<(CaptureFrameState, WayshotFrame)> {
         let state = CaptureFrameState::new(self.need_try_find_gbm());
-        let event_queue = self.conn.new_event_queue::<CaptureFrameState>();
-        let qh = event_queue.handle();
-        match self
-            .globals
-            .bind::<ExtImageCopyCaptureManagerV1, _, _>(&qh, 1..=1, ())
-        {
-            Ok(manager) => self.capture_output_frame_get_state_ext(
-                state,
-                event_queue,
-                manager,
-                cursor_overlay,
-                output,
-            ),
-            Err(_) => self.capture_output_frame_get_state_wlr(
-                state,
-                event_queue,
-                output,
-                cursor_overlay,
-                capture_region,
-            ),
+        if self.registers.image_copy_capture_manager.is_some() {
+            self.capture_output_frame_get_state_ext(state, cursor_overlay, output)
+        } else {
+            self.capture_output_frame_get_state_wlr(state, output, cursor_overlay, capture_region)
         }
     }
 
     #[allow(clippy::too_many_arguments)]
     fn capture_output_frame_inner_dmabuf<T: AsFd>(
-        &self,
+        &mut self,
         state: CaptureFrameState,
-        event_queue: EventQueue<CaptureFrameState>,
         frame: WayshotFrame,
         frame_format: DMAFrameFormat,
         stride: u32,
@@ -818,7 +846,6 @@ impl WayshotConnection {
         match frame {
             WayshotFrame::WlrScreenshot(frame) => self.capture_output_frame_inner_dmabuf_wlr(
                 state,
-                event_queue,
                 frame,
                 frame_format,
                 stride,
@@ -827,7 +854,6 @@ impl WayshotConnection {
             ),
             WayshotFrame::ExtImageCopy(frame) => self.ext_image_copy_frame_dmabuf_inner(
                 state,
-                event_queue,
                 frame,
                 frame_format,
                 stride,
@@ -839,9 +865,8 @@ impl WayshotConnection {
 
     #[allow(clippy::too_many_arguments)]
     fn ext_image_copy_frame_dmabuf_inner<T: AsFd>(
-        &self,
+        &mut self,
         mut state: CaptureFrameState,
-        mut event_queue: EventQueue<CaptureFrameState>,
         frame: ExtImageCopyCaptureFrameV1,
         frame_format: DMAFrameFormat,
         stride: u32,
@@ -854,6 +879,7 @@ impl WayshotConnection {
         };
         let fd = fd.as_fd();
 
+        let event_queue = &mut self.registers.capture_event_queue;
         // Connecting to wayland environment.
         let qh = event_queue.handle();
 
@@ -912,9 +938,8 @@ impl WayshotConnection {
 
     #[allow(clippy::too_many_arguments)]
     fn capture_output_frame_inner_dmabuf_wlr<T: AsFd>(
-        &self,
+        &mut self,
         mut state: CaptureFrameState,
-        mut event_queue: EventQueue<CaptureFrameState>,
         frame: ZwlrScreencopyFrameV1,
         frame_format: DMAFrameFormat,
         stride: u32,
@@ -926,6 +951,7 @@ impl WayshotConnection {
         };
         let fd = fd.as_fd();
 
+        let event_queue = &mut self.registers.capture_event_queue;
         // Connecting to wayland environment.
         let qh = event_queue.handle();
 
@@ -985,36 +1011,35 @@ impl WayshotConnection {
     }
 
     fn image_copy_frame_inner<T: AsFd>(
-        &self,
+        &mut self,
         state: CaptureFrameState,
-        event_queue: EventQueue<CaptureFrameState>,
         frame: WayshotFrame,
         frame_format: FrameFormat,
         fd: T,
     ) -> Result<FrameGuard> {
         match frame {
             WayshotFrame::WlrScreenshot(frame) => {
-                self.wlr_screencopy_inner(state, event_queue, frame, frame_format, fd)
+                self.wlr_screencopy_inner(state, frame, frame_format, fd)
             }
             WayshotFrame::ExtImageCopy(frame) => {
-                self.ext_image_copy_frame_inner(state, event_queue, frame, frame_format, fd)
+                self.ext_image_copy_frame_inner(state, frame, frame_format, fd)
             }
         }
     }
 
     fn wlr_screencopy_inner<T: AsFd>(
-        &self,
+        &mut self,
         mut state: CaptureFrameState,
-        mut event_queue: EventQueue<CaptureFrameState>,
         frame: ZwlrScreencopyFrameV1,
         frame_format: FrameFormat,
         fd: T,
     ) -> Result<FrameGuard> {
+        let event_queue = &mut self.registers.capture_event_queue;
         // Connecting to wayland environment.
         let qh = event_queue.handle();
 
-        // Instantiate shm global.
-        let shm = self.globals.bind::<WlShm, _, _>(&qh, 1..=1, ())?;
+        let shm = &self.registers.shm;
+
         let shm_pool = shm.create_pool(
             fd.as_fd(),
             frame_format
@@ -1062,18 +1087,18 @@ impl WayshotConnection {
     }
 
     fn ext_image_copy_frame_inner<T: AsFd>(
-        &self,
+        &mut self,
         mut state: CaptureFrameState,
-        mut event_queue: EventQueue<CaptureFrameState>,
         frame: ExtImageCopyCaptureFrameV1,
         frame_format: FrameFormat,
         fd: T,
     ) -> Result<FrameGuard> {
+        let event_queue = &mut self.registers.capture_event_queue;
         // Connecting to wayland environment.
         let qh = event_queue.handle();
 
+        let shm = &self.registers.shm;
         // Instantiate shm global.
-        let shm = self.globals.bind::<WlShm, _, _>(&qh, 1..=1, ())?;
         let shm_pool = shm.create_pool(
             fd.as_fd(),
             frame_format
@@ -1128,7 +1153,7 @@ impl WayshotConnection {
     /// Get a FrameCopy instance with screenshot pixel data for any wl_output object.
     #[tracing::instrument(skip_all, fields(output = format!("{output_info}"), region = capture_region.map(|r| format!("{r:}")).unwrap_or("fullscreen".to_string())))]
     fn capture_frame_copy(
-        &self,
+        &mut self,
         output_info: &OutputInfo,
         cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
@@ -1172,7 +1197,7 @@ impl WayshotConnection {
     }
 
     pub fn capture_frame_copies(
-        &self,
+        &mut self,
         output_capture_regions: &[(OutputInfo, Option<EmbeddedRegion>)],
         cursor_overlay: bool,
     ) -> Result<Vec<(FrameCopy, FrameGuard, OutputInfo)>> {
@@ -1188,7 +1213,7 @@ impl WayshotConnection {
     /// Create a layer shell surface for each output,
     /// render the screen captures on them and use the callback to select a region from them
     fn overlay_frames_and_select_region<F>(
-        &self,
+        &mut self,
         frames: &[(FrameCopy, FrameGuard, OutputInfo)],
         callback: F,
     ) -> Result<LogicalRegion>
@@ -1198,35 +1223,23 @@ impl WayshotConnection {
         let mut state = LayerShellState {
             configured_outputs: HashSet::new(),
         };
-        let mut event_queue: EventQueue<LayerShellState> =
-            self.conn.new_event_queue::<LayerShellState>();
-        let qh = event_queue.handle();
+        let qh = self.registers.layer_event_queue.handle();
 
-        let compositor = match self.globals.bind::<WlCompositor, _, _>(&qh, 3..=3, ()) {
-            Ok(x) => x,
-            Err(e) => {
-                tracing::error!(
-                    "Failed to create compositor. Does your compositor implement WlCompositor?"
-                );
-                tracing::error!("err: {e}");
-                return Err(Error::ProtocolNotFound(
-                    "WlCompositor not found".to_string(),
-                ));
-            }
-        };
-        let layer_shell = match self.globals.bind::<ZwlrLayerShellV1, _, _>(&qh, 1..=1, ()) {
-            Ok(x) => x,
-            Err(e) => {
+        let compositor = &self.registers.compositor;
+
+        let layer_shell = match self.registers.layer_shell.clone() {
+            Some(x) => x,
+            None => {
                 tracing::error!(
                     "Failed to create layer shell. Does your compositor implement WlrLayerShellV1?"
                 );
-                tracing::error!("err: {e}");
                 return Err(Error::ProtocolNotFound(
                     "WlrLayerShellV1 not found".to_string(),
                 ));
             }
         };
-        let viewporter = self.globals.bind::<WpViewporter, _, _>(&qh, 1..=1, ()).ok();
+
+        let viewporter = self.registers.viewporter.clone();
         if viewporter.is_none() {
             tracing::info!(
                 "Compositor does not support wp_viewporter, display scaling may be inaccurate."
@@ -1261,7 +1274,9 @@ impl WayshotConnection {
 
                 debug!("Waiting for layer surface to be configured.");
                 while !state.configured_outputs.contains(&output_info.wl_output) {
-                    event_queue.blocking_dispatch(&mut state)?;
+                    self.registers
+                        .layer_event_queue
+                        .blocking_dispatch(&mut state)?;
                 }
 
                 surface.set_buffer_transform(output_info.transform);
@@ -1279,7 +1294,7 @@ impl WayshotConnection {
                 debug!("Committing surface with attached buffer.");
                 surface.commit();
                 layer_shell_surfaces.push((surface, layer_surface));
-                event_queue.roundtrip(&mut state)?;
+                self.registers.layer_event_queue.roundtrip(&mut state)?;
 
                 Ok(())
             })?;
@@ -1293,7 +1308,7 @@ impl WayshotConnection {
             surface.commit(); //unmap surface by committing a null buffer
             layer_shell_surface.destroy();
         }
-        event_queue.roundtrip(&mut state)?;
+        self.registers.layer_event_queue.roundtrip(&mut state)?;
 
         callback_result
     }
@@ -1301,7 +1316,7 @@ impl WayshotConnection {
     /// Take a screenshot from the specified region.
     #[tracing::instrument(skip_all, fields(max_scale = tracing::field::Empty))]
     fn screenshot_region_capturer(
-        &self,
+        &mut self,
         region_capturer: RegionCapturer,
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
@@ -1465,7 +1480,7 @@ impl WayshotConnection {
     }
 
     pub fn screenshot(
-        &self,
+        &mut self,
         capture_region: LogicalRegion,
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
@@ -1474,7 +1489,11 @@ impl WayshotConnection {
 
     /// Take a screenshot, overlay the screenshot, run the callback, and then
     /// unfreeze the screenshot and return the selected region.
-    pub fn screenshot_freeze<F>(&self, callback: F, cursor_overlay: bool) -> Result<DynamicImage>
+    pub fn screenshot_freeze<F>(
+        &mut self,
+        callback: F,
+        cursor_overlay: bool,
+    ) -> Result<DynamicImage>
     where
         F: Fn(&WayshotConnection) -> Result<LogicalRegion> + 'static,
     {
@@ -1483,7 +1502,7 @@ impl WayshotConnection {
 
     /// Take a screenshot from one output
     pub fn screenshot_single_output(
-        &self,
+        &mut self,
         output_info: &OutputInfo,
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
@@ -1493,7 +1512,7 @@ impl WayshotConnection {
 
     /// Take a screenshot from all of the specified outputs.
     pub fn screenshot_outputs(
-        &self,
+        &mut self,
         outputs: &[OutputInfo],
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
@@ -1505,13 +1524,13 @@ impl WayshotConnection {
     }
 
     /// Take a screenshot from all accessible outputs.
-    pub fn screenshot_all(&self, cursor_overlay: bool) -> Result<DynamicImage> {
-        self.screenshot_outputs(self.get_all_outputs(), cursor_overlay)
+    pub fn screenshot_all(&mut self, cursor_overlay: bool) -> Result<DynamicImage> {
+        self.screenshot_outputs(&self.get_all_outputs().to_vec(), cursor_overlay)
     }
 
     /// Take a screenshot from a specific toplevel (window).
     pub fn screenshot_toplevel(
-        &self,
+        &mut self,
         toplevel: &TopLevel,
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
@@ -1522,26 +1541,18 @@ impl WayshotConnection {
     }
 
     fn capture_toplevel_frame_get_state(
-        &self,
+        &mut self,
         toplevel: &ExtForeignToplevelHandleV1,
         cursor_overlay: bool,
-    ) -> Result<(
-        CaptureFrameState,
-        EventQueue<CaptureFrameState>,
-        WayshotFrame,
-    )> {
+    ) -> Result<(CaptureFrameState, WayshotFrame)> {
         // Create state and event queue similar to other ext-image flows
         let mut state = CaptureFrameState::new(self.need_try_find_gbm());
-        let mut event_queue = self.conn.new_event_queue::<CaptureFrameState>();
+        let event_queue = &mut self.registers.capture_event_queue;
         let qh = event_queue.handle();
 
+        let manager = self.registers.image_copy_capture_manager.as_ref().unwrap();
+        let toplevel_source_manager = self.registers.toplevel_source_manager.as_ref().unwrap();
         // Bind managers
-        let manager = self
-            .globals
-            .bind::<ExtImageCopyCaptureManagerV1, _, _>(&qh, 1..=1, ())?;
-        let toplevel_source_manager = self
-            .globals
-            .bind::<ExtForeignToplevelImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())?;
 
         let source = toplevel_source_manager.create_source(toplevel, &qh, ());
 
@@ -1557,34 +1568,32 @@ impl WayshotConnection {
             event_queue.blocking_dispatch(&mut state)?;
         }
 
-        Ok((state, event_queue, WayshotFrame::ExtImageCopy(frame)))
+        Ok((state, WayshotFrame::ExtImageCopy(frame)))
     }
 
     pub fn capture_toplevel_frame_shm_fd<T: AsFd>(
-        &self,
+        &mut self,
         toplevel: &ExtForeignToplevelHandleV1,
         cursor_overlay: bool,
         fd: T,
     ) -> Result<(FrameFormat, FrameGuard)> {
-        let (state, event_queue, frame, frame_format) =
+        let (state, frame, frame_format) =
             self.capture_toplevel_frame_get_state_shm(toplevel, cursor_overlay)?;
         let WayshotFrame::ExtImageCopy(frame) = frame else {
             unreachable!()
         };
-        let frame_guard =
-            self.ext_image_copy_frame_inner(state, event_queue, frame, frame_format, fd)?;
+        let frame_guard = self.ext_image_copy_frame_inner(state, frame, frame_format, fd)?;
         Ok((frame_format, frame_guard))
     }
 
     pub fn capture_toplevel_frame_shm_fd_with_format<T: AsFd>(
-        &self,
+        &mut self,
         toplevel: &ExtForeignToplevelHandleV1,
         cursor_overlay: bool,
         fd: T,
         frame_format: wl_shm::Format,
     ) -> Result<FrameGuard> {
-        let (state, event_queue, frame) =
-            self.capture_toplevel_frame_get_state(toplevel, cursor_overlay)?;
+        let (state, frame) = self.capture_toplevel_frame_get_state(toplevel, cursor_overlay)?;
 
         let WayshotFrame::ExtImageCopy(frame) = frame else {
             unreachable!()
@@ -1596,7 +1605,7 @@ impl WayshotConnection {
             .copied()
         {
             let frame_guard: FrameGuard =
-                self.ext_image_copy_frame_inner(state, event_queue, frame, format, fd)?;
+                self.ext_image_copy_frame_inner(state, frame, format, fd)?;
             Ok(frame_guard)
         } else {
             Err(Error::NoSupportedBufferFormat)
@@ -1604,12 +1613,12 @@ impl WayshotConnection {
     }
 
     fn capture_toplevel_frame_shm_from_file(
-        &self,
+        &mut self,
         cursor_overlay: bool,
         toplevel: &ExtForeignToplevelHandleV1,
         file: &File,
     ) -> Result<(FrameFormat, FrameGuard)> {
-        let (state, event_queue, frame, frame_format) =
+        let (state, frame, frame_format) =
             self.capture_toplevel_frame_get_state_shm(toplevel, cursor_overlay)?;
 
         file.set_len(frame_format.byte_size())?;
@@ -1617,14 +1626,13 @@ impl WayshotConnection {
         let WayshotFrame::ExtImageCopy(frame) = frame else {
             unreachable!()
         };
-        let frame_guard =
-            self.ext_image_copy_frame_inner(state, event_queue, frame, frame_format, file)?;
+        let frame_guard = self.ext_image_copy_frame_inner(state, frame, frame_format, file)?;
 
         Ok((frame_format, frame_guard))
     }
 
     fn capture_toplevel(
-        &self,
+        &mut self,
         toplevel: &ExtForeignToplevelHandleV1,
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
@@ -1657,18 +1665,12 @@ impl WayshotConnection {
 
     // Helper method to get frame format for toplevel using ext-image session events
     pub fn capture_toplevel_frame_get_state_shm(
-        &self,
+        &mut self,
         toplevel: &ExtForeignToplevelHandleV1,
         cursor_overlay: bool,
-    ) -> Result<(
-        CaptureFrameState,
-        EventQueue<CaptureFrameState>,
-        WayshotFrame,
-        FrameFormat,
-    )> {
+    ) -> Result<(CaptureFrameState, WayshotFrame, FrameFormat)> {
         // Drain events at least once to populate formats from the session
-        let (state, event_queue, frame) =
-            self.capture_toplevel_frame_get_state(toplevel, cursor_overlay)?;
+        let (state, frame) = self.capture_toplevel_frame_get_state(toplevel, cursor_overlay)?;
         let frame_format = state
             .formats
             .iter()
@@ -1689,6 +1691,6 @@ impl WayshotConnection {
                 Error::NoSupportedBufferFormat
             })?;
 
-        Ok((state, event_queue, frame, frame_format))
+        Ok((state, frame, frame_format))
     }
 }

@@ -40,7 +40,7 @@ fn rgb_to_hsl(r: u8, g: u8, b: u8) -> (u16, u8, u8) {
 }
 
 /// Let the user click a pixel and print its color. When `freeze` is true, the screen is frozen first.
-pub fn pick(conn: &WayshotConnection, freeze: bool, format: ColorFormat) -> Result<()> {
+pub fn pick(conn: &mut WayshotConnection, freeze: bool, format: ColorFormat) -> Result<()> {
     let image = (if freeze {
         conn.screenshot_freeze(
             |w_conn| get_region_point(w_conn).map_err(libwayshot::Error::FreezeCallbackError),

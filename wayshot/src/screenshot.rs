@@ -39,7 +39,7 @@ pub enum CaptureMode {
 /// Capture a screenshot according to `mode`.
 #[cfg_attr(not(feature = "selector"), allow(unused_variables))]
 pub fn capture(
-    conn: &WayshotConnection,
+    conn: &mut WayshotConnection,
     mode: &CaptureMode,
     cursor: bool,
     freeze: bool,
@@ -71,7 +71,7 @@ pub fn capture(
 /// Capture an interactively selected screen region.
 #[cfg(feature = "selector")]
 fn capture_geometry(
-    conn: &WayshotConnection,
+    conn: &mut WayshotConnection,
     cursor: bool,
     freeze: bool,
     foreground_color: Option<String>,
@@ -94,11 +94,11 @@ fn capture_geometry(
 }
 
 fn capture_toplevel_by_identifier(
-    conn: &WayshotConnection,
+    conn: &mut WayshotConnection,
     identifier: &str,
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
-    let toplevels = conn.get_all_toplevels();
+    let toplevels = conn.get_all_toplevels().to_vec();
     let toplevel = toplevels
         .iter()
         .filter(|t| t.active)
@@ -113,10 +113,10 @@ fn capture_toplevel_by_identifier(
 }
 
 fn capture_toplevel_interactive(
-    conn: &WayshotConnection,
+    conn: &mut WayshotConnection,
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
-    let toplevels = conn.get_all_toplevels();
+    let toplevels = conn.get_all_toplevels().to_vec();
     let active: Vec<_> = toplevels.iter().filter(|t| t.active).collect();
     if active.is_empty() {
         bail!("No active toplevel windows found!");
@@ -132,11 +132,11 @@ fn capture_toplevel_interactive(
 }
 
 fn capture_output_by_name(
-    conn: &WayshotConnection,
+    conn: &mut WayshotConnection,
     name: &str,
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
-    let outputs = conn.get_all_outputs();
+    let outputs = conn.get_all_outputs().to_vec();
     let output = outputs
         .iter()
         .find(|o| o.name == name)
@@ -150,10 +150,10 @@ fn capture_output_by_name(
 }
 
 fn capture_output_interactive(
-    conn: &WayshotConnection,
+    conn: &mut WayshotConnection,
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
-    let outputs = conn.get_all_outputs();
+    let outputs = conn.get_all_outputs().to_vec();
     let names: Vec<&str> = outputs.iter().map(|o| o.name.as_str()).collect();
     let idx = fuzzy_select(&names).ok_or_else(|| eyre::eyre!("No output selected!"))?;
     Ok((

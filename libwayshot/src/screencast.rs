@@ -271,25 +271,12 @@ impl WayshotConnection {
         Option<ZwlrScreencopyManagerV1>,
     )> {
         let event_queue = self.conn.new_event_queue::<CaptureFrameState>();
-        let qh = event_queue.handle();
-        let screencopy_manager = self
-            .globals
-            .bind::<ZwlrScreencopyManagerV1, _, _>(&qh, 3..=3, ())
-            .ok();
+        let screencopy_manager = self.registers.screencopy_manager.clone();
 
         // Bind managers
-        let manager = self
-            .globals
-            .bind::<ExtImageCopyCaptureManagerV1, _, _>(&qh, 1..=1, ())
-            .ok();
-        let toplevel_source_manager = self
-            .globals
-            .bind::<ExtForeignToplevelImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())
-            .ok();
-        let output_source_manager = self
-            .globals
-            .bind::<ExtOutputImageCaptureSourceManagerV1, _, _>(&qh, 1..=1, ())
-            .ok();
+        let manager = self.registers.image_copy_capture_manager.clone();
+        let toplevel_source_manager = self.registers.toplevel_source_manager.clone();
+        let output_source_manager = self.registers.output_image_management.clone();
         Ok((
             event_queue,
             manager,
@@ -305,7 +292,7 @@ impl WayshotConnection {
         if self.dmabuf_state.is_some() {
             return Ok(());
         }
-        let (mut state, _, _) = self.capture_target_frame_get_state(&target, false, None)?;
+        let (mut state, _) = self.capture_target_frame_get_state(&target, false, None)?;
         let (globals, evq) = registry_queue_init::<WayshotState>(&self.conn)?;
         let Some(gbm) = state.gbm.take() else {
             return Err(Error::NoDMAStateError);
@@ -325,7 +312,7 @@ impl WayshotConnection {
     /// And bind the a `EglDisplay`, to support the egl
     #[cfg(feature = "egl")]
     pub fn create_screencast_with_egl(
-        &self,
+        &mut self,
         target: WayshotTarget,
         cursor_overlay: bool,
         egl_display: crate::egl::EglDisplay,
@@ -338,19 +325,19 @@ impl WayshotConnection {
     /// We suggest you to use this api to do screencast
     /// Same with create_screencast_with_shm, but now it is with dmabuf
     pub fn create_screencast_with_dmabuf(
-        &self,
+        &mut self,
         target: WayshotTarget,
         cursor_overlay: bool,
     ) -> Result<WayshotScreenCast> {
-        let Some(dmabuf_state) = &self.dmabuf_state else {
-            return Err(Error::NoDMAStateError);
-        };
         let (event_queue, image_copy_manager, foreign_manager, output_manager, wlr_screencopy) =
             self.screencast_init()?;
-        let (state, _, _) = self.capture_target_frame_get_state(&target, cursor_overlay, None)?;
+        let (state, _) = self.capture_target_frame_get_state(&target, cursor_overlay, None)?;
         if state.dmabuf_formats.is_empty() {
             return Err(Error::NoSupportedBufferFormat);
         }
+        let Some(dmabuf_state) = &self.dmabuf_state else {
+            return Err(Error::NoDMAStateError);
+        };
         let frame_format = state.dmabuf_formats[0];
         tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
         let gbm = &dmabuf_state.gbmdev;
@@ -423,7 +410,7 @@ impl WayshotConnection {
     /// This will save a screencast status for you
     /// We suggest you to use this api to do screencast
     pub fn create_screencast_with_shm<T: AsFd>(
-        &self,
+        &mut self,
         target: WayshotTarget,
         cursor_overlay: bool,
         shm_format: wl_shm::Format,
@@ -431,7 +418,7 @@ impl WayshotConnection {
     ) -> Result<WayshotScreenCast> {
         let (event_queue, image_copy_manager, foreign_manager, output_manager, wlr_screencopy) =
             self.screencast_init()?;
-        let (state, _, _) = self.capture_target_frame_get_state(&target, cursor_overlay, None)?;
+        let (state, _) = self.capture_target_frame_get_state(&target, cursor_overlay, None)?;
         let Some(frame_format) = state
             .formats
             .iter()
