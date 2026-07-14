@@ -355,8 +355,8 @@ impl WayshotConnection {
     }
 
     /// Fetch all accessible wayland outputs.
-    pub fn get_all_outputs(&self) -> &[OutputInfo] {
-        self.output_infos.as_slice()
+    pub fn get_all_outputs(&self) -> Vec<OutputInfo> {
+        self.output_infos.clone()
     }
 
     /// refresh the outputs, to get new outputs
@@ -400,8 +400,8 @@ impl WayshotConnection {
         Ok(())
     }
 
-    pub fn get_all_toplevels(&self) -> &[TopLevel] {
-        self.toplevel_infos.as_slice()
+    pub fn get_all_toplevels(&self) -> Vec<TopLevel> {
+        self.toplevel_infos.clone()
     }
 
     pub fn refresh_toplevels(&mut self) -> Result<()> {
@@ -1525,7 +1525,7 @@ impl WayshotConnection {
 
     /// Take a screenshot from all accessible outputs.
     pub fn screenshot_all(&mut self, cursor_overlay: bool) -> Result<DynamicImage> {
-        self.screenshot_outputs(&self.get_all_outputs().to_vec(), cursor_overlay)
+        self.screenshot_outputs(&self.get_all_outputs(), cursor_overlay)
     }
 
     /// Take a screenshot from a specific toplevel (window).
