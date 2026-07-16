@@ -658,12 +658,12 @@ impl WayshotConnection {
         cursor_overlay: bool,
         capture_region: Option<EmbeddedRegion>,
     ) -> Result<(DMAFrameFormat, DMAFrameGuard, BufferObject<()>)> {
-        let (state, frame) =
-            self.capture_target_frame_get_state(target, cursor_overlay, capture_region)?;
         let Some(dmabuf_state) = &self.dmabuf_state else {
             return Err(Error::NoDMAStateError);
         };
 
+        let (state, frame) =
+            self.capture_target_frame_get_state(target, cursor_overlay, capture_region)?;
         if state.dmabuf_formats.is_empty() {
             return Err(Error::NoSupportedBufferFormat);
         }

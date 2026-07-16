@@ -329,6 +329,9 @@ impl WayshotConnection {
         target: WayshotTarget,
         cursor_overlay: bool,
     ) -> Result<WayshotScreenCast> {
+        let Some(dmabuf_state) = &self.dmabuf_state else {
+            return Err(Error::NoDMAStateError);
+        };
         let (state, _) = self.capture_target_frame_get_state(&target, cursor_overlay, None)?;
         if state.dmabuf_formats.is_empty() {
             return Err(Error::NoSupportedBufferFormat);
@@ -336,9 +339,6 @@ impl WayshotConnection {
         let (event_queue, image_copy_manager, foreign_manager, output_manager, wlr_screencopy) =
             self.screencast_init()?;
 
-        let Some(dmabuf_state) = &self.dmabuf_state else {
-            return Err(Error::NoDMAStateError);
-        };
         let frame_format = state.dmabuf_formats[0];
         tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
         let gbm = &dmabuf_state.gbmdev;
