@@ -1258,7 +1258,7 @@ impl WayshotConnection {
             }
         };
 
-        let viewporter = self.registers.viewporter.clone();
+        let viewporter = &self.registers.viewporter;
         if viewporter.is_none() {
             tracing::info!(
                 "Compositor does not support wp_viewporter, display scaling may be inaccurate."
