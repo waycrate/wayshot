@@ -312,7 +312,7 @@ impl WayshotConnection {
     /// And bind the a `EglDisplay`, to support the egl
     #[cfg(feature = "egl")]
     pub fn create_screencast_with_egl(
-        &mut self,
+        &self,
         target: WayshotTarget,
         cursor_overlay: bool,
         egl_display: crate::egl::EglDisplay,
@@ -325,16 +325,17 @@ impl WayshotConnection {
     /// We suggest you to use this api to do screencast
     /// Same with create_screencast_with_shm, but now it is with dmabuf
     pub fn create_screencast_with_dmabuf(
-        &mut self,
+        &self,
         target: WayshotTarget,
         cursor_overlay: bool,
     ) -> Result<WayshotScreenCast> {
-        let (event_queue, image_copy_manager, foreign_manager, output_manager, wlr_screencopy) =
-            self.screencast_init()?;
         let (state, _) = self.capture_target_frame_get_state(&target, cursor_overlay, None)?;
         if state.dmabuf_formats.is_empty() {
             return Err(Error::NoSupportedBufferFormat);
         }
+        let (event_queue, image_copy_manager, foreign_manager, output_manager, wlr_screencopy) =
+            self.screencast_init()?;
+
         let Some(dmabuf_state) = &self.dmabuf_state else {
             return Err(Error::NoDMAStateError);
         };
@@ -410,7 +411,7 @@ impl WayshotConnection {
     /// This will save a screencast status for you
     /// We suggest you to use this api to do screencast
     pub fn create_screencast_with_shm<T: AsFd>(
-        &mut self,
+        &self,
         target: WayshotTarget,
         cursor_overlay: bool,
         shm_format: wl_shm::Format,

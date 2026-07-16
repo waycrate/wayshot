@@ -39,7 +39,7 @@ pub enum CaptureMode {
 /// Capture a screenshot according to `mode`.
 #[cfg_attr(not(feature = "selector"), allow(unused_variables))]
 pub fn capture(
-    conn: &mut WayshotConnection,
+    conn: &WayshotConnection,
     mode: &CaptureMode,
     cursor: bool,
     freeze: bool,
@@ -71,7 +71,7 @@ pub fn capture(
 /// Capture an interactively selected screen region.
 #[cfg(feature = "selector")]
 fn capture_geometry(
-    conn: &mut WayshotConnection,
+    conn: &WayshotConnection,
     cursor: bool,
     freeze: bool,
     foreground_color: Option<String>,
@@ -94,7 +94,7 @@ fn capture_geometry(
 }
 
 fn capture_toplevel_by_identifier(
-    conn: &mut WayshotConnection,
+    conn: &WayshotConnection,
     identifier: &str,
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
@@ -113,7 +113,7 @@ fn capture_toplevel_by_identifier(
 }
 
 fn capture_toplevel_interactive(
-    conn: &mut WayshotConnection,
+    conn: &WayshotConnection,
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
     let toplevels = conn.get_all_toplevels();
@@ -132,7 +132,7 @@ fn capture_toplevel_interactive(
 }
 
 fn capture_output_by_name(
-    conn: &mut WayshotConnection,
+    conn: &WayshotConnection,
     name: &str,
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
@@ -150,7 +150,7 @@ fn capture_output_by_name(
 }
 
 fn capture_output_interactive(
-    conn: &mut WayshotConnection,
+    conn: &WayshotConnection,
     cursor: bool,
 ) -> Result<(image::DynamicImage, ShotResult)> {
     let outputs = conn.get_all_outputs();
