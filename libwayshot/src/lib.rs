@@ -11,6 +11,7 @@ mod error;
 mod image_util;
 pub mod output;
 pub mod region;
+#[cfg(feature = "screencast")]
 pub mod screencast;
 mod screencopy;
 

@@ -9,13 +9,14 @@ repository.workspace = true
 edition.workspace = true
 
 [features]
-default = ["png", "egl"]
+default = ["png", "egl", "screencast"]
 png = ["image/png"]
 jpeg = ["image/jpeg"]
 qoi = ["image/qoi"]
 webp = ["image/webp"]
 avif = ["image/avif"]
 egl = ["dep:gl", "dep:r-egl-wayland"]
+screencast = []
 
 [dependencies]
 tracing.workspace = true
