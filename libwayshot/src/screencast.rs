@@ -16,8 +16,9 @@ use wayland_protocols::{
             ext_foreign_toplevel_image_capture_source_manager_v1::ExtForeignToplevelImageCaptureSourceManagerV1,
             ext_output_image_capture_source_manager_v1::ExtOutputImageCaptureSourceManagerV1,
         },
-        image_copy_capture::v1::client::ext_image_copy_capture_manager_v1::{
-            ExtImageCopyCaptureManagerV1, Options,
+        image_copy_capture::v1::client::{
+            ext_image_copy_capture_frame_v1::ExtImageCopyCaptureFrameV1,
+            ext_image_copy_capture_manager_v1::{ExtImageCopyCaptureManagerV1, Options},
         },
     },
     wp::linux_dmabuf::zv1::client::{
@@ -160,7 +161,7 @@ impl WayshotScreenCast {
         if self.target.is_screen() && self.image_copy_manager.is_none() {
             return self.screencast_wlr();
         }
-        let mut state = CaptureFrameState::new(false);
+        let state = CaptureFrameState::new(false);
         let qh = self.event_queue.handle();
         let options = if self.cursor_overlay {
             Options::PaintCursors
@@ -170,7 +171,7 @@ impl WayshotScreenCast {
         let image_copy_manager = self.image_copy_manager.as_ref().ok_or(Error::Unsupported(
             "image_copy_manager is not supported".to_owned(),
         ))?;
-        let session = match &self.target {
+        let (session, source) = match &self.target {
             WayshotTarget::Screen(output) => {
                 let source = self
                     .output_manager
@@ -180,7 +181,10 @@ impl WayshotScreenCast {
                     ))?
                     .create_source(output, &qh, ());
 
-                image_copy_manager.create_session(&source, options, &qh, ())
+                (
+                    image_copy_manager.create_session(&source, options, &qh, ()),
+                    source,
+                )
             }
             WayshotTarget::Toplevel(toplevel) => {
                 let source = self
@@ -191,10 +195,24 @@ impl WayshotScreenCast {
                     ))?
                     .create_source(toplevel, &qh, ());
 
-                image_copy_manager.create_session(&source, options, &qh, ())
+                (
+                    image_copy_manager.create_session(&source, options, &qh, ()),
+                    source,
+                )
             }
         };
         let frame = session.create_frame(&qh, ());
+        let result = self.screencast_ext_frame(frame, state);
+        session.destroy();
+        source.destroy();
+        result
+    }
+
+    fn screencast_ext_frame(
+        &mut self,
+        frame: ExtImageCopyCaptureFrameV1,
+        mut state: CaptureFrameState,
+    ) -> Result<()> {
         while !state.session_done {
             self.event_queue.blocking_dispatch(&mut state)?;
         }
