@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use clap::Parser;
 use eyre::Result;
-use libwayshot::WayshotConnection;
+use libwayshot::{LogicalRegion, OutputInfo, Size, WayshotConnection, region};
 
 mod cli;
 #[cfg(feature = "clipboard")]
@@ -21,6 +21,35 @@ mod utils;
 
 use config::Config;
 use settings::{AppSettings, Command};
+
+/// print the displays' info
+pub fn print_displays_info(conn: &WayshotConnection) {
+    for OutputInfo {
+        physical_size: Size { width, height },
+        logical_region:
+            LogicalRegion {
+                inner:
+                    region::Region {
+                        position: region::Position { x, y },
+                        size:
+                            Size {
+                                width: logical_width,
+                                height: logical_height,
+                            },
+                    },
+            },
+        name,
+        description,
+        ..
+    } in conn.get_all_outputs()
+    {
+        println!("{name}");
+        println!("description: {description}");
+        println!("    Size: {width},{height}");
+        println!("    LogicSize: {logical_width}, {logical_height}");
+        println!("    Position: {x}, {y}");
+    }
+}
 
 fn main() -> Result<()> {
     let cli = cli::Cli::parse();
@@ -52,7 +81,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         Command::ListOutputsInfo => {
-            connection.print_displays_info();
+            print_displays_info(&connection);
             Ok(())
         }
         Command::ListToplevels => {
