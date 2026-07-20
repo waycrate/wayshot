@@ -23,6 +23,48 @@ impl AsRef<WlOutput> for OutputInfo {
     }
 }
 
+pub trait ToOutputInfo {
+    fn output_info(self) -> OutputInfo;
+}
+
+impl ToOutputInfo for WlOutput {
+    fn output_info(self) -> OutputInfo {
+        OutputInfo {
+            wl_output: self,
+            name: "".to_owned(),
+            description: "".to_owned(),
+            transform: wl_output::Transform::Normal,
+            physical_size: Size::default(),
+            logical_region: LogicalRegion::default(),
+        }
+    }
+}
+
+impl ToOutputInfo for &WlOutput {
+    fn output_info(self) -> OutputInfo {
+        OutputInfo {
+            wl_output: self.clone(),
+            name: "".to_owned(),
+            description: "".to_owned(),
+            transform: wl_output::Transform::Normal,
+            physical_size: Size::default(),
+            logical_region: LogicalRegion::default(),
+        }
+    }
+}
+
+impl ToOutputInfo for &OutputInfo {
+    fn output_info(self) -> OutputInfo {
+        self.clone()
+    }
+}
+
+impl ToOutputInfo for OutputInfo {
+    fn output_info(self) -> OutputInfo {
+        self
+    }
+}
+
 impl Display for OutputInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

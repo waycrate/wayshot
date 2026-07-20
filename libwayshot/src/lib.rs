@@ -77,7 +77,10 @@ use wayland_protocols_wlr::{
     },
 };
 
-use crate::dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState};
+use crate::{
+    dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState},
+    output::ToOutputInfo,
+};
 
 pub use crate::{
     output::OutputInfo,
@@ -1536,11 +1539,15 @@ impl WayshotConnection {
     }
 
     /// Take a screenshot from one output
-    pub fn screenshot_single_output(
+    pub fn screenshot_single_output<W>(
         &self,
-        output_info: &OutputInfo,
+        output_info: W,
         cursor_overlay: bool,
-    ) -> Result<DynamicImage> {
+    ) -> Result<DynamicImage>
+    where
+        W: ToOutputInfo,
+    {
+        let output_info = &output_info.output_info();
         let (mut frame_copy, _) = self.capture_frame_copy(output_info, cursor_overlay, None)?;
         frame_copy.get_image()
     }
