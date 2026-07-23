@@ -704,7 +704,13 @@ impl WayshotConnection {
     ) -> Result<(CaptureFrameState, WayshotFrame)> {
         let mut event_queue = self.registers.capture_event_queue.borrow_mut();
         let qh = event_queue.handle();
-        let screencopy_manager = self.registers.screencopy_manager.as_ref().unwrap();
+        let screencopy_manager =
+            self.registers
+                .screencopy_manager
+                .as_ref()
+                .ok_or(Error::ProtocolNotFound(
+                    "ZwlrScreencopyManagerV1".to_string(),
+                ))?;
 
         tracing::debug!("Capturing output(shm buffer)...");
         let frame = if let Some(embedded_region) = capture_region {
@@ -864,7 +870,7 @@ impl WayshotConnection {
                 modifier,
                 fd,
             ),
-            WayshotFrame::ExtImageCopy(frame) => self.ext_image_copy_frame_dmabuf_inner(
+            WayshotFrame::ExtImageCopy(frame) => self.capture_output_frame_inner_dmabuf_ext(
                 state,
                 frame,
                 frame_format,
@@ -877,7 +883,7 @@ impl WayshotConnection {
 
     #[allow(clippy::too_many_arguments)]
     #[cfg(feature = "dmabuf")]
-    fn ext_image_copy_frame_dmabuf_inner<T: AsFd>(
+    fn capture_output_frame_inner_dmabuf_ext<T: AsFd>(
         &self,
         mut state: CaptureFrameState,
         frame: ExtImageCopyCaptureFrameV1,
@@ -1563,8 +1569,20 @@ impl WayshotConnection {
         let mut event_queue = self.registers.capture_event_queue.borrow_mut();
         let qh = event_queue.handle();
 
-        let manager = self.registers.image_copy_capture_manager.as_ref().unwrap();
-        let toplevel_source_manager = self.registers.toplevel_source_manager.as_ref().unwrap();
+        let manager =
+            self.registers
+                .image_copy_capture_manager
+                .as_ref()
+                .ok_or(Error::ProtocolNotFound(
+                    "ExtImageCopyCaptureManagerV1".to_string(),
+                ))?;
+        let toplevel_source_manager =
+            self.registers
+                .toplevel_source_manager
+                .as_ref()
+                .ok_or(Error::ProtocolNotFound(
+                    "ExtForeignToplevelImageCaptureSourceManagerV1".to_string(),
+                ))?;
         // Bind managers
 
         let source = toplevel_source_manager.create_source(toplevel, &qh, ());
