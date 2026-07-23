@@ -2,7 +2,6 @@
 
 mod convert;
 mod error;
-mod image_util;
 mod screencopy;
 
 #[cfg(all(test, unix))]

@@ -1452,7 +1452,6 @@ impl WayshotConnection {
                 .map(|(mut frame_copy, _, _)| {
                     scope.spawn(move || {
                         let logical_region = frame_copy.logical_region;
-                        let transform = frame_copy.transform;
                         let logical_size = logical_region.inner.size;
                         // Perform in-place color conversion directly on the mmap buffer
                         // to avoid cloning. Calling `get_image()` here would force an
@@ -1460,23 +1459,9 @@ impl WayshotConnection {
                         let frame_color_type = frame_copy.convert_color_inplace()?;
 
                         let image = match frame_color_type {
-                            image::ColorType::Rgba8 => {
-                                let image = frame_copy.into_mmap_rgba_image_buffer()?;
-                                image_util::prepare_mmap_rgba_image(
-                                    image,
-                                    transform,
-                                    logical_size,
-                                    max_scale,
-                                )
-                            }
-                            image::ColorType::Rgb8 => {
+                            image::ColorType::Rgba8 | image::ColorType::Rgb8 => {
                                 let image: DynamicImage = (&frame_copy).try_into()?;
-                                image_util::PreparedImage::Dynamic(image_util::rotate_image_buffer(
-                                    image,
-                                    transform,
-                                    logical_size,
-                                    max_scale,
-                                ))
+                                image_util::resize_image_buffer(image, logical_size, max_scale)
                             }
                             _ => return Err(Error::InvalidColor),
                         };
@@ -1521,7 +1506,7 @@ impl WayshotConnection {
                             )
                             .in_scope(|| {
                                 tracing::debug!("Replacing parts of the final image");
-                                image.replace_into(&mut composite_image, x, y);
+                                image::imageops::replace(&mut composite_image, &image, x, y);
                             });
 
                             Ok(composite_image)
