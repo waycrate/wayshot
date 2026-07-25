@@ -328,6 +328,46 @@ impl WayshotConnection {
         Ok(initial_state)
     }
 
+    /// This function allows you to clone a [WayshotConnection] with most of its status
+    /// sharing the same connection, and registered status
+    /// NOTE: But globals, queues are new, and also, dmabuf_state will be reset to None
+    pub fn try_clone(&self) -> Result<Self> {
+        let conn = self.conn.clone();
+        let (globals, _) = registry_queue_init::<WayshotState>(&conn)?;
+        let layer_event_queue: EventQueue<LayerShellState> =
+            conn.new_event_queue::<LayerShellState>();
+        let capture_event_queue = conn.new_event_queue::<CaptureFrameState>();
+        let output_event_queue = conn.new_event_queue::<OutputCaptureState>();
+        let registers = WayshotRegisters {
+            layer_event_queue: RefCell::new(layer_event_queue),
+            capture_event_queue: RefCell::new(capture_event_queue),
+            output_event_queue: RefCell::new(output_event_queue),
+            zxdg_output_manager: self.registers.zxdg_output_manager.clone(),
+            toplevel_list: self.registers.toplevel_list.clone(),
+            layer_shell: self.registers.layer_shell.clone(),
+            shm: self.registers.shm.clone(),
+            compositor: self.registers.compositor.clone(),
+            viewporter: self.registers.viewporter.clone(),
+            screencopy_manager: self.registers.screencopy_manager.clone(),
+            image_copy_capture_manager: self.registers.image_copy_capture_manager.clone(),
+            output_image_management: self.registers.output_image_management.clone(),
+            toplevel_source_manager: self.registers.toplevel_source_manager.clone(),
+        };
+        Ok(Self {
+            conn,
+            globals,
+            output_infos: self.output_infos.clone(),
+            toplevel_infos: self.toplevel_infos.clone(),
+            #[cfg(feature = "dmabuf")]
+            dmabuf_state: None,
+            toplevel_capture_support: self.toplevel_capture_support,
+            image_copy_support: self.image_copy_support,
+            #[cfg(feature = "dmabuf")]
+            find_dmabuf: false,
+            registers,
+        })
+    }
+
     #[cfg(feature = "dmabuf")]
     fn has_gbm(&self) -> bool {
         self.dmabuf_state.is_some()
