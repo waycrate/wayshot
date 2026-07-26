@@ -80,6 +80,7 @@ use wayland_protocols_wlr::{
 use crate::{
     dispatch::{CaptureFrameState, FrameState, OutputCaptureState, WayshotState},
     output::ToOutputInfo,
+    region::AsExtForeignToplevel,
 };
 
 pub use crate::{
@@ -1418,9 +1419,6 @@ impl WayshotConnection {
                         })
                     })
                     .collect(),
-                RegionCapturer::TopLevel(ref toplevel) => {
-                    return self.capture_toplevel(toplevel.as_ref(), cursor_overlay);
-                }
                 RegionCapturer::Freeze(_) => self
                     .get_all_outputs()
                     .iter()
@@ -1436,7 +1434,6 @@ impl WayshotConnection {
             RegionCapturer::Freeze(callback) => {
                 self.overlay_frames_and_select_region(&frames, callback)?
             }
-            RegionCapturer::TopLevel(_) => unreachable!("TopLevel handled earlier"),
         };
 
         // TODO When freeze was used, we can still further remove the outputs
@@ -1588,15 +1585,39 @@ impl WayshotConnection {
     }
 
     /// Take a screenshot from a specific toplevel (window).
-    pub fn screenshot_toplevel(
+    pub fn screenshot_toplevel<T: AsExtForeignToplevel>(
         &self,
-        toplevel: &TopLevel,
+        toplevel: T,
         cursor_overlay: bool,
     ) -> Result<DynamicImage> {
-        self.screenshot_region_capturer(
-            RegionCapturer::TopLevel(toplevel.to_owned()),
+        // Back the buffer with a shm file of the required size
+        let fd = create_shm_fd()?;
+        let memfile = File::from(fd);
+        // Determine a suitable shm FrameFormat for this frame
+        let (frame_format, _) = self.capture_toplevel_frame_shm_from_file(
             cursor_overlay,
-        )
+            toplevel.toplevel(),
+            &memfile,
+        )?;
+
+        // Map and convert to image
+        let frame_mmap = unsafe { MmapMut::map_mut(&memfile)? };
+        let mut frame_copy = FrameCopy {
+            frame_format,
+            frame_color_type: image::ColorType::Rgb8, // will be updated by get_image
+            frame_data: FrameData::Mmap(frame_mmap),
+            transform: Transform::Normal,
+            logical_region: LogicalRegion {
+                inner: crate::region::Region {
+                    position: crate::region::Position { x: 0, y: 0 },
+                    size: frame_format.size,
+                },
+            },
+            physical_size: frame_format.size,
+            color_converted: false,
+        };
+
+        frame_copy.get_image()
     }
 
     fn capture_toplevel_frame_get_state(
@@ -1700,38 +1721,6 @@ impl WayshotConnection {
         let frame_guard = self.ext_image_copy_frame_inner(state, frame, frame_format, file)?;
 
         Ok((frame_format, frame_guard))
-    }
-
-    fn capture_toplevel(
-        &self,
-        toplevel: &ExtForeignToplevelHandleV1,
-        cursor_overlay: bool,
-    ) -> Result<DynamicImage> {
-        // Back the buffer with a shm file of the required size
-        let fd = create_shm_fd()?;
-        let memfile = File::from(fd);
-        // Determine a suitable shm FrameFormat for this frame
-        let (frame_format, _) =
-            self.capture_toplevel_frame_shm_from_file(cursor_overlay, toplevel, &memfile)?;
-
-        // Map and convert to image
-        let frame_mmap = unsafe { MmapMut::map_mut(&memfile)? };
-        let mut frame_copy = FrameCopy {
-            frame_format,
-            frame_color_type: image::ColorType::Rgb8, // will be updated by get_image
-            frame_data: FrameData::Mmap(frame_mmap),
-            transform: Transform::Normal,
-            logical_region: LogicalRegion {
-                inner: crate::region::Region {
-                    position: crate::region::Position { x: 0, y: 0 },
-                    size: frame_format.size,
-                },
-            },
-            physical_size: frame_format.size,
-            color_converted: false,
-        };
-
-        frame_copy.get_image()
     }
 
     // Helper method to get frame format for toplevel using ext-image session events

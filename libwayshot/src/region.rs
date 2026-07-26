@@ -14,8 +14,6 @@ pub enum RegionCapturer {
     Outputs(Vec<OutputInfo>),
     /// Capture an already known `LogicalRegion`.
     Region(LogicalRegion),
-    /// Capture a specific toplevel window.
-    TopLevel(TopLevel),
     /// The outputs will be "frozen" to the user at which point the given
     /// callback is called to get the region to capture. This callback is often
     /// a user interaction to let the user select a region.
@@ -29,6 +27,33 @@ pub struct TopLevel {
     pub app_id: String,
     pub identifier: String,
     pub active: bool,
+}
+
+pub trait AsExtForeignToplevel {
+    fn toplevel(&self) -> &ExtForeignToplevelHandleV1;
+}
+
+impl AsExtForeignToplevel for TopLevel {
+    fn toplevel(&self) -> &ExtForeignToplevelHandleV1 {
+        &self.handle
+    }
+}
+
+impl AsExtForeignToplevel for &TopLevel {
+    fn toplevel(&self) -> &ExtForeignToplevelHandleV1 {
+        &self.handle
+    }
+}
+impl AsExtForeignToplevel for ExtForeignToplevelHandleV1 {
+    fn toplevel(&self) -> &ExtForeignToplevelHandleV1 {
+        self
+    }
+}
+
+impl AsExtForeignToplevel for &ExtForeignToplevelHandleV1 {
+    fn toplevel(&self) -> &ExtForeignToplevelHandleV1 {
+        self
+    }
 }
 
 impl AsRef<ExtForeignToplevelHandleV1> for TopLevel {
