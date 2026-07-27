@@ -104,7 +104,7 @@ pub struct Cli {
     /// Without a value: interactively select a region (requires the `selector` feature).
     /// With a value: parse the geometry string in slurp/grim format "x,y widthxheight".
     ///   Example: wayshot -g "$(slurp)" or wayshot -g "783,746 177x251"
-    #[arg(short, long, value_name = "GEOMETRY", num_args = 0..=1, verbatim_doc_comment)]
+    #[arg(short, long, allow_hyphen_values = true, value_name = "GEOMETRY", num_args = 0..=1, verbatim_doc_comment)]
     pub geometry: Option<Option<String>>,
 
     /// Background color (rgba hex) while selecting a region (geometry).
