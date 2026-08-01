@@ -1,6 +1,6 @@
 [package]
 name = "libwayshot"
-version = "0.8.0"
+version = "0.9.0-rc1"
 authors.workspace = true
 description.workspace = true
 keywords.workspace = true

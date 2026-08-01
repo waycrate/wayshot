@@ -5,7 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.0-rc1] - 2026-08-01
+
+### libwayshot 0.9.0-rc1
+
+#### Fixed
+
+- screencast will continue allocate the memory, only when WayshotConnection is dead, the memory will be release in [@Decodetalkers](https://github.com/Decodetalkers) in [#390](https://github.com/waycrate/wayshot/pull/390)
+- toypo in toplevel list by [@Diax179](https://github.com/Diax179) in [#385](https://github.com/waycrate/wayshot/pull/385)
+- guards & build with --no-default-features --all-targets flags by [@id3v1669](https://github.com/id3v1669) in [#369](https://github.com/waycrate/wayshot/pull/396)
+
+#### Changed
+- Allow to use wl_output to invoke screenshot_single_output
+- Allow to use ExtForeignToplevelHandle to invoke screenshot_toplevel
+- Add new api try_clone
+
+#### Breaking Changed
+- separate dmabuf-related features by [@Gigas002](https://github.com/Gigas002)
+- remove print_displays_info
+- remove Toplevel from enum Region
+- screencast now is another feature
+
+### wayshot
+
+#### Changed
+
+- use identifier to select toplevel([#381](https://github.com/waycrate/wayshot/issues/379)) by [@Decodetalkers](https://github.com/Decodetalkers) in [#381](https://github.com/waycrate/wayshot/pull/381)
+- remove invalid changelog from flake.nix by [@Diax179](https://github.com/Diax179) in [#388](https://github.com/waycrate/wayshot/pull/388)
+- list outputs and toplevels as json by [@Diax179](https://github.com/waycrate/wayshot/pull/387)
+- allow negative coordinates in geometry string  by [@theripper-1920](https://github.com/theripper-1920) in [#418](https://github.com/waycrate/wayshot/pull/418)
+- install manpages in Nix package by [@Diax179](https://github.com/waycrate/wayshot/pull/387)
 
 ## [1.5.0] - 2026-05-26
 
