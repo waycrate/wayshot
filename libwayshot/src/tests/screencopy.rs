@@ -160,43 +160,6 @@ fn frame_copy_get_image_succeeds_for_supported_format() {
     assert_eq!(img.height(), 4);
 }
 
-#[test]
-fn frame_copy_into_mmap_rgba_image_buffer_succeeds() {
-    let fc = make_frame_copy(wl_shm::Format::Xbgr8888, 4, 4, false);
-    // frame_color_type is Rgba8, so this should succeed
-    let result = fc.into_mmap_rgba_image_buffer();
-    assert!(result.is_ok());
-    let buf = result.unwrap();
-    assert_eq!(buf.width(), 4);
-    assert_eq!(buf.height(), 4);
-}
-
-#[test]
-fn frame_copy_into_mmap_rgba_image_buffer_fails_for_non_rgba8() {
-    let stride = 4 * 3;
-    let mmap = MmapOptions::new().len(stride * 4).map_anon().unwrap();
-    let fc = FrameCopy {
-        frame_format: FrameFormat {
-            format: wl_shm::Format::Bgr888,
-            size: Size {
-                width: 4,
-                height: 4,
-            },
-            stride: stride as u32,
-        },
-        frame_color_type: ColorType::Rgb8,
-        frame_data: FrameData::Mmap(mmap),
-        transform: wl_output::Transform::Normal,
-        logical_region: LogicalRegion::default(),
-        physical_size: Size {
-            width: 4,
-            height: 4,
-        },
-        color_converted: true,
-    };
-    assert!(fc.into_mmap_rgba_image_buffer().is_err());
-}
-
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn create_shm_fd_returns_valid_fd() {

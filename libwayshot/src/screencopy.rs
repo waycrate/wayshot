@@ -6,7 +6,7 @@ use std::{
 
 #[cfg(feature = "dmabuf")]
 use gbm::BufferObject;
-use image::{ColorType, DynamicImage, ImageBuffer, Pixel, Rgba};
+use image::{ColorType, DynamicImage, EncodableLayout, Rgb, RgbImage, Rgba, RgbaImage};
 use memmap2::MmapMut;
 use rustix::{
     fs::{self, SealFlags},
@@ -78,21 +78,6 @@ impl FrameFormat {
     }
 }
 
-#[tracing::instrument(skip(frame_data))]
-fn create_image_buffer<P, C>(frame_format: &FrameFormat, frame_data: C) -> Result<ImageBuffer<P, C>>
-where
-    P: Pixel<Subpixel = u8>,
-    C: std::ops::Deref<Target = [u8]>,
-{
-    tracing::debug!("Creating image buffer");
-    ImageBuffer::from_raw(
-        frame_format.size.width,
-        frame_format.size.height,
-        frame_data,
-    )
-    .ok_or(Error::BufferTooSmall)
-}
-
 #[derive(Debug)]
 pub enum FrameData {
     Mmap(MmapMut),
@@ -140,18 +125,6 @@ impl FrameCopy {
         Ok(frame_color_type)
     }
 
-    pub(crate) fn into_mmap_rgba_image_buffer(self) -> Result<ImageBuffer<Rgba<u8>, MmapMut>> {
-        if self.frame_color_type != ColorType::Rgba8 {
-            return Err(Error::InvalidColor);
-        }
-
-        match self.frame_data {
-            FrameData::Mmap(frame_mmap) => create_image_buffer(&self.frame_format, frame_mmap),
-            #[cfg(feature = "dmabuf")]
-            FrameData::GBMBo(_) => todo!(),
-        }
-    }
-
     pub(crate) fn get_image(&mut self) -> Result<DynamicImage, Error> {
         self.convert_color_inplace()?;
         let image: DynamicImage = (&*self).try_into()?;
@@ -163,25 +136,81 @@ impl TryFrom<&FrameCopy> for DynamicImage {
     type Error = Error;
 
     fn try_from(value: &FrameCopy) -> Result<Self> {
-        Ok(match value.frame_color_type {
-            ColorType::Rgb8 => {
-                let frame_data = match &value.frame_data {
-                    FrameData::Mmap(frame_mmap) => frame_mmap.to_vec(),
-                    #[cfg(feature = "dmabuf")]
-                    FrameData::GBMBo(_) => todo!(),
-                };
-                Self::ImageRgb8(create_image_buffer(&value.frame_format, frame_data)?)
+        value.allocate_image()
+    }
+}
+
+impl FrameCopy {
+    fn allocate_image(&self) -> Result<DynamicImage> {
+        match self.frame_color_type {
+            ColorType::Rgb8 => self.allocate_image_rgb8(),
+            ColorType::Rgba8 => self.allocate_image_rgba8(),
+            _ => Err(Error::InvalidColor),
+        }
+    }
+
+    fn data(&self) -> &[u8] {
+        match &self.frame_data {
+            FrameData::Mmap(frame_mmap) => frame_mmap.as_bytes(),
+            #[cfg(feature = "dmabuf")]
+            FrameData::GBMBo(_) => unimplemented!("it is still not used, and todo"),
+        }
+    }
+
+    fn pixel_position(&self, index: usize) -> (u32, u32) {
+        let index = index as u32;
+        let Size { width, height } = self.frame_format.size;
+        match self.transform {
+            wl_output::Transform::Normal => (index % width, index / width),
+            wl_output::Transform::_90 => (height - index / width - 1, index % width),
+            wl_output::Transform::_180 => (width - index % width - 1, height - index / width - 1),
+            wl_output::Transform::_270 => (index / width, width - index % width - 1),
+            wl_output::Transform::Flipped => (width - index % width - 1, index / width),
+            wl_output::Transform::Flipped90 => (index / width, index % width),
+            wl_output::Transform::Flipped180 => (index % width, height - index / width - 1),
+            wl_output::Transform::Flipped270 => {
+                (height - index / width - 1, width - index % width - 1)
             }
-            ColorType::Rgba8 => {
-                let frame_data = match &value.frame_data {
-                    FrameData::Mmap(frame_mmap) => frame_mmap.to_vec(),
-                    #[cfg(feature = "dmabuf")]
-                    FrameData::GBMBo(_) => todo!(),
-                };
-                Self::ImageRgba8(create_image_buffer(&value.frame_format, frame_data)?)
+            _ => unreachable!(),
+        }
+    }
+    fn image_shape(&self) -> (u32, u32) {
+        match self.transform {
+            wl_output::Transform::Normal
+            | wl_output::Transform::_180
+            | wl_output::Transform::Flipped
+            | wl_output::Transform::Flipped180 => {
+                (self.frame_format.size.width, self.frame_format.size.height)
             }
-            _ => return Err(Error::InvalidColor),
-        })
+            _ => (self.frame_format.size.height, self.frame_format.size.width),
+        }
+    }
+
+    fn allocate_image_rgba8(&self) -> Result<DynamicImage> {
+        let (width, height) = self.image_shape();
+        let mut img = RgbaImage::new(width, height);
+        for (index, pixel) in self.data().chunks(4).enumerate() {
+            let r = pixel[0];
+            let g = pixel[1];
+            let b = pixel[2];
+            let a = pixel[3];
+            let (x, y) = self.pixel_position(index);
+            img.put_pixel(x, y, Rgba([r, g, b, a]));
+        }
+        Ok(DynamicImage::ImageRgba8(img))
+    }
+
+    fn allocate_image_rgb8(&self) -> Result<DynamicImage> {
+        let (width, height) = self.image_shape();
+        let mut img = RgbImage::new(width, height);
+        for (index, pixel) in self.data().chunks(3).enumerate() {
+            let r = pixel[0];
+            let g = pixel[1];
+            let b = pixel[2];
+            let (x, y) = self.pixel_position(index);
+            img.put_pixel(x, y, Rgb([r, g, b]));
+        }
+        Ok(DynamicImage::ImageRgb8(img))
     }
 }
 
