@@ -5,22 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.6.0-rc1] - 2026-08-01
+## [1.6.0] - 2026-08-04
 
-### libwayshot 0.9.0-rc1
+### libwayshot 0.9.0
 
 #### Fixed
 
 - screencast will continue allocate the memory, only when WayshotConnection is dead, the memory will be release in [@Decodetalkers](https://github.com/Decodetalkers) in [#390](https://github.com/waycrate/wayshot/pull/390)
-- toypo in toplevel list by [@Diax179](https://github.com/Diax179) in [#385](https://github.com/waycrate/wayshot/pull/385)
-- guards & build with --no-default-features --all-targets flags by [@id3v1669](https://github.com/id3v1669) in [#369](https://github.com/waycrate/wayshot/pull/396)
+- typo in toplevel list by [@Diax170](https://github.com/Diax170) in [#385](https://github.com/waycrate/wayshot/pull/385)
+- guards & build with --no-default-features --all-targets flags by [@id3v1669](https://github.com/id3v1669) in [#396](https://github.com/waycrate/wayshot/pull/396)
 
 #### Changed
+
 - Allow to use wl_output to invoke screenshot_single_output
 - Allow to use ExtForeignToplevelHandle to invoke screenshot_toplevel
 - Add new api try_clone
+- better rotation logic by [@Decodetalkers](https://github.com/Decodetalkers) in [#411](https://github.com/waycrate/wayshot/pull/411)
+- name style tidy up, remove wrong use of unwrap by [@Decodetalkers](https://github.com/Decodetalkers) in [#412](https://github.com/waycrate/wayshot/pull/412)
 
 #### Breaking Changed
+
 - separate dmabuf-related features by [@Gigas002](https://github.com/Gigas002)
 - remove print_displays_info
 - remove Toplevel from enum Region
@@ -28,13 +32,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### wayshot
 
+#### Added
+
+- list outputs and toplevels as json by [@Diax170](https://github.com/Diax170) in [#387](https://github.com/waycrate/wayshot/pull/387)
+- Nix module and repackaged flake with feature flags by [@id3v1669](https://github.com/id3v1669) in [#392](https://github.com/waycrate/wayshot/pull/392)
+- install manpages in Nix package by [@Diax170](https://github.com/Diax170) in [#393](https://github.com/waycrate/wayshot/pull/393)
+- shell completions added to Nix flake by [@Diax170](https://github.com/Diax170) in [#386](https://github.com/waycrate/wayshot/pull/386)
+
 #### Changed
 
-- use identifier to select toplevel([#381](https://github.com/waycrate/wayshot/issues/379)) by [@Decodetalkers](https://github.com/Decodetalkers) in [#381](https://github.com/waycrate/wayshot/pull/381)
-- remove invalid changelog from flake.nix by [@Diax179](https://github.com/Diax179) in [#388](https://github.com/waycrate/wayshot/pull/388)
-- list outputs and toplevels as json by [@Diax179](https://github.com/waycrate/wayshot/pull/387)
-- allow negative coordinates in geometry string  by [@theripper-1920](https://github.com/theripper-1920) in [#418](https://github.com/waycrate/wayshot/pull/418)
-- install manpages in Nix package by [@Diax179](https://github.com/waycrate/wayshot/pull/387)
+- remove invalid changelog from flake.nix by [@Diax170](https://github.com/Diax170) in [#388](https://github.com/waycrate/wayshot/pull/388)
+- allow negative coordinates in geometry string by [@theripper-1920](https://github.com/theripper-1920) in [#418](https://github.com/waycrate/wayshot/pull/418)
+- improve Nix flake and add flake.lock update action by [@Diax170](https://github.com/Diax170) in [#377](https://github.com/waycrate/wayshot/pull/377)
+
+#### Breaking Changes
+
+- use identifier to select toplevel by [@Decodetalkers](https://github.com/Decodetalkers) in [#381](https://github.com/waycrate/wayshot/pull/381)
 
 ## [1.5.0] - 2026-05-26
 
