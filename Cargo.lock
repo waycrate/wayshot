@@ -1414,7 +1414,7 @@ dependencies = [
 
 [[package]]
 name = "libwayshot"
-version = "0.9.0-rc1"
+version = "0.9.0"
 dependencies = [
  "drm 0.15.0",
  "gbm",
@@ -2860,7 +2860,7 @@ dependencies = [
 
 [[package]]
 name = "wayshot"
-version = "1.6.0-rc1"
+version = "1.6.0"
 dependencies = [
  "chrono",
  "clap",
