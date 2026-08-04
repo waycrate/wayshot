@@ -1138,6 +1138,7 @@ impl WayshotConnection {
                             buffer,
                             shm_pool,
                             size: frame_format.size,
+                            transform: state.transform,
                         });
                     }
                 }
@@ -1202,6 +1203,7 @@ impl WayshotConnection {
                             buffer,
                             shm_pool,
                             size: frame_format.size,
+                            transform: state.transform,
                         });
                     }
                 }
@@ -1246,7 +1248,7 @@ impl WayshotConnection {
             frame_format,
             frame_color_type: image::ColorType::Rgb8,
             frame_data: FrameData::Mmap(frame_mmap),
-            transform: output_info.transform,
+            transform: frame_guard.transform.unwrap_or(output_info.transform),
             logical_region: capture_region
                 .map(|capture_region| capture_region.logical())
                 .unwrap_or(output_info.logical_region),
@@ -1579,7 +1581,7 @@ impl WayshotConnection {
         let fd = create_shm_fd()?;
         let memfile = File::from(fd);
         // Determine a suitable shm FrameFormat for this frame
-        let (frame_format, _) = self.capture_toplevel_frame_shm_from_file(
+        let (frame_format, guard) = self.capture_toplevel_frame_shm_from_file(
             cursor_overlay,
             toplevel.toplevel(),
             &memfile,
@@ -1591,7 +1593,7 @@ impl WayshotConnection {
             frame_format,
             frame_color_type: image::ColorType::Rgb8, // will be updated by get_image
             frame_data: FrameData::Mmap(frame_mmap),
-            transform: Transform::Normal,
+            transform: guard.transform.unwrap_or(Transform::Normal),
             logical_region: LogicalRegion {
                 inner: crate::region::Region {
                     position: crate::region::Position { x: 0, y: 0 },

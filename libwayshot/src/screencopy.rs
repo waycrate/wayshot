@@ -26,6 +26,7 @@ pub struct FrameGuard {
     pub buffer: WlBuffer,
     pub shm_pool: WlShmPool,
     pub size: Size,
+    pub transform: Option<wl_output::Transform>,
 }
 
 impl Drop for FrameGuard {

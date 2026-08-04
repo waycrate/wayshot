@@ -217,6 +217,7 @@ pub struct CaptureFrameState {
     pub buffer_done: AtomicBool,
     pub toplevels: Vec<TopLevel>,
     pub(crate) session_done: bool,
+    pub transform: Option<wl_output::Transform>,
     #[cfg(feature = "dmabuf")]
     pub(crate) gbm: Option<gbm::Device<Card>>,
     #[cfg_attr(not(feature = "dmabuf"), allow(dead_code))]
@@ -233,6 +234,7 @@ impl CaptureFrameState {
             buffer_done: AtomicBool::new(false),
             toplevels: Vec::new(),
             session_done: false,
+            transform: None,
             #[cfg(feature = "dmabuf")]
             gbm: None,
             find_gbm,
@@ -286,7 +288,11 @@ impl Dispatch<ExtImageCopyCaptureFrameV1, ()> for CaptureFrameState {
                 state.buffer_done.store(true, Ordering::Relaxed);
                 state.state = Some(FrameState::FailedWithReason(reason));
             }
-            ext_image_copy_capture_frame_v1::Event::Transform { .. } => {}
+            ext_image_copy_capture_frame_v1::Event::Transform {
+                transform: WEnum::Value(transform),
+            } => {
+                state.transform = Some(transform);
+            }
             _ => {}
         }
     }
