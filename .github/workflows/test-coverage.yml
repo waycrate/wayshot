@@ -47,20 +47,20 @@ jobs:
             #     has no /dev/input/event* nodes
             #   - WLR_HEADLESS_OUTPUTS=1: create one virtual output so
             #     get_all_outputs()/screenshot_all() have something to return
-            # WAYLAND_DISPLAY is set explicitly *before* sway starts so the socket
-            # name is deterministic instead of having to parse it back out of logs.
+            # sway picks its own server socket name; WAYLAND_DISPLAY is
+            # discovered afterwards from XDG_RUNTIME_DIR and exported for
+            # later steps rather than assumed in advance (see inline comment
+            # below for why).
             - name: Start headless Wayland compositor
               run: |
                   export XDG_RUNTIME_DIR=/tmp/xdg-runtime
                   mkdir -p "$XDG_RUNTIME_DIR"
                   chmod 0700 "$XDG_RUNTIME_DIR"
                   echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" >> "$GITHUB_ENV"
-                  echo "WAYLAND_DISPLAY=wayland-ci" >> "$GITHUB_ENV"
 
                   printf 'xwayland disable\n' > /tmp/ci-sway-config
 
                   XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
-                  WAYLAND_DISPLAY=wayland-ci \
                   WLR_BACKENDS=headless \
                   WLR_RENDERER=pixman \
                   WLR_LIBINPUT_NO_DEVICES=1 \
@@ -68,10 +68,11 @@ jobs:
                   sway -c /tmp/ci-sway-config > /tmp/sway.log 2>&1 &
                   echo $! > /tmp/sway.pid
 
+                  sock=""
                   for i in $(seq 1 60); do
-                      if [ -S "$XDG_RUNTIME_DIR/wayland-ci" ]; then
-                          echo "compositor socket is up at $XDG_RUNTIME_DIR/wayland-ci (after ${i}s)"
-                          exit 0
+                      sock=$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -type s -name 'wayland-*' 2>/dev/null | head -n1)
+                      if [ -n "$sock" ]; then
+                          break
                       fi
                       if ! kill -0 "$(cat /tmp/sway.pid)" 2>/dev/null; then
                           echo "::error::sway process exited during startup"
@@ -84,11 +85,19 @@ jobs:
                       sleep 1
                   done
 
-                  echo "::error::compositor failed to start within timeout"
-                  echo "sway (pid $(cat /tmp/sway.pid)) is still running - looks like a genuine hang, not a crash"
-                  echo "--- full sway.log ---"
-                  cat /tmp/sway.log
-                  exit 1
+                  if [ -z "$sock" ]; then
+                      echo "::error::compositor failed to start within timeout"
+                      echo "sway (pid $(cat /tmp/sway.pid)) is still running - looks like a genuine hang, not a crash"
+                      echo "--- full sway.log ---"
+                      cat /tmp/sway.log
+                      echo "--- contents of XDG_RUNTIME_DIR ---"
+                      ls -la "$XDG_RUNTIME_DIR"
+                      exit 1
+                  fi
+
+                  display_name=$(basename "$sock")
+                  echo "compositor socket is up at $sock"
+                  echo "WAYLAND_DISPLAY=$display_name" >> "$GITHUB_ENV"
 
             - name: Run tests
               run: cargo test --all-features --verbose
