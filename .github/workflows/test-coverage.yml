@@ -29,7 +29,7 @@ jobs:
 
             - name: Install wayland dependencies
               run: |
-                  pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo sway swaybg
+                  pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo sway swaybg wl-clipboard
 
             - name: Install cargo-llvm-cov
               uses: taiki-e/install-action@v2
