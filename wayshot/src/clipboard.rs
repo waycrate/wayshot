@@ -53,7 +53,8 @@ pub fn copy_to_clipboard(data: Vec<u8>, encoding: EncodingFormat) -> Result<()> 
                 let _ = rustix::stdio::dup2_stderr(&devnull);
             }
             opts.foreground(true);
-            opts.copy(Source::Bytes(data.into()), mime)?;
+            let result = opts.copy(Source::Bytes(data.into()), mime);
+            std::process::exit(if result.is_ok() { 0 } else { 1 });
         }
         Err(e) => {
             tracing::warn!(
