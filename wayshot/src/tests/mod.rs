@@ -9,6 +9,8 @@ mod clipboard;
 mod color_picker;
 mod config;
 mod listing;
+#[cfg(feature = "logger")]
+mod logger;
 #[cfg(feature = "notifications")]
 mod notification;
 mod settings;
