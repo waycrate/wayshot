@@ -309,3 +309,124 @@ fn clipboard_flag_does_not_hang_when_stdout_is_piped() {
         ),
     }
 }
+
+/// pids whose /proc/<pid>/cmdline contains `marker` as a substring.
+#[cfg(all(feature = "clipboard", target_os = "linux"))]
+fn find_pids_with_cmdline_containing(marker: &str) -> Vec<u32> {
+    let mut pids = Vec::new();
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return pids;
+    };
+    for entry in entries.flatten() {
+        let Ok(pid) = entry.file_name().to_string_lossy().parse::<u32>() else {
+            continue;
+        };
+        if let Ok(cmdline) = std::fs::read(entry.path().join("cmdline"))
+            && String::from_utf8_lossy(&cmdline).contains(marker)
+        {
+            pids.push(pid);
+        }
+    }
+    pids
+}
+
+/// Whether `pid` is still running, treating a zombie (unreaped by an init
+/// that doesn't wait() on adopted orphans - a real possibility in a
+/// container without a proper `--init`) the same as "not alive", since
+/// that's what actually matters here.
+#[cfg(all(feature = "clipboard", target_os = "linux"))]
+fn pid_is_alive(pid: u32) -> bool {
+    let Ok(stat) = std::fs::read_to_string(format!("/proc/{pid}/stat")) else {
+        return false;
+    };
+    // `comm` (the 2nd field) can itself contain spaces/parens, so find the
+    // *last* ')' rather than naively splitting on whitespace.
+    let Some((_, after_comm)) = stat.rsplit_once(')') else {
+        return false;
+    };
+    !matches!(after_comm.trim_start().chars().next(), None | Some('Z'))
+}
+
+/// Lifecycle sanity check for the clipboard-serving background process: it
+/// should actually terminate once something else takes over the clipboard,
+/// rather than lingering forever.
+///
+/// This does NOT specifically regression-test the "falls through into
+/// main()'s tail logic instead of exiting" bug that was fixed alongside the
+/// pipe-hang bug in the same commit. I tried: `notification::send_success`
+/// (the only thing left to run in that fall-through path) uses the exact
+/// same fork-and-forget pattern as `copy_to_clipboard` itself, so even the
+/// *broken* version only does a near-instant extra fork before exiting -
+/// there's no externally observable delay or hang to assert on, timing-based
+/// or otherwise, so a black-box test here can't actually distinguish the two
+/// versions (confirmed empirically: an earlier version of this test passed
+/// identically with the fix reverted). Catching that specific bug reliably
+/// would need either a D-Bus notification monitor or refactoring
+/// `copy_to_clipboard` to be unit-testable without a real fork, both bigger
+/// than this test's scope. That fix is verified by code inspection only.
+#[cfg(all(feature = "clipboard", target_os = "linux"))]
+#[test]
+fn clipboard_server_process_exits_once_overwritten() {
+    if !compositor_available() {
+        return;
+    }
+    if Command::new("wl-copy").arg("--version").output().is_err() {
+        eprintln!("skipping: wl-copy (wl-clipboard) not installed");
+        return;
+    }
+
+    let marker = format!(
+        "wayshot-integration-test-{}-clipboard-server",
+        std::process::id()
+    );
+    let path = std::env::temp_dir().join(format!("{marker}.png"));
+
+    let status = Command::new(env!("CARGO_BIN_EXE_wayshot"))
+        .args(["--clipboard", "--silent", "--encoding", "png"])
+        .arg(&path)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .expect("failed to run wayshot binary");
+    assert!(status.success());
+    let _ = std::fs::remove_file(&path);
+
+    // The background server is a detached grandchild reparented to init, so
+    // we can't get its pid from the Command/Child handle above - find it by
+    // matching our unique marker in its argv via /proc instead.
+    let mut server_pid = None;
+    for _ in 0..20 {
+        if let Some(&pid) = find_pids_with_cmdline_containing(&marker).first() {
+            server_pid = Some(pid);
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+    let server_pid = server_pid.expect("clipboard server process should be running");
+
+    // Overwrite the clipboard with something else, forcing the server's
+    // blocking copy() call to return. wl-copy forks its own persistence
+    // server the same way wayshot does, and it inherits our stdio by
+    // default too - explicitly null it out rather than risk the exact same
+    // pipe-hang class of bug this whole file is here to guard against.
+    Command::new("wl-copy")
+        .arg("regression-test-overwrite")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .expect("failed to run wl-copy");
+
+    let mut exited = false;
+    for _ in 0..25 {
+        if !pid_is_alive(server_pid) {
+            exited = true;
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+    assert!(
+        exited,
+        "clipboard server process {server_pid} should have exited \
+         after the clipboard was overwritten"
+    );
+}
