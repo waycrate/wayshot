@@ -14,6 +14,7 @@ jobs:
         runs-on: ubuntu-latest
         container:
             image: archlinux:latest
+            options: --cap-add=SYS_NICE
 
         steps:
             - name: Checkout
