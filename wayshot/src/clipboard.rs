@@ -10,7 +10,7 @@ use crate::utils::EncodingFormat;
 ///
 /// wl-clipboard-rs's MimeType::Autodetect only works reliably for JPEG and PNG.
 /// For other formats (WebP, AVIF, JXL, etc.), we must explicitly specify the MIME type.
-fn mime_type_for_encoding(encoding: EncodingFormat) -> MimeType {
+pub(crate) fn mime_type_for_encoding(encoding: EncodingFormat) -> MimeType {
     let mime_str = match encoding {
         #[cfg(feature = "jpeg")]
         EncodingFormat::Jpg => "image/jpeg",
