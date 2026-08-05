@@ -28,12 +28,56 @@ jobs:
 
             - name: Install wayland dependencies
               run: |
-                  pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo
+                  pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo sway
 
             - name: Install cargo-llvm-cov
               uses: taiki-e/install-action@v2
               with:
                   tool: cargo-llvm-cov
+
+            # Starts a real wlroots compositor using wlroots' headless backend,
+            # so tests that construct a `WayshotConnection` and exercise
+            # protocol roundtrips can run instead of being skipped.
+            # This job's container has no GPU, so:
+            #   - WLR_BACKENDS=headless: no DRM/KMS, no libseat/seatd session needed
+            #   - WLR_RENDERER=pixman: pure CPU rendering, sidesteps EGL/GBM/Mesa
+            #     software-GL fallback entirely instead of hoping llvmpipe works
+            #   - WLR_LIBINPUT_NO_DEVICES=1: don't fail just because the container
+            #     has no /dev/input/event* nodes
+            #   - WLR_HEADLESS_OUTPUTS=1: create one virtual output so
+            #     get_all_outputs()/screenshot_all() have something to return
+            # WAYLAND_DISPLAY is set explicitly *before* sway starts so the socket
+            # name is deterministic instead of having to parse it back out of logs.
+            - name: Start headless Wayland compositor
+              run: |
+                  export XDG_RUNTIME_DIR=/tmp/xdg-runtime
+                  mkdir -p "$XDG_RUNTIME_DIR"
+                  chmod 0700 "$XDG_RUNTIME_DIR"
+                  echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" >> "$GITHUB_ENV"
+                  echo "WAYLAND_DISPLAY=wayland-ci" >> "$GITHUB_ENV"
+
+                  touch /tmp/empty-sway-config
+
+                  XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+                  WAYLAND_DISPLAY=wayland-ci \
+                  WLR_BACKENDS=headless \
+                  WLR_RENDERER=pixman \
+                  WLR_LIBINPUT_NO_DEVICES=1 \
+                  WLR_HEADLESS_OUTPUTS=1 \
+                  sway -c /tmp/empty-sway-config > /tmp/sway.log 2>&1 &
+                  echo $! > /tmp/sway.pid
+
+                  for _ in $(seq 1 20); do
+                      if [ -S "$XDG_RUNTIME_DIR/wayland-ci" ]; then
+                          echo "compositor socket is up at $XDG_RUNTIME_DIR/wayland-ci"
+                          exit 0
+                      fi
+                      sleep 0.5
+                  done
+
+                  echo "::error::compositor failed to start within timeout"
+                  cat /tmp/sway.log
+                  exit 1
 
             - name: Run tests
               run: cargo test --all-features --verbose
@@ -45,6 +89,14 @@ jobs:
             - name: Generate coverage report (wayshot)
               run: |
                   cargo llvm-cov --all-features -p wayshot --lcov --output-path lcov-wayshot.info
+
+            - name: Stop headless Wayland compositor
+              if: always()
+              run: |
+                  if [ -f /tmp/sway.pid ]; then
+                      kill "$(cat /tmp/sway.pid)" 2>/dev/null || true
+                  fi
+                  cat /tmp/sway.log || true
 
             - name: Upload libwayshot coverage to Codecov
               uses: codecov/codecov-action@v7
