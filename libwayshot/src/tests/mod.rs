@@ -3,6 +3,7 @@
 mod convert;
 mod error;
 mod image_util;
+mod live_connection;
 mod screencopy;
 
 #[cfg(all(test, unix))]
