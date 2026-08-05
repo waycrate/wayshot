@@ -68,20 +68,24 @@ jobs:
                   sway -c /tmp/ci-sway-config > /tmp/sway.log 2>&1 &
                   echo $! > /tmp/sway.pid
 
-                  for _ in $(seq 1 20); do
+                  for i in $(seq 1 60); do
                       if [ -S "$XDG_RUNTIME_DIR/wayland-ci" ]; then
-                          echo "compositor socket is up at $XDG_RUNTIME_DIR/wayland-ci"
+                          echo "compositor socket is up at $XDG_RUNTIME_DIR/wayland-ci (after ${i}s)"
                           exit 0
                       fi
-                      sleep 0.5
+                      if ! kill -0 "$(cat /tmp/sway.pid)" 2>/dev/null; then
+                          echo "::error::sway process exited during startup"
+                          cat /tmp/sway.log
+                          exit 1
+                      fi
+                      if [ $((i % 10)) -eq 0 ]; then
+                          echo "still waiting for compositor socket (${i}s elapsed, sway still running)"
+                      fi
+                      sleep 1
                   done
 
                   echo "::error::compositor failed to start within timeout"
-                  if kill -0 "$(cat /tmp/sway.pid)" 2>/dev/null; then
-                      echo "sway (pid $(cat /tmp/sway.pid)) is still running - looks like a hang, not a crash"
-                  else
-                      echo "sway process is no longer running - it exited/crashed during startup"
-                  fi
+                  echo "sway (pid $(cat /tmp/sway.pid)) is still running - looks like a genuine hang, not a crash"
                   echo "--- full sway.log ---"
                   cat /tmp/sway.log
                   exit 1
