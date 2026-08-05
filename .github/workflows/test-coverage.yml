@@ -29,7 +29,7 @@ jobs:
 
             - name: Install wayland dependencies
               run: |
-                  pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo sway
+                  pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo sway swaybg
 
             - name: Install cargo-llvm-cov
               uses: taiki-e/install-action@v2
@@ -57,7 +57,7 @@ jobs:
                   echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" >> "$GITHUB_ENV"
                   echo "WAYLAND_DISPLAY=wayland-ci" >> "$GITHUB_ENV"
 
-                  touch /tmp/empty-sway-config
+                  printf 'xwayland disable\n' > /tmp/ci-sway-config
 
                   XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
                   WAYLAND_DISPLAY=wayland-ci \
@@ -65,7 +65,7 @@ jobs:
                   WLR_RENDERER=pixman \
                   WLR_LIBINPUT_NO_DEVICES=1 \
                   WLR_HEADLESS_OUTPUTS=1 \
-                  sway -c /tmp/empty-sway-config > /tmp/sway.log 2>&1 &
+                  sway -c /tmp/ci-sway-config > /tmp/sway.log 2>&1 &
                   echo $! > /tmp/sway.pid
 
                   for _ in $(seq 1 20); do
@@ -77,6 +77,12 @@ jobs:
                   done
 
                   echo "::error::compositor failed to start within timeout"
+                  if kill -0 "$(cat /tmp/sway.pid)" 2>/dev/null; then
+                      echo "sway (pid $(cat /tmp/sway.pid)) is still running - looks like a hang, not a crash"
+                  else
+                      echo "sway process is no longer running - it exited/crashed during startup"
+                  fi
+                  echo "--- full sway.log ---"
                   cat /tmp/sway.log
                   exit 1
 
