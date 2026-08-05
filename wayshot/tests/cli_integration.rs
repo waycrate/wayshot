@@ -149,3 +149,114 @@ fn capturing_to_stdout_produces_a_valid_png() {
             .starts_with(&[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n'])
     );
 }
+
+#[cfg(feature = "notifications")]
+#[test]
+fn capturing_to_a_file_writes_a_valid_png_and_the_notification_fork_does_not_hang() {
+    if !compositor_available() {
+        return;
+    }
+    // Deliberately NOT --silent: this is the tool's primary real-world path
+    // (save to a file, notify on success), which forks a background process
+    // to serve the "open folder" notification action. The parent is
+    // documented to return immediately regardless of whether the fork or the
+    // D-Bus notification itself succeeds, so this also confirms that fork
+    // doesn't block wayshot's own exit even without a notification daemon
+    // present in CI.
+    //
+    // --config points at a path that doesn't exist so this doesn't depend on
+    // (and isn't silently skipped by) a real user config.toml that disables
+    // notifications - discovered by testing on a machine with exactly such a
+    // config, which made this test pass without ever actually exercising the
+    // notification/fork path it's meant to cover.
+    let path = std::env::temp_dir().join(format!(
+        "wayshot-integration-test-{}-notify-fork.png",
+        std::process::id()
+    ));
+    let bogus_config = std::env::temp_dir().join(format!(
+        "wayshot-integration-test-{}-nonexistent-config.toml",
+        std::process::id()
+    ));
+    let output = Command::new(env!("CARGO_BIN_EXE_wayshot"))
+        .args(["--encoding", "png", "--config"])
+        .arg(&bogus_config)
+        .arg(&path)
+        .output()
+        .expect("failed to run wayshot binary");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let bytes = std::fs::read(&path).expect("output file should have been written");
+    let _ = std::fs::remove_file(&path);
+    assert!(bytes.starts_with(&[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n']));
+}
+
+#[cfg(feature = "clipboard")]
+#[test]
+fn clipboard_flag_sets_the_real_wayland_clipboard() {
+    if !compositor_available() {
+        return;
+    }
+    if Command::new("wl-paste").arg("--version").output().is_err() {
+        eprintln!("skipping: wl-paste (wl-clipboard) not installed");
+        return;
+    }
+
+    // Write to a real file rather than stdout ("-"), AND avoid
+    // `Command::output()` / any piped stdout+stderr entirely. The clipboard
+    // fork deliberately persists in the background indefinitely (to keep
+    // serving the clipboard until it's overwritten) and never closes the
+    // stdio fds it inherited at fork time. If either pipe were captured here
+    // (as `Command::output()` sets up for both stdout AND stderr by
+    // default), that lingering background process would hold the pipe's
+    // write end open forever and our read would hang waiting for an EOF that
+    // never comes - this is a real, reproducible bug in the tool
+    // (`wayshot --clipboard - | cat` hangs the same way from a plain shell,
+    // and redirecting only stdout to a file while leaving stderr piped still
+    // hangs), not just a test-harness quirk, and is worth fixing in
+    // clipboard.rs separately.
+    let path = std::env::temp_dir().join(format!(
+        "wayshot-integration-test-{}-clipboard.png",
+        std::process::id()
+    ));
+    let status = Command::new(env!("CARGO_BIN_EXE_wayshot"))
+        .args(["--clipboard", "--silent", "--encoding", "png"])
+        .arg(&path)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .expect("failed to run wayshot binary");
+    assert!(status.success());
+    let bytes = std::fs::read(&path).expect("output file should have been written");
+    let _ = std::fs::remove_file(&path);
+
+    // The background process wayshot forked to serve the clipboard claims
+    // the wl_data_source *after* the parent (and thus wayshot's own exit)
+    // already returned - a genuine async handoff, not just test-harness
+    // slack. Reading via wl-paste immediately can catch it mid-handshake (or
+    // read a stale previous clipboard owner), so poll briefly instead of
+    // asserting on the very first read.
+    let mut pasted_stdout = Vec::new();
+    let mut matched = false;
+    for _ in 0..20 {
+        let pasted = Command::new("wl-paste")
+            .output()
+            .expect("failed to run wl-paste");
+        assert!(pasted.status.success());
+        pasted_stdout = pasted.stdout;
+        if pasted_stdout == bytes {
+            matched = true;
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+    assert!(
+        matched,
+        "clipboard content should eventually match the captured image \
+         (got {} bytes, expected {} bytes)",
+        pasted_stdout.len(),
+        bytes.len()
+    );
+}
