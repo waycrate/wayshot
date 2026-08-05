@@ -329,6 +329,47 @@ fn toplevel_id_and_title_empty_fields() {
 }
 
 #[test]
+fn toplevel_id_title_identifier_formats_all_fields() {
+    let handle = dummy_toplevel_handle();
+    let mut toplevel = TopLevel::new(handle);
+    toplevel.app_id = "com.example.myapp".to_string();
+    toplevel.title = "My App Window".to_string();
+    toplevel.identifier = "id-42".to_string();
+    assert_eq!(
+        toplevel.id_title_identifier(),
+        "app_id: \"com.example.myapp\", title: \"My App Window\", identifier: \"id-42\""
+    );
+}
+
+#[test]
+fn as_ext_foreign_toplevel_impls_return_the_handle() {
+    use crate::region::AsExtForeignToplevel;
+
+    let handle = dummy_toplevel_handle();
+    let toplevel = TopLevel::new(handle.clone());
+
+    assert_eq!(
+        <TopLevel as AsExtForeignToplevel>::toplevel(&toplevel),
+        &handle
+    );
+    assert_eq!(
+        <&TopLevel as AsExtForeignToplevel>::toplevel(&&toplevel),
+        &handle
+    );
+    assert_eq!(
+        <ExtForeignToplevelHandleV1 as AsExtForeignToplevel>::toplevel(&handle),
+        &handle
+    );
+    assert_eq!(
+        <&ExtForeignToplevelHandleV1 as AsExtForeignToplevel>::toplevel(&&handle),
+        &handle
+    );
+
+    mem::forget(toplevel);
+    mem::forget(handle);
+}
+
+#[test]
 fn toplevel_as_ref_returns_handle() {
     let handle = dummy_toplevel_handle();
     let toplevel = TopLevel::new(handle);
