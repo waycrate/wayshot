@@ -206,6 +206,18 @@ fn encoding_format_try_from_pathbuf_unsupported_extension_errors() {
     assert!(result.is_err());
 }
 
+#[cfg(unix)]
+#[test]
+fn encoding_format_try_from_pathbuf_non_utf8_extension_errors() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    // 0xFF is not valid UTF-8 in any position.
+    let path = PathBuf::from(OsStr::from_bytes(b"shot.\xff\xff"));
+    let result: Result<EncodingFormat, _> = (&path).try_into();
+    assert!(result.is_err());
+}
+
 #[test]
 fn encoding_format_into_image_format() {
     let fmt: image::ImageFormat = EncodingFormat::Png.into();
@@ -233,6 +245,9 @@ fn encoding_format_webp_variant() {
         EncodingFormat::from_str("webp").unwrap(),
         EncodingFormat::Webp
     );
+    assert_eq!(Into::<&str>::into(EncodingFormat::Webp), "webp");
+    let fmt: image::ImageFormat = EncodingFormat::Webp.into();
+    assert_eq!(fmt, image::ImageFormat::WebP);
 }
 
 #[cfg(feature = "qoi")]
@@ -242,6 +257,9 @@ fn encoding_format_qoi_variant() {
         EncodingFormat::from_str("qoi").unwrap(),
         EncodingFormat::Qoi
     );
+    assert_eq!(Into::<&str>::into(EncodingFormat::Qoi), "qoi");
+    let fmt: image::ImageFormat = EncodingFormat::Qoi.into();
+    assert_eq!(fmt, image::ImageFormat::Qoi);
 }
 
 #[cfg(feature = "pnm")]
@@ -251,6 +269,9 @@ fn encoding_format_pnm_variant() {
         EncodingFormat::from_str("ppm").unwrap(),
         EncodingFormat::Ppm
     );
+    assert_eq!(Into::<&str>::into(EncodingFormat::Ppm), "ppm");
+    let fmt: image::ImageFormat = EncodingFormat::Ppm.into();
+    assert_eq!(fmt, image::ImageFormat::Pnm);
 }
 
 #[cfg(feature = "avif")]
@@ -260,6 +281,9 @@ fn encoding_format_avif_variant() {
         EncodingFormat::from_str("avif").unwrap(),
         EncodingFormat::Avif
     );
+    assert_eq!(Into::<&str>::into(EncodingFormat::Avif), "avif");
+    let fmt: image::ImageFormat = EncodingFormat::Avif.into();
+    assert_eq!(fmt, image::ImageFormat::Avif);
 }
 
 #[cfg(feature = "jxl")]
@@ -270,6 +294,11 @@ fn encoding_format_jxl_variant() {
         EncodingFormat::Jxl
     );
     assert_eq!(Into::<&str>::into(EncodingFormat::Jxl), "jxl");
+    // Jxl has no `image::ImageFormat` counterpart; encode_image() never routes
+    // through this conversion for Jxl, but the fallback arm still exists and
+    // should map to something harmless (Png) rather than panicking.
+    let fmt: image::ImageFormat = EncodingFormat::Jxl.into();
+    assert_eq!(fmt, image::ImageFormat::Png);
 }
 
 // ─── encode_image ───────────────────────────────────────────────────────────

@@ -62,3 +62,44 @@ fn icon_is_empty_when_not_configured() {
     let n = build_base_notification(&config, true);
     assert!(n.icon.is_empty());
 }
+
+#[test]
+fn sound_name_hint_is_set_when_configured() {
+    let config = NotificationConfig {
+        sound_name: Some("message-new-instant".to_string()),
+        ..NotificationConfig::default()
+    };
+    let n = build_base_notification(&config, true);
+    assert!(n.hints.contains(&notify_rust::Hint::SoundName(
+        "message-new-instant".to_string()
+    )));
+}
+
+#[test]
+fn transient_hint_is_set_when_configured() {
+    let config = NotificationConfig {
+        transient: Some(true),
+        ..NotificationConfig::default()
+    };
+    let n = build_base_notification(&config, true);
+    assert!(n.hints.contains(&notify_rust::Hint::Transient(true)));
+}
+
+#[test]
+fn category_hint_is_set_when_configured() {
+    let config = NotificationConfig {
+        category: Some("transfer.complete".to_string()),
+        ..NotificationConfig::default()
+    };
+    let n = build_base_notification(&config, true);
+    assert!(n.hints.contains(&notify_rust::Hint::Category(
+        "transfer.complete".to_string()
+    )));
+}
+
+#[test]
+fn no_hints_are_set_when_nothing_configured() {
+    let config = NotificationConfig::default();
+    let n = build_base_notification(&config, true);
+    assert!(n.hints.is_empty());
+}
