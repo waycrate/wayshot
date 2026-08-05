@@ -47,6 +47,11 @@ pub fn copy_to_clipboard(data: Vec<u8>, encoding: EncodingFormat) -> Result<()> 
             // Parent exits this function so the rest of main can continue.
         }
         Ok(Fork::Child(_)) => {
+            if let Ok(devnull) = std::fs::File::open("/dev/null") {
+                let _ = rustix::stdio::dup2_stdin(&devnull);
+                let _ = rustix::stdio::dup2_stdout(&devnull);
+                let _ = rustix::stdio::dup2_stderr(&devnull);
+            }
             opts.foreground(true);
             opts.copy(Source::Bytes(data.into()), mime)?;
         }

@@ -204,19 +204,16 @@ fn clipboard_flag_sets_the_real_wayland_clipboard() {
         return;
     }
 
-    // Write to a real file rather than stdout ("-"), AND avoid
-    // `Command::output()` / any piped stdout+stderr entirely. The clipboard
-    // fork deliberately persists in the background indefinitely (to keep
-    // serving the clipboard until it's overwritten) and never closes the
-    // stdio fds it inherited at fork time. If either pipe were captured here
-    // (as `Command::output()` sets up for both stdout AND stderr by
-    // default), that lingering background process would hold the pipe's
-    // write end open forever and our read would hang waiting for an EOF that
-    // never comes - this is a real, reproducible bug in the tool
-    // (`wayshot --clipboard - | cat` hangs the same way from a plain shell,
-    // and redirecting only stdout to a file while leaving stderr piped still
-    // hangs), not just a test-harness quirk, and is worth fixing in
-    // clipboard.rs separately.
+    // Write to a real file rather than stdout ("-") and use Stdio::null()
+    // for good measure. The clipboard fork deliberately persists in the
+    // background indefinitely to keep serving the clipboard until it's
+    // overwritten; it used to also inherit and never close stdin/stdout/
+    // stderr, which meant anything capturing wayshot's own output through a
+    // pipe would hang forever (fixed in clipboard.rs - see
+    // `clipboard_flag_does_not_hang_when_stdout_is_piped` below for the
+    // regression test covering that specifically). This test is about
+    // content correctness, so it sidesteps piping entirely rather than
+    // relying on the fix.
     let path = std::env::temp_dir().join(format!(
         "wayshot-integration-test-{}-clipboard.png",
         std::process::id()
@@ -259,4 +256,56 @@ fn clipboard_flag_sets_the_real_wayland_clipboard() {
         pasted_stdout.len(),
         bytes.len()
     );
+}
+
+/// Regression test for a real bug: the clipboard-serving child forked by
+/// `--clipboard` used to inherit stdin/stdout/stderr from the parent and
+/// never close them. Since that child persists in the background
+/// indefinitely (by design, to keep serving the clipboard until it's
+/// overwritten), anything reading wayshot's own output through a pipe -
+/// `Command::output()`, or a plain shell `wayshot --clipboard - | cat` -
+/// would hang forever waiting for an EOF the lingering process would never
+/// produce, even though all the actual data had already been written. Fixed
+/// in clipboard.rs by redirecting the forked child's stdio to /dev/null
+/// before it starts serving.
+///
+/// This runs the piped call on a background thread and bounds the wait with
+/// a channel timeout instead of trusting `Command::output()` not to hang the
+/// whole test suite if the regression reappears.
+#[cfg(feature = "clipboard")]
+#[test]
+fn clipboard_flag_does_not_hang_when_stdout_is_piped() {
+    if !compositor_available() {
+        return;
+    }
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let result = Command::new(env!("CARGO_BIN_EXE_wayshot"))
+            .args(["--clipboard", "--silent", "--encoding", "png", "-"])
+            .output();
+        // The test may have already timed out and moved on; ignore a
+        // disconnected receiver.
+        let _ = tx.send(result);
+    });
+
+    match rx.recv_timeout(std::time::Duration::from_secs(15)) {
+        Ok(result) => {
+            let output = result.expect("failed to run wayshot binary");
+            assert!(
+                output.status.success(),
+                "stderr: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(
+                output
+                    .stdout
+                    .starts_with(&[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n'])
+            );
+        }
+        Err(_) => panic!(
+            "wayshot --clipboard with piped stdout did not complete within 15s - \
+             the stdio-inheritance pipe-hang regression is back"
+        ),
+    }
 }

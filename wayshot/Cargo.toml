@@ -102,7 +102,7 @@ eyre = "0.6"
 chrono = "0.4"
 
 wl-clipboard-rs = { version = "0.9", optional = true }
-rustix = { workspace = true, features = ["process", "runtime"], optional = true }
+rustix = { workspace = true, features = ["process", "runtime", "stdio"], optional = true }
 
 shellexpand = "3.1"
 toml = { version = "1.1", default-features = false, features = [
