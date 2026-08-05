@@ -100,7 +100,7 @@ jobs:
                   echo "WAYLAND_DISPLAY=$display_name" >> "$GITHUB_ENV"
 
             - name: Run tests
-              run: cargo test --all-features --verbose
+              run: cargo test --workspace --all-features --verbose
 
             - name: Generate coverage report (libwayshot)
               run: |
