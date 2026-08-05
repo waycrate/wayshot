@@ -3,6 +3,10 @@
 mod convert;
 mod error;
 mod image_util;
+mod live_capture;
+mod live_connection;
+#[cfg(feature = "screencast")]
+mod live_screencast;
 mod screencopy;
 
 #[cfg(all(test, unix))]

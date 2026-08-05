@@ -1,6 +1,8 @@
 mod dispatch;
 mod error;
 mod state;
+#[cfg(test)]
+mod tests;
 mod utils;
 
 use std::time::{Duration, Instant};
