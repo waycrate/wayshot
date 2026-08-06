@@ -98,11 +98,15 @@ fn dmabuf_capture_errors_cleanly_without_a_dmabuf_capable_connection() {
     if skip_without_compositor() {
         return;
     }
-    // `WayshotConnection::new()` never sets up dmabuf/GBM state (only
-    // `from_connection_with_dmabuf` does), so this should fail fast with
-    // `NoDMAStateError` before touching any GPU/DRM device at all - this
-    // container has no GPU (WLR_RENDERER=pixman), so that's exactly the
-    // right thing to test rather than exercising the real dmabuf path.
+    // `WayshotConnection::new()` never sets `dmabuf_state` - only
+    // `from_connection_with_dmabuf()` does (see `dmabuf_state: None` in both
+    // `from_connection` and `try_clone`, vs. `Some(..)` only in
+    // `from_connection_with_dmabuf`). `capture_target_frame_dmabuf` checks
+    // that field before touching any GPU/DRM device, so this is
+    // deterministic regardless of the host's actual dmabuf/GPU capability -
+    // it holds the same way on a machine with full GPU support, because it's
+    // driven entirely by which constructor was called, not by what the
+    // environment can do.
     let conn = WayshotConnection::new().expect("should connect to the CI compositor");
     let output = conn.get_all_outputs()[0].clone();
     let target = WayshotTarget::Screen(output.wl_output);
