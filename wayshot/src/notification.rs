@@ -76,7 +76,10 @@ pub fn send_failure(error: &Error, config: &NotificationConfig) {
         .show();
 }
 
-fn build_base_notification(config: &NotificationConfig, is_success: bool) -> Notification {
+pub(crate) fn build_base_notification(
+    config: &NotificationConfig,
+    is_success: bool,
+) -> Notification {
     let default_summary = if is_success {
         "Screenshot Taken"
     } else {

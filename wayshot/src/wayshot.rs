@@ -18,6 +18,8 @@ mod logger;
 mod notification;
 mod screenshot;
 mod settings;
+#[cfg(test)]
+mod tests;
 mod utils;
 
 use crate::listing::{DisplayInfo, PositionInfo, SizeInfo, ToplevelInfo};

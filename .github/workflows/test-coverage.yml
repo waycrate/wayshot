@@ -14,6 +14,7 @@ jobs:
         runs-on: ubuntu-latest
         container:
             image: archlinux:latest
+            options: --cap-add=SYS_NICE
 
         steps:
             - name: Checkout
@@ -28,15 +29,78 @@ jobs:
 
             - name: Install wayland dependencies
               run: |
-                  pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo
+                  pacman -Syu --noconfirm git egl-wayland egl-gbm wayland base-devel mesa pango cairo sway swaybg wl-clipboard
 
             - name: Install cargo-llvm-cov
               uses: taiki-e/install-action@v2
               with:
                   tool: cargo-llvm-cov
 
+            # Starts a real wlroots compositor using wlroots' headless backend,
+            # so tests that construct a `WayshotConnection` and exercise
+            # protocol roundtrips can run instead of being skipped.
+            # This job's container has no GPU, so:
+            #   - WLR_BACKENDS=headless: no DRM/KMS, no libseat/seatd session needed
+            #   - WLR_RENDERER=pixman: pure CPU rendering, sidesteps EGL/GBM/Mesa
+            #     software-GL fallback entirely instead of hoping llvmpipe works
+            #   - WLR_LIBINPUT_NO_DEVICES=1: don't fail just because the container
+            #     has no /dev/input/event* nodes
+            #   - WLR_HEADLESS_OUTPUTS=1: create one virtual output so
+            #     get_all_outputs()/screenshot_all() have something to return
+            # sway picks its own server socket name; WAYLAND_DISPLAY is
+            # discovered afterwards from XDG_RUNTIME_DIR and exported for
+            # later steps rather than assumed in advance (see inline comment
+            # below for why).
+            - name: Start headless Wayland compositor
+              run: |
+                  export XDG_RUNTIME_DIR=/tmp/xdg-runtime
+                  mkdir -p "$XDG_RUNTIME_DIR"
+                  chmod 0700 "$XDG_RUNTIME_DIR"
+                  echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" >> "$GITHUB_ENV"
+
+                  printf 'xwayland disable\n' > /tmp/ci-sway-config
+
+                  XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+                  WLR_BACKENDS=headless \
+                  WLR_RENDERER=pixman \
+                  WLR_LIBINPUT_NO_DEVICES=1 \
+                  WLR_HEADLESS_OUTPUTS=1 \
+                  sway -c /tmp/ci-sway-config > /tmp/sway.log 2>&1 &
+                  echo $! > /tmp/sway.pid
+
+                  sock=""
+                  for i in $(seq 1 60); do
+                      sock=$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -type s -name 'wayland-*' 2>/dev/null | head -n1)
+                      if [ -n "$sock" ]; then
+                          break
+                      fi
+                      if ! kill -0 "$(cat /tmp/sway.pid)" 2>/dev/null; then
+                          echo "::error::sway process exited during startup"
+                          cat /tmp/sway.log
+                          exit 1
+                      fi
+                      if [ $((i % 10)) -eq 0 ]; then
+                          echo "still waiting for compositor socket (${i}s elapsed, sway still running)"
+                      fi
+                      sleep 1
+                  done
+
+                  if [ -z "$sock" ]; then
+                      echo "::error::compositor failed to start within timeout"
+                      echo "sway (pid $(cat /tmp/sway.pid)) is still running - looks like a genuine hang, not a crash"
+                      echo "--- full sway.log ---"
+                      cat /tmp/sway.log
+                      echo "--- contents of XDG_RUNTIME_DIR ---"
+                      ls -la "$XDG_RUNTIME_DIR"
+                      exit 1
+                  fi
+
+                  display_name=$(basename "$sock")
+                  echo "compositor socket is up at $sock"
+                  echo "WAYLAND_DISPLAY=$display_name" >> "$GITHUB_ENV"
+
             - name: Run tests
-              run: cargo test --all-features --verbose
+              run: cargo test --workspace --all-features --verbose
 
             - name: Generate coverage report (libwayshot)
               run: |
@@ -45,6 +109,14 @@ jobs:
             - name: Generate coverage report (wayshot)
               run: |
                   cargo llvm-cov --all-features -p wayshot --lcov --output-path lcov-wayshot.info
+
+            - name: Stop headless Wayland compositor
+              if: always()
+              run: |
+                  if [ -f /tmp/sway.pid ]; then
+                      kill "$(cat /tmp/sway.pid)" 2>/dev/null || true
+                  fi
+                  cat /tmp/sway.log || true
 
             - name: Upload libwayshot coverage to Codecov
               uses: codecov/codecov-action@v7

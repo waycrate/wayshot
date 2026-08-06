@@ -64,11 +64,7 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for WaylandEGLState {
     ) {
         match event {
             xdg_toplevel::Event::Configure { width, height, .. } => {
-                if width == 0 || height == 0 {
-                    return; // We do not respect this configure
-                }
-
-                if state.width != width || state.height != height {
+                if should_apply_configure((state.width, state.height), (width, height)) {
                     state.width = width;
                     state.height = height;
 
@@ -146,3 +142,10 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for WaylandEGLState {
 }
 
 delegate_noop!(WaylandEGLState: wl_compositor::WlCompositor);
+
+/// Whether an `xdg_toplevel::Event::Configure` should actually resize the
+/// window. A `0` in either dimension means the compositor has no size
+/// preference and should be ignored; an unchanged size needs no work either.
+pub(crate) fn should_apply_configure(current: (i32, i32), new: (i32, i32)) -> bool {
+    new.0 != 0 && new.1 != 0 && current != new
+}

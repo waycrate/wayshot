@@ -6,7 +6,7 @@ use libwayshot::WayshotConnection;
 use crate::cli::ColorFormat;
 use crate::utils::get_region_point;
 
-fn rgb_to_hsl(r: u8, g: u8, b: u8) -> (u16, u8, u8) {
+pub(crate) fn rgb_to_hsl(r: u8, g: u8, b: u8) -> (u16, u8, u8) {
     let r = r as f32 / 255.0;
     let g = g as f32 / 255.0;
     let b = b as f32 / 255.0;

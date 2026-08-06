@@ -306,6 +306,85 @@ fn wayshot_target_from_output_info() {
 }
 
 #[test]
+fn to_output_info_for_wl_output_returns_defaults() {
+    use crate::output::ToOutputInfo;
+    let wl_output = dummy_wl_output();
+    let output_info = wl_output.output_info();
+    assert_eq!(output_info.name, "");
+    assert_eq!(output_info.description, "");
+    assert_eq!(
+        output_info.transform,
+        wayland_client::protocol::wl_output::Transform::Normal
+    );
+    assert_eq!(output_info.physical_size, Size::default());
+    assert_eq!(output_info.logical_region, LogicalRegion::default());
+    mem::forget(output_info);
+}
+
+#[test]
+fn to_output_info_for_wl_output_ref_returns_defaults() {
+    use crate::output::ToOutputInfo;
+    let wl_output = dummy_wl_output();
+    let output_info = (&wl_output).output_info();
+    assert_eq!(output_info.name, "");
+    assert_eq!(output_info.physical_size, Size::default());
+    mem::forget(output_info);
+    mem::forget(wl_output);
+}
+
+#[test]
+fn to_output_info_for_owned_output_info_is_identity() {
+    use crate::output::ToOutputInfo;
+    let output_info = make_output_info(
+        "HDMI-1",
+        "Display",
+        Size {
+            width: 1920,
+            height: 1080,
+        },
+        LogicalRegion {
+            inner: Region {
+                position: Position { x: 0, y: 0 },
+                size: Size {
+                    width: 1920,
+                    height: 1080,
+                },
+            },
+        },
+    );
+    let expected_name = output_info.name.clone();
+    let converted = output_info.output_info();
+    assert_eq!(converted.name, expected_name);
+    mem::forget(converted);
+}
+
+#[test]
+fn to_output_info_for_output_info_ref_clones() {
+    use crate::output::ToOutputInfo;
+    let output_info = make_output_info(
+        "HDMI-1",
+        "Display",
+        Size {
+            width: 1920,
+            height: 1080,
+        },
+        LogicalRegion {
+            inner: Region {
+                position: Position { x: 0, y: 0 },
+                size: Size {
+                    width: 1920,
+                    height: 1080,
+                },
+            },
+        },
+    );
+    let converted = (&output_info).output_info();
+    assert_eq!(converted.name, output_info.name);
+    mem::forget(output_info);
+    mem::forget(converted);
+}
+
+#[test]
 fn output_info_as_ref_returns_wl_output() {
     let output_info = make_output_info(
         "HDMI-1",
