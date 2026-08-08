@@ -4,9 +4,8 @@
   rustPlatform,
   pkg-config,
   installShellFiles,
+  scdoc,
   pango,
-  libgbm,
-  libGL,
   wayland,
   jpegSupport ? true,
   pnmSupport ? true,
@@ -49,18 +48,16 @@ rustPlatform.buildRustPackage rec {
   nativeBuildInputs = [
     pkg-config
     installShellFiles
+    scdoc
   ];
 
-  buildInputs = [
-    pango
-    libgbm
-    libGL
-    wayland
-  ];
+  buildInputs =
+    [wayland]
+    ++ lib.optional (selectorSupport || colorPickerSupport) pango;
 
   postInstall =
     ''
-      installManPage docs/wayshot.1.scd docs/wayshot.5.scd docs/wayshot.7.scd
+      installManPage docs/wayshot.1.gz docs/wayshot.5.gz docs/wayshot.7.gz
     ''
     + lib.optionalString (completionsSupport && stdenv.buildPlatform.canExecute stdenv.hostPlatform) ''
       installShellCompletion --cmd wayshot \
@@ -73,9 +70,7 @@ rustPlatform.buildRustPackage rec {
   meta = {
     description = "Screenshot crate for wlroots based compositors implementing the zwlr_screencopy_v1 protocol.";
     homepage = "https://crates.io/crates/wayshot";
-    license = with lib.licenses; [
-      gpl3Only
-    ];
+    license = lib.licenses.gpl3Only;
     mainProgram = "wayshot";
     platforms = lib.platforms.linux;
   };
