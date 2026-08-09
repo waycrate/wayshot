@@ -19,6 +19,7 @@ in
       clippy
       rust-analyzer
       rustfmt
+      scdoc
     ];
     buildInputs = deps;
     LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath deps;
