@@ -43,7 +43,7 @@ impl Convert for ConvertNone {
 
 impl Convert for ConvertRGB8 {
     fn convert_inplace(&self, data: &mut [u8]) -> ColorType {
-        for chunk in data.chunks_exact_mut(4) {
+        for chunk in data.as_chunks_mut::<4>().0 {
             chunk.swap(0, 2);
         }
         ColorType::Rgba8
@@ -57,7 +57,7 @@ fn convert10_to_8(color: u32) -> u8 {
 
 impl Convert for ConvertBGR10 {
     fn convert_inplace(&self, data: &mut [u8]) -> ColorType {
-        for chunk in data.chunks_exact_mut(4) {
+        for chunk in data.as_chunks_mut::<4>().0 {
             let pixel = ((chunk[3] as u32) << 24)
                 | ((chunk[2] as u32) << 16)
                 | ((chunk[1] as u32) << 8)
