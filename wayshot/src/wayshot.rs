@@ -1,4 +1,4 @@
-use std::io::{self, BufWriter, Write};
+use std::io::{self, BufWriter, IsTerminal, Write};
 use std::time::Duration;
 
 use clap::Parser;
@@ -155,7 +155,7 @@ fn main() -> Result<()> {
                         std::fs::write(f, &encoded)?;
                     }
 
-                    if settings.stdout_print {
+                    if settings.stdout_print || !stdout.is_terminal() {
                         writer.write_all(&encoded)?;
                     }
 
