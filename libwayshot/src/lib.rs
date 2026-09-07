@@ -503,7 +503,7 @@ impl WayshotConnection {
     /// # Returns
     /// - A vector of `FrameFormat` if screen capture succeeds.
     /// - [`Error::ProtocolNotFound`] if wlr-screencopy protocol is not found.
-    pub fn get_available_frame_formats(&self, target: &WayshotTarget) -> Result<Vec<FrameFormat>> {
+    pub fn get_available_frame_formats(&self, target: &WayshotTarget) -> Result<(Vec<FrameFormat>, Vec<DMAFrameFormat>)> {
         let state = match target {
             WayshotTarget::Screen(output) => {
                 let (state, _) = self.capture_output_frame_get_state(output, 0, None)?;
@@ -515,7 +515,7 @@ impl WayshotConnection {
             }
         };
 
-        Ok(state.formats)
+        Ok((state.formats, state.dmabuf_formats))
     }
 
     /// Captures a screenshot into a shared memory buffer using a specified format, if available, and writes pixel data in the provided file descriptor.
