@@ -6,7 +6,12 @@ use crate::region::{LogicalRegion, Position, Size};
 
 /// Represents an accessible wayland output.
 ///
-/// Do not instantiate, instead use [`crate::WayshotConnection::get_all_outputs`].
+/// Record the useful information of a WlOutput
+/// The most important part is wl_output and transform
+/// The two part will influence the output of the image
+/// If you are using [crate::WayshotConnection::screenshot_single_output], you can do not care about
+/// the physical_size and logical_region
+/// But with region screenshot, they are needed
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OutputInfo {
     pub wl_output: WlOutput,
@@ -15,6 +20,25 @@ pub struct OutputInfo {
     pub transform: wl_output::Transform,
     pub physical_size: Size,
     pub logical_region: LogicalRegion,
+}
+
+impl OutputInfo {
+    /// create a [OutputInfo] with new
+    pub fn new(wl_output: WlOutput) -> Self {
+        Self {
+            wl_output,
+            name: "".to_owned(),
+            description: "".to_owned(),
+            transform: wl_output::Transform::Normal,
+            physical_size: Size::default(),
+            logical_region: LogicalRegion::default(),
+        }
+    }
+    /// set the transform of [OutputInfo]
+    pub fn transform(mut self, transform: wl_output::Transform) -> Self {
+        self.transform = transform;
+        self
+    }
 }
 
 impl AsRef<WlOutput> for OutputInfo {
