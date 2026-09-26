@@ -19,7 +19,7 @@ use wayland_client::{
         wl_compositor::WlCompositor,
         wl_output::{self, WlOutput},
         wl_registry::{self, WlRegistry},
-        wl_shm::WlShm,
+        wl_shm::{self, WlShm},
         wl_shm_pool::WlShmPool,
         wl_surface::WlSurface,
     },
@@ -298,6 +298,15 @@ impl Dispatch<ExtImageCopyCaptureFrameV1, ()> for CaptureFrameState {
     }
 }
 
+fn shm_stride(format: wl_shm::Format, width: u32) -> u32 {
+    // BGR888 is packed into three bytes; the other supported SHM formats use four.
+    let bytes_per_pixel = match format {
+        wl_shm::Format::Bgr888 => 3,
+        _ => 4,
+    };
+    bytes_per_pixel * width
+}
+
 impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
     fn event(
         state: &mut Self,
@@ -313,7 +322,7 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
                 state.session_size.height = height;
                 for format in &mut state.formats {
                     format.size = Size { width, height };
-                    format.stride = 4 * width;
+                    format.stride = shm_stride(format.format, width);
                 }
 
                 for DMAFrameFormat {
@@ -335,7 +344,7 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, ()> for CaptureFrameState {
                 state.formats.push(FrameFormat {
                     format,
                     size: state.session_size,
-                    stride: 4 * state.session_size.width,
+                    stride: shm_stride(format, state.session_size.width),
                 });
             }
             ext_image_copy_capture_session_v1::Event::DmabufDevice { device } => {
