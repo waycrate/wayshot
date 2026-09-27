@@ -650,6 +650,59 @@ fn session_shm_format_pushes_format() {
 }
 
 #[test]
+fn session_shm_stride_matches_format_in_either_event_order() {
+    use ext_image_copy_capture_session_v1::Event;
+
+    let conn = dummy_conn();
+    let qh = conn.new_event_queue::<CaptureFrameState>().handle();
+    let session: ExtImageCopyCaptureSessionV1 = inert(&conn);
+
+    for (width, height) in [(2560, 1440), (1920, 1080)] {
+        for (format, bytes_per_pixel) in [
+            (wl_shm::Format::Bgr888, 3),
+            (wl_shm::Format::Argb8888, 4),
+            (wl_shm::Format::Xrgb8888, 4),
+            (wl_shm::Format::Xbgr8888, 4),
+            (wl_shm::Format::Xbgr2101010, 4),
+            (wl_shm::Format::Abgr2101010, 4),
+        ] {
+            for size_first in [true, false] {
+                let mut state = CaptureFrameState::new(false);
+                let mut events = [
+                    Event::BufferSize { width, height },
+                    Event::ShmFormat {
+                        format: WEnum::Value(format),
+                    },
+                ];
+                if !size_first {
+                    events.reverse();
+                }
+                for event in events {
+                    <CaptureFrameState as Dispatch<ExtImageCopyCaptureSessionV1, ()>>::event(
+                        &mut state,
+                        &session,
+                        event,
+                        &(),
+                        &conn,
+                        &qh,
+                    );
+                }
+
+                assert_eq!(state.formats.len(), 1);
+                let frame = state.formats[0];
+                assert_eq!(frame.format, format);
+                assert_eq!(frame.size, Size { width, height });
+                assert_eq!(frame.stride, width * bytes_per_pixel);
+                assert_eq!(
+                    frame.byte_size(),
+                    u64::from(width) * u64::from(height) * u64::from(bytes_per_pixel)
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn session_shm_format_unknown_is_ignored() {
     let conn = dummy_conn();
     let qh = conn.new_event_queue::<CaptureFrameState>().handle();
