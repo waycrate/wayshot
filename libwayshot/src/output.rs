@@ -17,6 +17,35 @@ pub struct OutputInfo {
     pub logical_region: LogicalRegion,
 }
 
+/// When using [crate::WayshotConnection::screenshot_single_output],
+/// We only need a [WlOutput] and [wl_output::Transform]
+/// So we added this structure
+pub struct SingleOutputInfo {
+    wl_output: WlOutput,
+    transform: wl_output::Transform,
+}
+
+impl SingleOutputInfo {
+    /// Create a new SingleOutputInfo
+    pub fn new(wl_output: WlOutput) -> Self {
+        Self {
+            wl_output,
+            transform: wl_output::Transform::Normal,
+        }
+    }
+
+    /// Change the [wl_output::Transform] in [SingleOutputInfo]
+    pub fn transform(mut self, transform: wl_output::Transform) -> Self {
+        self.transform = transform;
+        self
+    }
+
+    /// return the [WlOutput] of the [SingleOutputInfo]
+    pub fn wl_output(&self) -> WlOutput {
+        self.wl_output.clone()
+    }
+}
+
 impl AsRef<WlOutput> for OutputInfo {
     fn as_ref(&self) -> &WlOutput {
         &self.wl_output
@@ -47,6 +76,19 @@ impl ToOutputInfo for &WlOutput {
             name: "".to_owned(),
             description: "".to_owned(),
             transform: wl_output::Transform::Normal,
+            physical_size: Size::default(),
+            logical_region: LogicalRegion::default(),
+        }
+    }
+}
+
+impl ToOutputInfo for &SingleOutputInfo {
+    fn output_info(self) -> OutputInfo {
+        OutputInfo {
+            wl_output: self.wl_output.clone(),
+            name: "".to_owned(),
+            description: "".to_owned(),
+            transform: self.transform,
             physical_size: Size::default(),
             logical_region: LogicalRegion::default(),
         }
