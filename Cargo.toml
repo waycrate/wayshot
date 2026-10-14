@@ -18,6 +18,7 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 r-egl-wayland = "0.7"
 rustix = "1.1"
+libc = "0.2"
 thiserror = "2"
 image = { version = "0.25", default-features = false }
 wayland-client = "0.31"
