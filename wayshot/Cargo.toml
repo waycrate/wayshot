@@ -42,8 +42,8 @@ webp = ["image/webp"]
 # Copies the screenshot to the Wayland clipboard via wl-clipboard-rs.
 # The image is served by a forked child process so it persists after wayshot exits.
 # Adds the --clipboard CLI flag.
-# Pulls in: wl-clipboard-rs, rustix
-clipboard = ["dep:wl-clipboard-rs", "dep:rustix"]
+# Pulls in: wl-clipboard-rs, libc
+clipboard = ["dep:wl-clipboard-rs", "dep:libc"]
 
 # Adds the --color CLI flag: freeze the screen, click a pixel, print its RGBA/hex value.
 # Requires the `selector` feature (uses libwaysip for point selection).
@@ -73,8 +73,8 @@ logger = ["dep:tracing-subscriber"]
 
 # Sends a desktop notification (via D-Bus / libnotify) after each capture.
 # Disable removes the --silent CLI flag.
-# Pulls in: notify-rust, rustix
-notifications = ["dep:notify-rust", "dep:rustix"]
+# Pulls in: notify-rust, libc
+notifications = ["dep:notify-rust", "dep:libc"]
 
 # Adds the --completions <SHELL> CLI flag for generating shell completion scripts.
 # Pulls in: clap_complete, clap_complete_nushell
@@ -102,7 +102,7 @@ eyre = "0.6"
 chrono = "0.4"
 
 wl-clipboard-rs = { version = "0.9", optional = true }
-rustix = { workspace = true, features = ["process", "runtime", "stdio"], optional = true }
+libc = { workspace = true, optional = true }
 
 shellexpand = "3.1"
 toml = { version = "1.1", default-features = false, features = [
