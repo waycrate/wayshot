@@ -2,7 +2,6 @@
 
 use eyre::Error;
 use notify_rust::{Hint, Notification, Urgency};
-use rustix::runtime::{self, Fork};
 use std::path::Path;
 use std::process::Command;
 
@@ -39,8 +38,8 @@ pub fn send_success(
         notification.action("open_location", "Open Folder");
         notification.action("default", "Open Folder");
 
-        match unsafe { runtime::kernel_fork() } {
-            Ok(Fork::Child(_)) => {
+        match unsafe { libc::fork() } {
+            0 => {
                 if let Ok(handle) = notification.show() {
                     handle.wait_for_action(|action| {
                         if action == "open_location" || action == "default" {
@@ -58,11 +57,12 @@ pub fn send_success(
                 }
                 std::process::exit(0);
             }
-            Ok(Fork::ParentOf(_)) => {}
-            Err(e) => {
+            -1 => {
+                let e = std::io::Error::last_os_error();
                 tracing::error!("Fork failed for notification action: {}", e);
                 let _ = notification.show();
             }
+            _ => {}
         }
     } else {
         let _ = notification.show();
