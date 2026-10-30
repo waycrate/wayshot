@@ -69,8 +69,8 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 	"_x_,_y_ _width_x_height_" (e.g. "100,200 300x400"). Compatible with the output of *slurp*(1).
 	Example: *wayshot -g "$(slurp)"*
 
-	_Note:_ passing a file path directly after *-g* is no longer supported; place the path
-	before the flag or use *--* to separate arguments (e.g. *wayshot -g -- file.png*).
+	_Note:_ passing any other argument directly after *-g* is no longer supported; if *-g* is used
+	without a value it must be the last argument (e.g. *wayshot file.png -g*).
 
 *--geometry-background-color <RGBA_HEX_COLOR>*
 	Background color (rgba hex) while selecting a region (*--geometry*). Example: #00000050
