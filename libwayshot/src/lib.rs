@@ -1235,7 +1235,8 @@ impl WayshotConnection {
 
         let frame_mmap = unsafe { MmapMut::map_mut(&mem_file)? };
 
-        let rotated_physical_size = match output_info.transform {
+        let transform = frame_guard.transform.unwrap_or(output_info.transform);
+        let rotated_physical_size = match transform {
             Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270 => {
                 Size {
                     width: frame_format.size.height,
@@ -1248,7 +1249,7 @@ impl WayshotConnection {
             frame_format,
             frame_color_type: image::ColorType::Rgb8,
             frame_data: FrameData::Mmap(frame_mmap),
-            transform: frame_guard.transform.unwrap_or(output_info.transform),
+            transform,
             logical_region: capture_region
                 .map(|capture_region| capture_region.logical())
                 .unwrap_or(output_info.logical_region),
@@ -1312,7 +1313,7 @@ impl WayshotConnection {
 
         let mut layer_shell_surfaces = Vec::with_capacity(frames.len());
 
-        for (_, frame_guard, output_info) in frames {
+        for (frame_copy, frame_guard, output_info) in frames {
             tracing::span!(
                 tracing::Level::DEBUG,
                 "overlay_frames::surface",
@@ -1341,7 +1342,7 @@ impl WayshotConnection {
                     layer_event_queue.blocking_dispatch(&mut state)?;
                 }
 
-                surface.set_buffer_transform(output_info.transform);
+                surface.set_buffer_transform(frame_copy.transform);
                 // surface.set_buffer_scale(output_info.scale());
                 surface.attach(Some(&frame_guard.buffer), 0, 0);
 
