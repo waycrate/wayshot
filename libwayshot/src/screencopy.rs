@@ -6,7 +6,7 @@ use std::{
 
 #[cfg(feature = "dmabuf")]
 use gbm::BufferObject;
-use image::{ColorType, DynamicImage, EncodableLayout, Rgb, RgbImage, Rgba, RgbaImage};
+use image::{ColorType, DynamicImage, EncodableLayout, RgbImage, RgbaImage};
 use memmap2::MmapMut;
 use rustix::{
     fs::{self, SealFlags},
@@ -196,7 +196,11 @@ impl FrameCopy {
             let b = pixel[2];
             let a = pixel[3];
             let (x, y) = self.pixel_position(index);
-            img.put_pixel(x, y, Rgba([r, g, b, a]));
+            // NOTE: Maybe wm side will sent dirty data
+            // Try to fix https://github.com/waycrate/wayshot/issues/458
+            if let Some(pixel) = img.get_pixel_mut_checked(x, y) {
+                pixel.0 = [r, g, b, a];
+            }
         }
         Ok(DynamicImage::ImageRgba8(img))
     }
@@ -209,7 +213,9 @@ impl FrameCopy {
             let g = pixel[1];
             let b = pixel[2];
             let (x, y) = self.pixel_position(index);
-            img.put_pixel(x, y, Rgb([r, g, b]));
+            if let Some(pixel) = img.get_pixel_mut_checked(x, y) {
+                pixel.0 = [r, g, b];
+            }
         }
         Ok(DynamicImage::ImageRgb8(img))
     }
