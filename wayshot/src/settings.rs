@@ -172,43 +172,38 @@ impl AppSettings {
         output: Option<String>,
         geometry_config: Geometry,
     ) -> CaptureMode {
-        if let Some(geometry) = &cli.geometry {
-            match geometry {
-                Some(s) if !s.trim().is_empty() => match utils::parse_slurp_geometry(s) {
-                    Ok(region) => return CaptureMode::GeometryRegion(region),
-                    Err(e) => {
-                        tracing::error!("invalid geometry: {e}");
-                        std::process::exit(1);
-                    }
-                },
-                Some(_) => {
-                    tracing::error!("geometry string is empty or incorrect");
+        if let Some(region) = &cli.geometry_string {
+            match utils::parse_slurp_geometry(region) {
+                Ok(region) => return CaptureMode::GeometryRegion(region),
+                Err(e) => {
+                    tracing::error!("invalid --geometry-string: {e}");
                     std::process::exit(1);
-                }
-                None => {
-                    #[cfg(feature = "selector")]
-                    return CaptureMode::Geometry {
-                        foreground_color: cli
-                            .geometry_foreground_color
-                            .clone()
-                            .or(geometry_config.foreground_color),
-                        background_color: cli
-                            .geometry_background_color
-                            .clone()
-                            .or(geometry_config.background_color),
-                    };
-                    #[cfg(not(feature = "selector"))]
-                    {
-                        let _ = geometry_config; // suppress clippy unused warning
-                        tracing::error!(
-                            "interactive geometry selection requires the selector feature; \
-                             provide a geometry string instead, e.g. wayshot -g \"$(slurp)\""
-                        );
-                        std::process::exit(1);
-                    }
                 }
             }
         }
+        if cli.geometry {
+            #[cfg(feature = "selector")]
+            return CaptureMode::Geometry {
+                foreground_color: cli
+                    .geometry_foreground_color
+                    .clone()
+                    .or(geometry_config.foreground_color),
+                background_color: cli
+                    .geometry_background_color
+                    .clone()
+                    .or(geometry_config.background_color),
+            };
+            #[cfg(not(feature = "selector"))]
+            {
+                tracing::error!(
+                    "interactive geometry selection requires the selector feature; \
+                     provide a geometry string instead, e.g. wayshot --geometry-string \"$(slurp)\""
+                );
+                std::process::exit(1);
+            }
+        }
+        #[cfg(not(feature = "selector"))]
+        let _ = geometry_config; // only used by interactive selection
         if let Some(ref name) = cli.toplevel {
             CaptureMode::Toplevel(name.clone())
         } else if cli.choose_toplevel {

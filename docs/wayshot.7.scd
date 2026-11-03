@@ -20,8 +20,8 @@ Optionally, with custom background/foreground colors:
 
 Capture a region using a geometry string in slurp/grim format "_x_,_y_ _width_x_height_":
 
-	wayshot FILE -g "$(slurp)"
-	wayshot -g "783,746 177x251"
+	wayshot FILE -G "$(slurp)"
+	wayshot -G "783,746 177x251"
 
 # CAPTURE FULLSCREEN
 
