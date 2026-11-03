@@ -36,9 +36,9 @@ wayshot FILE -g --geometry-background-color 00000050 --geometry-foreground-color
 Capture a region using a geometry string (compatible with `slurp`/`waysip`):
 
 ```bash
-wayshot FILE -g "$(slurp)"
+wayshot FILE -G "$(slurp)"
 # or with a literal geometry string:
-wayshot -g "783,746 177x251"
+wayshot -G "783,746 177x251"
 ```
 
 Fullscreen:

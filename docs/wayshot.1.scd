@@ -58,19 +58,18 @@ Wayshot - Screenshot tool for compositors implementing zwlr_screencopy_v1 such a
 
 ## Capture target (what to capture)
 
-*-g*, *--geometry* [_GEOMETRY_]
-	Select a screen region to capture.
-
-	Without a value: interactively select a region. By default the screen is frozen before the
+*-g*, *--geometry*
+	Interactively select a screen region to capture. By default the screen is frozen before the
 	selection overlay is shown, giving a stable view for precise selection. Use *--no-freeze* to
 	select on the live display and capture after selection. _Requires the_ *selector* _feature._
 
-	With a value: capture the fixed region described by _GEOMETRY_, a string in slurp/grim format
-	"_x_,_y_ _width_x_height_" (e.g. "100,200 300x400"). Compatible with the output of *slurp*(1).
-	Example: *wayshot -g "$(slurp)"*
+	To capture a region you already know (e.g. from *slurp*(1)), use *--geometry-string* instead.
 
-	_Note:_ passing a file path directly after *-g* is no longer supported; place the path
-	before the flag or use *--* to separate arguments (e.g. *wayshot -g -- file.png*).
+*-G*, *--geometry-string* <_GEOMETRY_>
+	Capture the fixed region described by _GEOMETRY_, a string in slurp/grim format
+	"_x_,_y_ _width_x_height_" (e.g. "100,200 300x400"). Coordinates may be negative, as on
+	outputs placed left of or above the origin (e.g. "-1920,0 1920x1080").
+	Compatible with the output of *slurp*(1). Example: *wayshot -G "$(slurp)"*
 
 *--geometry-background-color <RGBA_HEX_COLOR>*
 	Background color (rgba hex) while selecting a region (*--geometry*). Example: #00000050
