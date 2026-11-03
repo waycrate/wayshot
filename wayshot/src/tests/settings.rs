@@ -323,14 +323,26 @@ fn choose_output_flag_selects_choose_output_capture_mode() {
 }
 
 #[test]
-fn geometry_string_parses_into_geometry_region() {
-    let settings = AppSettings::resolve(&cli(&["-g", "10,20 300x400"]), &Config::default());
+fn geometry_string_string_parses_into_geometry_region() {
+    let settings = AppSettings::resolve(&cli(&["-G", "10,20 300x400"]), &Config::default());
     match settings.command {
         Command::Screenshot(CaptureMode::GeometryRegion(region)) => {
             assert_eq!(region.inner.position.x, 10);
             assert_eq!(region.inner.position.y, 20);
             assert_eq!(region.inner.size.width, 300);
             assert_eq!(region.inner.size.height, 400);
+        }
+        _ => panic!("expected GeometryRegion capture mode"),
+    }
+}
+
+#[test]
+fn geometry_string_string_with_negative_coordinates() {
+    let settings = AppSettings::resolve(&cli(&["-G", "-1920,-10 300x400"]), &Config::default());
+    match settings.command {
+        Command::Screenshot(CaptureMode::GeometryRegion(region)) => {
+            assert_eq!(region.inner.position.x, -1920);
+            assert_eq!(region.inner.position.y, -10);
         }
         _ => panic!("expected GeometryRegion capture mode"),
     }
@@ -346,15 +358,13 @@ fn interactive_geometry_uses_cli_colors_over_config() {
         }),
         ..Config::default()
     };
-    // `-g` has `allow_hyphen_values` + `num_args = 0..=1`, so it must come last
-    // or it would greedily swallow the next flag as its own value.
     let settings = AppSettings::resolve(
         &cli(&[
+            "-g",
             "--geometry-foreground-color",
             "#aaaaaaaa",
             "--geometry-background-color",
             "#bbbbbbbb",
-            "-g",
         ]),
         &config,
     );

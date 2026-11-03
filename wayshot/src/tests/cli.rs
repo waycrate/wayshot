@@ -27,7 +27,8 @@ fn no_args_uses_defaults() {
     assert!(!cli.list_outputs_info);
     assert!(!cli.list_toplevels);
     assert!(!cli.list_toplevels_json);
-    assert!(cli.geometry.is_none());
+    assert!(!cli.geometry);
+    assert!(cli.geometry_string.is_none());
     assert!(cli.geometry_background_color.is_none());
     assert!(cli.geometry_foreground_color.is_none());
     assert!(cli.output.is_none());
@@ -119,41 +120,72 @@ fn choose_output_flag_and_alias() {
 }
 
 #[test]
-fn geometry_flag_without_value_is_some_none() {
-    let cli = parse(&["-g"]).unwrap();
-    assert_eq!(cli.geometry, Some(None));
+fn geometry_flag() {
+    assert!(parse(&["-g"]).unwrap().geometry);
+    assert!(parse(&["--geometry"]).unwrap().geometry);
 }
 
 #[test]
-fn geometry_flag_with_value() {
-    let cli = parse(&["-g", "100,100 200x200"]).unwrap();
-    assert_eq!(cli.geometry, Some(Some("100,100 200x200".to_string())));
+fn geometry_flag_does_not_take_a_value() {
+    // Anything after `-g` is parsed on its own: flags stay flags and a bare
+    // token is the output file.
+    let cli = parse(&["-g", "-c"]).unwrap();
+    assert!(cli.geometry);
+    assert!(cli.cursor);
+    let cli = parse(&["-g", "out.png"]).unwrap();
+    assert!(cli.geometry);
+    assert_eq!(cli.file, Some(PathBuf::from("out.png")));
+    let cli = parse(&["-g", "-"]).unwrap();
+    assert!(cli.geometry);
+    assert_eq!(cli.file, Some(PathBuf::from("-")));
 }
 
 #[test]
-fn geometry_long_form() {
-    let cli = parse(&["--geometry", "0,0 10x10"]).unwrap();
-    assert_eq!(cli.geometry, Some(Some("0,0 10x10".to_string())));
+fn geometry_string_with_value() {
+    let cli = parse(&["-G", "100,100 200x200"]).unwrap();
+    assert_eq!(cli.geometry_string.as_deref(), Some("100,100 200x200"));
+    let cli = parse(&["--geometry-string", "0,0 10x10"]).unwrap();
+    assert_eq!(cli.geometry_string.as_deref(), Some("0,0 10x10"));
+}
+
+#[test]
+fn geometry_string_allows_negative_coordinates() {
+    let cli = parse(&["-G", "-1920,-10 1920x1080", "-c", "out.png"]).unwrap();
+    assert_eq!(cli.geometry_string.as_deref(), Some("-1920,-10 1920x1080"));
+    assert!(cli.cursor);
+    assert_eq!(cli.file, Some(PathBuf::from("out.png")));
+}
+
+#[test]
+fn geometry_string_requires_a_value() {
+    assert!(parse(&["-G"]).is_err());
+    assert!(parse(&["--geometry-string"]).is_err());
+}
+
+#[test]
+fn geometry_string_conflicts_with_geometry() {
+    assert!(parse(&["-g", "-G", "0,0 10x10"]).is_err());
+    assert!(parse(&["-G", "0,0 10x10", "-g"]).is_err());
 }
 
 #[test]
 fn geometry_conflicts_with_output() {
-    // `-g` has `allow_hyphen_values` and `num_args = 0..=1`, so a bare `-o`
-    // right after it is swallowed as the geometry *value*, not a flag. Use an
-    // explicit geometry string to keep the two flags unambiguous.
-    assert!(parse(&["-g", "0,0 10x10", "-o", "eDP-1"]).is_err());
+    assert!(parse(&["-g", "-o", "eDP-1"]).is_err());
     assert!(parse(&["-o", "eDP-1", "-g"]).is_err());
+    assert!(parse(&["-G", "0,0 10x10", "-o", "eDP-1"]).is_err());
 }
 
 #[test]
 fn choose_output_conflicts_with_geometry_and_output() {
     assert!(parse(&["--choose-output", "-g"]).is_err());
+    assert!(parse(&["--choose-output", "-G", "0,0 10x10"]).is_err());
     assert!(parse(&["--choose-output", "-o", "eDP-1"]).is_err());
 }
 
 #[test]
 fn toplevel_conflicts_with_geometry_output_and_choose_flags() {
     assert!(parse(&["--toplevel", "x", "-g"]).is_err());
+    assert!(parse(&["--toplevel", "x", "-G", "0,0 10x10"]).is_err());
     assert!(parse(&["--toplevel", "x", "-o", "eDP-1"]).is_err());
     assert!(parse(&["--toplevel", "x", "--choose-output"]).is_err());
     assert!(parse(&["--toplevel", "x", "--choose-toplevel"]).is_err());
@@ -311,6 +343,7 @@ fn color_flag_with_explicit_format() {
 #[test]
 fn color_conflicts_with_geometry_output_and_choose_output() {
     assert!(parse(&["--color", "-g"]).is_err());
+    assert!(parse(&["--color", "-G", "0,0 10x10"]).is_err());
     assert!(parse(&["--color", "-o", "eDP-1"]).is_err());
     assert!(parse(&["--color", "--choose-output"]).is_err());
 }
