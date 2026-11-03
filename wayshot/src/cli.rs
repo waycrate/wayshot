@@ -93,19 +93,32 @@ pub struct Cli {
     #[arg(
         long,
         value_name = "FORMAT",
-        conflicts_with_all = ["geometry", "output", "choose_output"],
+        conflicts_with_all = ["geometry", "geometry_string", "output", "choose_output"],
         default_missing_value = "plain",
         num_args = 0..=1,
     )]
     pub color: Option<ColorFormat>,
 
     // ─── Capture target (what to capture) ────────────────────────────────────
-    /// Select a screen region to capture.
-    /// Without a value: interactively select a region (requires the `selector` feature).
-    /// With a value: parse the geometry string in slurp/grim format "x,y widthxheight".
-    ///   Example: wayshot -g "$(slurp)" or wayshot -g "783,746 177x251"
-    #[arg(short, long, allow_hyphen_values = true, value_name = "GEOMETRY", num_args = 0..=1, verbatim_doc_comment)]
-    pub geometry: Option<Option<String>>,
+    /// Interactively select a screen region to capture (requires the `selector` feature).
+    /// To capture a known geometry (e.g. from slurp), use --geometry-string (-G) instead.
+    #[arg(short, long, verbatim_doc_comment)]
+    pub geometry: bool,
+
+    /// Capture a fixed screen region given as a geometry string in slurp/grim
+    /// format "x,y widthxheight". Coordinates may be negative.
+    ///   Example: wayshot -G "$(slurp)" or wayshot -G "783,746 177x251"
+    // `allow_hyphen_values` lets negative coordinates ("-1920,0 1920x1080") through.
+    // The value is required, so this never swallows a following flag by accident.
+    #[arg(
+        short = 'G',
+        long,
+        value_name = "GEOMETRY",
+        allow_hyphen_values = true,
+        conflicts_with = "geometry",
+        verbatim_doc_comment
+    )]
+    pub geometry_string: Option<String>,
 
     /// Background color (rgba hex) while selecting a region (geometry).
     /// Example: #00000050
@@ -118,19 +131,19 @@ pub struct Cli {
     pub geometry_foreground_color: Option<String>,
 
     /// Capture a specific output/display by name.
-    #[arg(short, long, conflicts_with = "geometry")]
+    #[arg(short, long, conflicts_with_all = ["geometry", "geometry_string"])]
     pub output: Option<String>,
 
     /// Interactively choose an output/display to capture.
-    #[arg(long, alias = "choose-output", conflicts_with_all = ["geometry", "output"])]
+    #[arg(long, alias = "choose-output", conflicts_with_all = ["geometry", "geometry_string", "output"])]
     pub choose_output: bool,
 
     /// Capture a specific toplevel window by its identifier string.
-    #[arg(long, alias = "window", conflicts_with_all = ["geometry", "output", "choose_output", "choose_toplevel"])]
+    #[arg(long, alias = "window", conflicts_with_all = ["geometry", "geometry_string", "output", "choose_output", "choose_toplevel"])]
     pub toplevel: Option<String>,
 
     /// Interactively choose a toplevel window to capture.
-    #[arg(long, alias = "choose-window", conflicts_with_all = ["geometry", "output", "choose_output", "toplevel"])]
+    #[arg(long, alias = "choose-window", conflicts_with_all = ["geometry", "geometry_string", "output", "choose_output", "toplevel"])]
     pub choose_toplevel: bool,
 
     // ─── Capture options (how to capture) ────────────────────────────────────
