@@ -573,11 +573,11 @@ impl wayland_client::Dispatch<ZwlrLayerSurfaceV1, WlOutput> for LayerShellState 
     }
 }
 #[cfg(feature = "dmabuf")]
-pub(crate) struct Card(std::fs::File);
+pub struct Card(std::fs::File);
 
 /// Implementing [`AsFd`] is a prerequisite to implementing the traits found
-/// in this crate. Here, we are just calling [`File::as_fd()`] on the inner
-/// [`File`].
+/// in this crate. Here, we are just calling [`std::fs::File::as_fd()`] on the inner
+/// [`std::fs::File`].
 #[cfg(feature = "dmabuf")]
 impl AsFd for Card {
     fn as_fd(&self) -> BorrowedFd<'_> {
@@ -598,7 +598,7 @@ impl Card {
 }
 #[derive(Debug)]
 #[cfg(feature = "dmabuf")]
-pub(crate) struct DMABUFState {
+pub struct DMABUFState {
     pub linux_dmabuf: ZwpLinuxDmabufV1,
     pub gbmdev: gbm::Device<Card>,
 }
