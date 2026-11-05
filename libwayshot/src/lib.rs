@@ -25,7 +25,7 @@ use std::{
 };
 
 #[cfg(feature = "dmabuf")]
-use dispatch::DMABUFState;
+pub use dispatch::{DMABUFState, Card};
 use dispatch::LayerShellState;
 use image::DynamicImage;
 use memmap2::MmapMut;
@@ -99,6 +99,8 @@ pub mod reexport {
     pub use wayland_protocols::ext::image_copy_capture::v1::client::ext_image_copy_capture_frame_v1::FailureReason;
     pub use wl_output::{Transform, WlOutput};
     pub use wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1;
+    #[cfg(feature = "dmabuf")]
+    pub use gbm;
 }
 #[cfg(feature = "dmabuf")]
 use gbm::{BufferObject, BufferObjectFlags, Device as GBMDevice};
@@ -503,7 +505,10 @@ impl WayshotConnection {
     /// # Returns
     /// - A vector of `FrameFormat` if screen capture succeeds.
     /// - [`Error::ProtocolNotFound`] if wlr-screencopy protocol is not found.
-    pub fn get_available_frame_formats(&self, target: &WayshotTarget) -> Result<(Vec<FrameFormat>, Vec<DMAFrameFormat>)> {
+    pub fn get_available_frame_formats(
+        &self,
+        target: &WayshotTarget,
+    ) -> Result<(Vec<FrameFormat>, Vec<DMAFrameFormat>)> {
         let state = match target {
             WayshotTarget::Screen(output) => {
                 let (state, _) = self.capture_output_frame_get_state(output, 0, None)?;
@@ -730,6 +735,11 @@ impl WayshotConnection {
         )?;
 
         Ok((frame_format, frame_guard, bo))
+    }
+
+    #[cfg(feature = "dmabuf")]
+    pub fn dmabuf_state(&self) -> Option<&DMABUFState> {
+        self.dmabuf_state.as_ref()
     }
     // This API is exposed to provide users with access to window manager (WM)
     // information. For instance, enabling Vulkan in wlroots alters the display
