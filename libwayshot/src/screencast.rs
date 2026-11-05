@@ -6,6 +6,7 @@ use wayland_client::{
     globals::registry_queue_init,
     protocol::{
         wl_buffer::{self, WlBuffer},
+        wl_output,
         wl_shm::{self, WlShm},
         wl_shm_pool::WlShmPool,
     },
@@ -51,6 +52,7 @@ pub struct WayshotScreenCast {
     output_manager: Option<ExtOutputImageCaptureSourceManagerV1>,
     wlr_screencopy: Option<ZwlrScreencopyManagerV1>,
     event_queue: EventQueue<CaptureFrameState>,
+    transform: wl_output::Transform,
 }
 
 impl Drop for WayshotScreenCast {
@@ -63,6 +65,9 @@ impl Drop for WayshotScreenCast {
 }
 
 impl WayshotScreenCast {
+    pub fn transform(&self) -> wl_output::Transform {
+        self.transform
+    }
     /// Get the current_size of the screen or toplevel
     pub fn current_size(&self) -> Size<i32> {
         self.current_size
@@ -424,6 +429,7 @@ impl WayshotConnection {
             output_manager,
             event_queue,
             wlr_screencopy,
+            transform: state.transform.unwrap_or(wl_output::Transform::Normal),
         })
     }
     /// This will save a screencast status for you
@@ -489,6 +495,7 @@ impl WayshotConnection {
             output_manager,
             event_queue,
             wlr_screencopy,
+            transform: state.transform.unwrap_or(wl_output::Transform::Normal),
         })
     }
 }
