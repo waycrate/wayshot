@@ -505,6 +505,29 @@ impl WayshotConnection {
     /// # Returns
     /// - A vector of `FrameFormat` if screen capture succeeds.
     /// - [`Error::ProtocolNotFound`] if wlr-screencopy protocol is not found.
+    #[cfg(not(feature = "dmabuf"))]
+    pub fn get_available_frame_formats(&self, target: &WayshotTarget) -> Result<Vec<FrameFormat>> {
+        let state = match target {
+            WayshotTarget::Screen(output) => {
+                let (state, _) = self.capture_output_frame_get_state(output, 0, None)?;
+                state
+            }
+            WayshotTarget::Toplevel(toplevel) => {
+                let (state, _) = self.capture_toplevel_frame_get_state(toplevel, false)?;
+                state
+            }
+        };
+
+        Ok(state.formats)
+    }
+
+    /// Query which `wl_shm::Format` the compositor supports for this output by performing a trial screenshot through wlr-screencopy protocol.
+    /// # Parameters
+    /// - `output`: Reference to the [WayshotTarget] to inspect.
+    /// # Returns
+    /// - A vector of `FrameFormat` if screen capture succeeds.
+    /// - [`Error::ProtocolNotFound`] if wlr-screencopy protocol is not found.
+    #[cfg(feature = "dmabuf")]
     pub fn get_available_frame_formats(
         &self,
         target: &WayshotTarget,

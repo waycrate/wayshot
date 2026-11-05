@@ -48,6 +48,11 @@ fn create_screencast_with_shm_captures_a_frame() {
 
     // Query formats ourselves first so we know how big to size the shm file;
     // create_screencast_with_shm needs the fd already sized correctly.
+    #[cfg(not(feature = "dmabuf"))]
+    let formats = conn
+        .get_available_frame_formats(&target)
+        .expect("compositor should report at least one supported shm format");
+    #[cfg(feature = "dmabuf")]
     let (formats, _) = conn
         .get_available_frame_formats(&target)
         .expect("compositor should report at least one supported shm format");
@@ -80,6 +85,11 @@ fn screencast_can_capture_more_than_one_frame_on_the_same_session() {
     let output = conn.get_all_outputs()[0].clone();
     let target = WayshotTarget::Screen(output.wl_output.clone());
 
+    #[cfg(not(feature = "dmabuf"))]
+    let formats = conn
+        .get_available_frame_formats(&target)
+        .expect("compositor should report at least one supported shm format");
+    #[cfg(feature = "dmabuf")]
     let (formats, _) = conn
         .get_available_frame_formats(&target)
         .expect("compositor should report at least one supported shm format");

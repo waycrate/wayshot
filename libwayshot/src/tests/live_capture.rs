@@ -16,6 +16,12 @@ fn get_available_frame_formats_returns_at_least_one_format() {
     let conn = WayshotConnection::new().expect("should connect to the CI compositor");
     let output = conn.get_all_outputs()[0].clone();
     let target = WayshotTarget::Screen(output.wl_output);
+
+    #[cfg(not(feature = "dmabuf"))]
+    let formats = conn
+        .get_available_frame_formats(&target)
+        .expect("compositor should report at least one supported shm format");
+    #[cfg(feature = "dmabuf")]
     let (formats, _) = conn
         .get_available_frame_formats(&target)
         .expect("compositor should report at least one supported shm format");
