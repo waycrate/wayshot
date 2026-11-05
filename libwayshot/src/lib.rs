@@ -24,9 +24,9 @@ use std::{
     cell::RefCell, collections::HashSet, fs::File, os::fd::AsFd, sync::atomic::Ordering, thread,
 };
 
-#[cfg(feature = "dmabuf")]
-pub use dispatch::{DMABUFState, Card};
 use dispatch::LayerShellState;
+#[cfg(feature = "dmabuf")]
+pub use dispatch::{Card, DMABUFState};
 use image::DynamicImage;
 use memmap2::MmapMut;
 #[cfg(feature = "dmabuf")]
