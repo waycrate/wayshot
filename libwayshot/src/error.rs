@@ -60,6 +60,8 @@ pub enum Error {
     CaptureFailed(String),
     #[error("Unsupported for some reason: {0}")]
     Unsupported(String),
+    #[error("Image index ({0}, {1}) out of bound")]
+    ImageIndexOutOfBounds(u32, u32),
     #[cfg(feature = "dmabuf")]
     #[error("Fd does not exist")]
     InvalidFd(#[from] InvalidFdError),
