@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-11-04
+
+### libwayshot 0.10.0
+
+#### Added
+
+- `SingleOutputInfo` for capturing a single `wl_output` with only the output handle and its transform by [@Decodetalkers](https://github.com/Decodetalkers) in [#448](https://github.com/waycrate/wayshot/pull/448)
+- more unit tests, plus live capture, connection and screencast tests against a real (headless sway) compositor by [@Gigas002](https://github.com/Gigas002) in [#426](https://github.com/waycrate/wayshot/pull/426) and [#427](https://github.com/waycrate/wayshot/pull/427)
+
+#### Fixed
+
+- prefer the transform reported by ext-image-copy, and fall back to the `wl_output` transform only for wlr-screencopy by [@Decodetalkers](https://github.com/Decodetalkers) in [#425](https://github.com/waycrate/wayshot/pull/425)
+- wrong size and overlay transform for rotated outputs on Hyprland by [@Gigas002](https://github.com/Gigas002) in [#457](https://github.com/waycrate/wayshot/pull/457)
+- use packed stride for BGR888 capture by [@otakutyrant](https://github.com/otakutyrant) in [#446](https://github.com/waycrate/wayshot/pull/446)
+- clippy warnings with Rust 1.98 by [@Gigas002](https://github.com/Gigas002) in [#438](https://github.com/waycrate/wayshot/pull/438)
+
+### wayshot
+
+#### Added
+
+- **`-G` / `--geometry-string`** to capture a fixed region from a geometry string (e.g. `wayshot -G "$(slurp)"`) by [@Gigas002](https://github.com/Gigas002) in [#460](https://github.com/waycrate/wayshot/pull/460)
+- unit tests and CLI integration tests, run in CI against a real (headless sway) compositor by [@Gigas002](https://github.com/Gigas002) in [#426](https://github.com/waycrate/wayshot/pull/426) and [#427](https://github.com/waycrate/wayshot/pull/427)
+
+#### Changed
+
+- use libc's `fork` instead of rustix for clipboard and notifications by [@Gigas002](https://github.com/Gigas002) in [#450](https://github.com/waycrate/wayshot/pull/450)
+- Nix package: build man pages with `scdoc`, and only pull in `pango` when the selector or color picker is enabled by [@id3v1669](https://github.com/id3v1669) in [#430](https://github.com/waycrate/wayshot/pull/430)
+- bump dependencies, including `libwaysip` 0.7, `dirs` 7, `clap`, `clap_complete`, `clap_complete_nushell`, `wl-clipboard-rs`, `notify-rust`, `toml`, `serde_json`, `thiserror`, `eyre`, `flate2`, `memmap2`, and `rust-lang/crates-io-auth-action` in CI
+
+#### Fixed
+
+- forked clipboard child no longer keeps the parent's stdio open, and exits once the clipboard copy is done by [@Gigas002](https://github.com/Gigas002) in [#427](https://github.com/waycrate/wayshot/pull/427)
+- man pages were not installed by the Nix package by [@id3v1669](https://github.com/id3v1669) in [#430](https://github.com/waycrate/wayshot/pull/430)
+- removed broken CLI integration tests by [@Gigas002](https://github.com/Gigas002) in [#455](https://github.com/waycrate/wayshot/pull/455)
+
+#### Breaking Changes
+
+- **`-g` / `--geometry`** no longer takes a value and only starts interactive region selection; geometry strings moved to **`-G` / `--geometry-string`** by [@Gigas002](https://github.com/Gigas002) in [#460](https://github.com/waycrate/wayshot/pull/460)
+    - **Migration:** replace `wayshot -g "$(slurp)"` with `wayshot -G "$(slurp)"`.
+
+### waymirror-egl
+
+#### Added
+
+- unit and CLI integration tests by [@Gigas002](https://github.com/Gigas002) in [#427](https://github.com/waycrate/wayshot/pull/427)
+
+[1.7.0]: https://github.com/waycrate/wayshot/compare/v1.6.0...v1.7.0
+
 ## [1.6.0] - 2026-08-04
 
 ### libwayshot 0.9.0
@@ -306,4 +354,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [1.4.0]: https://github.com/waycrate/wayshot/compare/1.3.1...v1.4.0
 [1.5.0]: https://github.com/waycrate/wayshot/compare/v1.4.6...v1.5.0
-[Unreleased]: https://github.com/waycrate/wayshot/compare/v1.5.0...HEAD
+[1.6.0]: https://github.com/waycrate/wayshot/compare/v1.5.0...v1.6.0
+[Unreleased]: https://github.com/waycrate/wayshot/compare/v1.7.0...HEAD
