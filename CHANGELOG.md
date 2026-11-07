@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.7.0] - 2026-11-04
+## [0.10.0-libwayshot] - 2026-11-07
 
 ### libwayshot 0.10.0
 
@@ -13,15 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `SingleOutputInfo` for capturing a single `wl_output` with only the output handle and its transform by [@Decodetalkers](https://github.com/Decodetalkers) in [#448](https://github.com/waycrate/wayshot/pull/448)
 - more unit tests, plus live capture, connection and screencast tests against a real (headless sway) compositor by [@Gigas002](https://github.com/Gigas002) in [#426](https://github.com/waycrate/wayshot/pull/426) and [#427](https://github.com/waycrate/wayshot/pull/427)
+- Transform of the screencast is exported now, by [@Decodetalkers](https://github.com/Decodetalkers) in [#462](https://github.com/waycrate/wayshot/pull/462), which can be of help during screen capture
 
 #### Fixed
 
+- Instead of using put_pixel api of image, which will panic if the position out of bounds, we use get_pixel_mut_checked when generating the final image. This will return an Error instead of panicking the whole tas, by [@Decodetalkers](https://github.com/Decodetalkers) in [#459](https://github.com/waycrate/wayshot/pull/459)
 - prefer the transform reported by ext-image-copy, and fall back to the `wl_output` transform only for wlr-screencopy by [@Decodetalkers](https://github.com/Decodetalkers) in [#425](https://github.com/waycrate/wayshot/pull/425)
 - wrong size and overlay transform for rotated outputs on Hyprland by [@Gigas002](https://github.com/Gigas002) in [#457](https://github.com/waycrate/wayshot/pull/457)
 - use packed stride for BGR888 capture by [@otakutyrant](https://github.com/otakutyrant) in [#446](https://github.com/waycrate/wayshot/pull/446)
 - clippy warnings with Rust 1.98 by [@Gigas002](https://github.com/Gigas002) in [#438](https://github.com/waycrate/wayshot/pull/438)
 
-### wayshot
+[0.10.0-libwayshot]: https://github.com/waycrate/wayshot/compare/v1.6.0...v0.10.0-libwayshot
+
+## [1.7.0-wayshot] - 2026-11-07
+### wayshot 1.7.0
 
 #### Added
 
@@ -51,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - unit and CLI integration tests by [@Gigas002](https://github.com/Gigas002) in [#427](https://github.com/waycrate/wayshot/pull/427)
 
-[1.7.0]: https://github.com/waycrate/wayshot/compare/v1.6.0...v1.7.0
+[1.7.0-wayshot]: https://github.com/waycrate/wayshot/compare/v1.6.0...v1.7.0-wayshot
 
 ## [1.6.0] - 2026-08-04
 

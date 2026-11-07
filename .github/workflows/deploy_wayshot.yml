@@ -3,7 +3,7 @@ name: Deploy
 on:
     push:
         tags:
-            - "v*"
+            - "v*-wayshot"
 
 permissions:
     contents: read
@@ -63,7 +63,6 @@ jobs:
 
             - name: Publish to crates.io
               run: |
-                  cargo publish -p libwayshot
                   cargo publish -p wayshot
               env:
                   CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
