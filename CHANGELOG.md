@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.7.0] - 2026-11-04
+## [0.10.0-libwayshot] - 2026-11-07
 
 ### libwayshot 0.10.0
 
@@ -21,7 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - use packed stride for BGR888 capture by [@otakutyrant](https://github.com/otakutyrant) in [#446](https://github.com/waycrate/wayshot/pull/446)
 - clippy warnings with Rust 1.98 by [@Gigas002](https://github.com/Gigas002) in [#438](https://github.com/waycrate/wayshot/pull/438)
 
-### wayshot
+[0.10.0-libwayshot]: https://github.com/waycrate/wayshot/compare/v1.6.0...v0.10.0-libwayshot
+
+## [1.7.0-wayshot] - 2026-11-07
+### wayshot 1.7.0
 
 #### Added
 
@@ -51,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - unit and CLI integration tests by [@Gigas002](https://github.com/Gigas002) in [#427](https://github.com/waycrate/wayshot/pull/427)
 
-[1.7.0]: https://github.com/waycrate/wayshot/compare/v1.6.0...v1.7.0
+[1.7.0-wayshot]: https://github.com/waycrate/wayshot/compare/v1.6.0...v1.7.0-wayshot
 
 ## [1.6.0] - 2026-08-04
 
