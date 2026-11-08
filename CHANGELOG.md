@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Fixed
 
+- Use libwaysip 1.6.1 to fix [#337](https://github.com/waycrate/wayshot/issues/337)
 - forked clipboard child no longer keeps the parent's stdio open, and exits once the clipboard copy is done by [@Gigas002](https://github.com/Gigas002) in [#427](https://github.com/waycrate/wayshot/pull/427)
 - man pages were not installed by the Nix package by [@id3v1669](https://github.com/id3v1669) in [#430](https://github.com/waycrate/wayshot/pull/430)
 - removed broken CLI integration tests by [@Gigas002](https://github.com/Gigas002) in [#455](https://github.com/waycrate/wayshot/pull/455)
