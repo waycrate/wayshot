@@ -25,8 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.10.0-libwayshot]: https://github.com/waycrate/wayshot/compare/v1.6.0...v0.10.0-libwayshot
 
-## [1.7.0-wayshot] - 2026-11-07
-### wayshot 1.7.0
+## [1.7.1-wayshot] - 2026-11-08
+### wayshot 1.7.1
 
 #### Added
 
