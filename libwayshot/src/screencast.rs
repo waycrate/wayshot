@@ -339,8 +339,9 @@ impl WayshotConnection {
         target: WayshotTarget,
         cursor_overlay: bool,
         egl_display: crate::egl::EglDisplay,
+        modifiers: impl Into<Option<Vec<gbm::Modifier>>>,
     ) -> Result<WayshotScreenCast> {
-        let mut cast = self.create_screencast_with_dmabuf(target, cursor_overlay)?;
+        let mut cast = self.create_screencast_with_dmabuf(target, cursor_overlay, modifiers)?;
         cast.egl_display = Some(egl_display);
         Ok(cast)
     }
@@ -351,6 +352,7 @@ impl WayshotConnection {
         &self,
         target: WayshotTarget,
         cursor_overlay: bool,
+        modifiers: impl Into<Option<Vec<gbm::Modifier>>>,
     ) -> Result<WayshotScreenCast> {
         let Some(dmabuf_state) = &self.dmabuf_state else {
             return Err(Error::NoDMAStateError);
@@ -362,17 +364,30 @@ impl WayshotConnection {
         let (event_queue, image_copy_manager, foreign_manager, output_manager, wlr_screencopy) =
             self.screencast_init()?;
 
+        // FIXME: should let it can be chosen from outside
         let frame_format = state.dmabuf_formats[0];
         tracing::trace!("Selected frame buffer format: {:#?}", frame_format);
         let gbm = &dmabuf_state.gbmdev;
-        let bo = gbm.create_buffer_object::<()>(
-            frame_format.size.width,
-            frame_format.size.height,
-            gbm::Format::try_from(frame_format.format)?,
-            BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR,
-        )?;
+        let bo = if let Some(modifiers) = modifiers.into()
+            && !modifiers.is_empty() & modifiers.iter().all(|x| *x != gbm::Modifier::Invalid)
+        {
+            gbm.create_buffer_object_with_modifiers2::<()>(
+                frame_format.size.width,
+                frame_format.size.height,
+                gbm::Format::try_from(frame_format.format)?,
+                modifiers.into_iter(),
+                BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR,
+            )?
+        } else {
+            gbm.create_buffer_object::<()>(
+                frame_format.size.width,
+                frame_format.size.height,
+                gbm::Format::try_from(frame_format.format)?,
+                BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR,
+            )?
+        };
 
-        let stride = bo.stride();
+        let stride = bo.stride_for_plane(0);
         let modifier: u64 = bo.modifier().into();
         tracing::debug!(
             "Created GBM Buffer object with input frame format {:#?}, stride {:#?} and modifier {:#?} ",
